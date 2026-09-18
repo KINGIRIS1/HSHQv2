@@ -45,45 +45,43 @@ const getDB = (): Promise<IDBDatabase | null> => {
 };
 
 export const setIndexedDBItem = async (key: string, value: any): Promise<void> => {
-    try {
-        const db = await getDB();
-        if (!db) return;
-
-        return new Promise((resolve) => {
-            try {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.put(value, key);
-                req.onsuccess = () => resolve();
-                req.onerror = () => resolve();
-            } catch (e) {
-                resolve();
-            }
-        });
-    } catch {
-        // Bỏ qua lỗi IndexedDB nếu có
+    const db = await getDB();
+    if (!db) {
+        throw new Error("INDEXEDDB_UNAVAILABLE: IndexedDB is not supported or failed to open");
     }
+
+    return new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.put(value, key);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error || new Error('IndexedDB put request failed'));
+            tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+        } catch (e) {
+            reject(e);
+        }
+    });
 };
 
 export const getIndexedDBItem = async <T>(key: string): Promise<T | null> => {
-    try {
-        const db = await getDB();
-        if (!db) return null;
-
-        return new Promise((resolve) => {
-            try {
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.get(key);
-                req.onsuccess = () => {
-                    resolve(req.result !== undefined ? req.result : null);
-                };
-                req.onerror = () => resolve(null);
-            } catch (e) {
-                resolve(null);
-            }
-        });
-    } catch {
-        return null;
+    const db = await getDB();
+    if (!db) {
+        throw new Error("INDEXEDDB_UNAVAILABLE: IndexedDB is not supported or failed to open");
     }
+
+    return new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.get(key);
+            req.onsuccess = () => {
+                resolve(req.result !== undefined ? req.result : null);
+            };
+            req.onerror = () => reject(req.error || new Error('IndexedDB get request failed'));
+            tx.onerror = () => reject(tx.error || new Error('IndexedDB readonly transaction failed'));
+        } catch (e) {
+            reject(e);
+        }
+    });
 };

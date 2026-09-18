@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
-import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType } from '../constants';
+import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType, isCertificateRecordType } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
@@ -71,6 +71,10 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
   // Sử dụng trực tiếp trạng thái thực tế của hồ sơ, nếu hồ sơ đo đạc mang trạng thái cũ IN_PROGRESS thì hiển thị đúng bước thực tế
   const displayStatus = React.useMemo(() => {
+    const isCapGiay = isCertificateRecordType(record.recordType || '') || record.sourceTable === 'dangky_records' || record.group === '3. Đăng ký đất đai, cấp GCN';
+    if (isCapGiay) {
+      return record.status || RecordStatus.RECEIVED;
+    }
     const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
     if (isArchive) {
       if (record.status) return record.status;

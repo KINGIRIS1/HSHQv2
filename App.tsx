@@ -15,7 +15,7 @@ import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExp
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
 import { updateRecordApi, updateRecordFieldsApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent, markRecordsRecentlyUpdated } from './services/api';
-import { migrateArchiveRecordsFromLandRecords, createArchiveBatch, getOrGenerateDailyHighestBatch } from './services/apiArchive';
+import { createArchiveBatch, getOrGenerateDailyHighestBatch } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -245,13 +245,6 @@ function App() {
 
   // Sync Templates
   useEffect(() => { syncTemplatesFromCloud(); }, []);
-
-  // Run migration for archive records from land_records to archive_records
-  useEffect(() => {
-      if (currentUser) {
-          migrateArchiveRecordsFromLandRecords();
-      }
-  }, [currentUser]);
 
   // Save visible columns
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
@@ -729,19 +722,21 @@ function App() {
           ...processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser)
       }));
 
-      // Cập nhật giao diện tức thì 0 giây với O(1) Map
-      const updateMap = new Map<string, RecordFile>();
-      updatedTargets.forEach(u => updateMap.set(u.id, u));
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) throw new Error(res.error || "Không thể lưu dữ liệu phân công");
 
-      setIsAssignModalOpen(false); 
-      setSelectedRecordIds(new Set()); 
-      setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
+          const updateMap = new Map<string, RecordFile>();
+          updatedTargets.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
-      // Đẩy ngầm lên Supabase, không block UI
-      updateRecordsBatchById(updatedTargets).catch(err => {
-          console.error("Batch assign background error:", err);
-      });
+          setIsAssignModalOpen(false); 
+          setSelectedRecordIds(new Set()); 
+          setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
+      } catch (err: any) {
+          console.error("Batch assign error:", err);
+          setToast({ type: 'error', message: `Phân công thất bại: ${err?.message || 'Lỗi lưu dữ liệu'}` });
+      }
   };
 
   const getUpdatesForStatusChange = (newStatus: RecordStatus, customDateStr?: string, existingRecord?: Partial<RecordFile>, options?: any) => {
@@ -1105,7 +1100,10 @@ function App() {
 
   const handleBatchUpdateRecords = useCallback(async (updates: Partial<RecordFile>[]) => {
       try {
-          // Cập nhật giao diện tức thì
+          const res = await updateRecordsBatchById(updates);
+          if (!res.success) throw new Error(res.error || "Không thể lưu cập nhật vào CSDL");
+
+          // Cập nhật giao diện sau khi lưu/enqueue thành công
           const updateMap = new Map<string, Partial<RecordFile>>();
           updates.forEach(u => {
               if (u.id) updateMap.set(u.id, u);
@@ -1115,14 +1113,9 @@ function App() {
               return u ? { ...r, ...u } : r;
           }));
           setToast({ type: 'success', message: `Đã cập nhật sửa lỗi cho ${updates.length} hồ sơ thành công!` });
-
-          // Đẩy ngầm lên Supabase
-          updateRecordsBatchById(updates).catch(err => {
-              console.error("Lỗi khi sửa lỗi hàng loạt:", err);
-          });
-      } catch (err) {
+      } catch (err: any) {
           console.error("Lỗi khi sửa lỗi hàng loạt:", err);
-          setToast({ type: 'error', message: 'Có lỗi xảy ra khi sửa lỗi hàng loạt.' });
+          setToast({ type: 'error', message: `Có lỗi xảy ra khi sửa lỗi hàng loạt: ${err?.message || ''}` });
       }
   }, []);
 
@@ -1550,13 +1543,19 @@ function App() {
 
   const handleExecuteSignBatch = async () => {
       const nowStr = new Date().toISOString();
-      const updatedTargets = bulkSignPendingRecords.map(r => ({
-          ...r,
-          status: RecordStatus.SIGNED,
-          approvalDate: nowStr,
-          completedDate: null,
-          statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
-      }));
+      const updatedTargets = bulkSignPendingRecords.map(r => {
+          const isCapGiay = isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+          const nextStatus = isCapGiay ? RecordStatus.PENDING_HANDOVER : RecordStatus.SIGNED;
+          const statusNote = isCapGiay ? 'Ký duyệt đợt - Chờ bàn giao' : 'Ký duyệt đợt';
+          return {
+              ...r,
+              status: nextStatus,
+              approvalDate: nowStr,
+              pendingHandoverDate: isCapGiay ? nowStr : r.pendingHandoverDate,
+              completedDate: null,
+              statusLogs: createStatusLog(r, nextStatus, statusNote)
+          };
+      });
 
       try {
           const res = await updateRecordsBatchById(updatedTargets);
@@ -1907,7 +1906,7 @@ function App() {
             exportModalType={exportModalType}
             
             previewWorkbook={previewWorkbook} previewExcelName={previewExcelName}
-
+ 
             handleAddOrUpdate={handleAddOrUpdateRecord}
             handleImportRecords={onImportRecords}
             handleSaveEmployee={handleSaveEmployee}
@@ -1915,9 +1914,14 @@ function App() {
             handleDeleteAllData={handleDeleteAllData}
             onRefreshData={loadData}
             confirmAssign={confirmAssign}
-            handleDeleteRecord={() => { 
+            handleDeleteRecord={async () => { 
                 if (deletingRecord) { 
-                    handleDeleteRecord(deletingRecord.id); 
+                    try {
+                        await handleDeleteRecord(deletingRecord.id); 
+                        setToast({ type: 'success', message: 'Xóa hồ sơ thành công.' });
+                    } catch (err: any) {
+                        setToast({ type: 'error', message: err?.message || 'Lỗi khi xóa hồ sơ.' });
+                    }
                     setDeletingRecord(null);
                     setIsDeleteModalOpen(false);
                     if (viewingRecord && viewingRecord.id === deletingRecord.id) {
@@ -2153,7 +2157,7 @@ function App() {
             exportModalType={exportModalType}
             
             previewWorkbook={previewWorkbook} previewExcelName={previewExcelName}
-
+ 
             handleAddOrUpdate={handleAddOrUpdateRecord}
             handleImportRecords={onImportRecords}
             handleSaveEmployee={handleSaveEmployee}
@@ -2161,9 +2165,14 @@ function App() {
             handleDeleteAllData={handleDeleteAllData}
             onRefreshData={loadData}
             confirmAssign={confirmAssign}
-            handleDeleteRecord={() => { 
+            handleDeleteRecord={async () => { 
                 if (deletingRecord) { 
-                    handleDeleteRecord(deletingRecord.id); 
+                    try {
+                        await handleDeleteRecord(deletingRecord.id); 
+                        setToast({ type: 'success', message: 'Xóa hồ sơ thành công.' });
+                    } catch (err: any) {
+                        setToast({ type: 'error', message: err?.message || 'Lỗi khi xóa hồ sơ.' });
+                    }
                     setDeletingRecord(null);
                     setIsDeleteModalOpen(false);
                     if (viewingRecord && viewingRecord.id === deletingRecord.id) {
@@ -2240,20 +2249,22 @@ function App() {
                     ...(components ? { dossierComponents: components } : {})
                 }));
 
-                // Cập nhật giao diện tức thì 0 giây với O(1) Map
-                const updateMap = new Map<string, RecordFile>();
-                updates.forEach(u => updateMap.set(u.id, u));
-                setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+                try {
+                    const res = await updateRecordsBatchById(updates);
+                    if (!res.success) throw new Error(res.error || "Không thể lưu trình ký vào CSDL");
 
-                setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
-                setIsSubmitModalOpen(false);
-                setSubmitTargetRecords([]);
-                setSelectedRecordIds(new Set());
+                    const updateMap = new Map<string, RecordFile>();
+                    updates.forEach(u => updateMap.set(u.id, u));
+                    setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
-                // Đẩy ngầm lên Supabase, không block UI và không cần re-fetch toàn bộ loadData()
-                updateRecordsBatchById(updates).catch(error => {
+                    setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
+                    setIsSubmitModalOpen(false);
+                    setSubmitTargetRecords([]);
+                    setSelectedRecordIds(new Set());
+                } catch (error: any) {
                     console.error("Lỗi khi trình ký:", error);
-                });
+                    setToast({ type: 'error', message: `Trình ký thất bại: ${error?.message || 'Lỗi lưu dữ liệu'}` });
+                }
             }}
         />
 
@@ -2283,20 +2294,22 @@ function App() {
                     ...(components ? { dossierComponents: components } : {})
                 }));
 
-                // Cập nhật giao diện tức thì 0 giây với O(1) Map
-                const updateMap = new Map<string, RecordFile>();
-                updates.forEach(u => updateMap.set(u.id, u));
-                setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+                try {
+                    const res = await updateRecordsBatchById(updates);
+                    if (!res.success) throw new Error(res.error || "Không thể lưu trình kiểm tra vào CSDL");
 
-                setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });
-                setIsSubmitCheckModalOpen(false);
-                setSubmitTargetRecords([]);
-                setSelectedRecordIds(new Set());
+                    const updateMap = new Map<string, RecordFile>();
+                    updates.forEach(u => updateMap.set(u.id, u));
+                    setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
-                // Đẩy ngầm lên Supabase, không block UI và không cần re-fetch toàn bộ loadData()
-                updateRecordsBatchById(updates).catch(error => {
+                    setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });
+                    setIsSubmitCheckModalOpen(false);
+                    setSubmitTargetRecords([]);
+                    setSelectedRecordIds(new Set());
+                } catch (error: any) {
                     console.error("Lỗi khi trình kiểm tra:", error);
-                });
+                    setToast({ type: 'error', message: `Trình kiểm tra thất bại: ${error?.message || 'Lỗi lưu dữ liệu'}` });
+                }
             }}
         />
 

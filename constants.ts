@@ -492,10 +492,13 @@ export const isCertificateRecordType = (recordOrType: Partial<RecordFile> | stri
 
   if (typeof recordOrType === 'object' && recordOrType !== null) {
     if (recordOrType.sourceTable === 'luutru_records' || recordOrType.sourceTable === 'archive_records') return false;
+    if (recordOrType.sourceTable === 'land_records') return false;
     const code = String(recordOrType.code || '').trim();
-    if (code.toUpperCase().startsWith('LT-') || code.startsWith('1.')) return false;
+    if (code.toUpperCase().startsWith('LT-') || code.startsWith('1.') || code.startsWith('2.')) return false;
     const dept = String((recordOrType as any).department || '').toLowerCase();
-    if (dept.includes('lưu trữ') || dept.includes('luu tru')) return false;
+    if (dept.includes('lưu trữ') || dept.includes('luu tru') || dept.includes('đo đạc') || dept.includes('do dac')) return false;
+    const groupStr = String(recordOrType.group || '').trim();
+    if (groupStr.startsWith('1.') || groupStr.startsWith('2.') || groupStr.includes('Đo đạc')) return false;
   }
 
   const str = typeof recordOrType === 'string' 
@@ -505,6 +508,7 @@ export const isCertificateRecordType = (recordOrType: Partial<RecordFile> | stri
   if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
 
   const short = getShortRecordType(str);
+  if (t.startsWith('2.') || short.startsWith('2.')) return false;
   if (t.startsWith('3.') || short.startsWith('3.')) return true;
   const lower = str.toLowerCase();
   return lower.includes('cấp gcn') || 

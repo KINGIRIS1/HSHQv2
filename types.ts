@@ -287,7 +287,9 @@ export interface RecordFile {
   supplementRequestedAt?: string | null;
   supplementRequestedBy?: string | null;
   supplementReason?: string | null;
+  supplementStartedAt?: string | null;
   supplementCompletedAt?: string | null;
+  supplementCompletedBy?: string | null;
   supplementConfirmedBy?: string | null;
   supplementRequestDate?: string | null;
   supplementReturnedDate?: string | null;
@@ -302,6 +304,8 @@ export interface RecordFile {
   taxPaymentDate?: string | null;
   printCertDate?: string | null;
   pendingHandoverDate?: string | null;
+  updated_at?: string | null;
+  updatedAt?: string | null;
 }
 
 export type AttachmentDocType = 'GCN' | 'DON' | 'VBUQ' | 'BANVE' | 'BIENBAN' | 'TAICHINH' | 'PHIEU_KT' | 'TO_TRINH' | 'TLKHAC';

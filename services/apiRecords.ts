@@ -1,10 +1,22 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate, isBlankRecord } from './apiCore';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate, isBlankRecord, isTransientError } from './apiCore';
 import { getIndexedDBItem } from './storageService';
 import { addPendingRecord, removePendingRecord, getPendingRecords, getPendingSyncItems, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
 import { deriveActualSurveyStatus } from '../utils/appHelpers';
+
+/**
+ * Kiểm tra trạng thái trực tuyến của ứng dụng:
+ * Phải thỏa mãn cả 2 điều kiện:
+ * 1. Supabase đã được cấu hình (isConfigured === true)
+ * 2. Môi trường mạng trực tuyến (navigator.onLine !== false)
+ */
+export const isOnline = (): boolean => {
+    if (!isConfigured) return false;
+    if (typeof navigator !== 'undefined' && (navigator as any).onLine === false) return false;
+    return true;
+};
 
 // 24 cột cơ sở dữ liệu cốt lõi
 export const RECORD_DB_COLUMNS = [
@@ -25,7 +37,7 @@ export const RECORD_DB_COLUMNS = [
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
     'attachedFiles', 'dossierComponents',
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
-    'previousStatus', 'supplementReason', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
+    'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
 ];
 
 /**
@@ -56,71 +68,94 @@ export const markRecordsRecentlyUpdated = (records: (RecordFile | Partial<Record
 };
 
 /**
- * Định tuyến bảng dữ liệu chuẩn xác theo tiền tố mã thủ tục:
- * - Nhóm 1.x (Sao lục, Công văn, Cung cấp dữ liệu đất đai) -> luutru_records
- * - Nhóm 2.x (Trích lục, Trích đo, Duyệt đơn, Cắm mốc, Tách-Hợp thửa) -> land_records
- * - Nhóm 3.x (Đăng ký đất đai, Cấp giấy, Đăng ký biến động) -> dangky_records
+ * Kiểm tra mã/nhóm/loại có tiền tố rõ ràng (1.x, 2.x, 3.x, LT-):
+ * - Nhóm 1.x / LT- -> luutru_records
+ * - Nhóm 2.x -> land_records
+ * - Nhóm 3.x -> dangky_records
  */
-export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
-    // 0. Ưu tiên tuyệt đối nếu sourceTable đã được chỉ định (như Module Cấp giấy hoặc Module Lưu trữ)
-    if (record.sourceTable === 'dangky_records') return 'dangky_records';
-    if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
-    if (record.sourceTable === 'land_records') return 'land_records';
-
+export const getExplicitGroup = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' | null => {
     const rawType = String(record.recordType || record.content || '').trim();
     const code = String(record.code || '').trim();
-    const shortType = getShortRecordType(rawType);
     const groupStr = String(record.group || '').trim();
 
-    // 1. Phân loại theo tiền tố mã thủ tục hoặc tên thủ tục chuyên môn (ƯU TIÊN HÀNG ĐẦU TẠI CÁC MODULE)
-    // Nhóm 1.x / Mã LT- -> Tổ Lưu trữ (luutru_records)
+    // Đối với mã một cửa chuẩn (như H19...), hệ thống không ép định tuyến cứng dựa trên recordType/group
+    // trừ khi chính CODE có tiền tố chỉ định rõ ràng (1.x, 2.x, 3.x, LT-)
+    const isOneStopCode = code.toUpperCase().startsWith('H') || /^H\d+/i.test(code);
+
     if (
-        shortType.startsWith('1.') ||
-        rawType.startsWith('1.') ||
         code.startsWith('1.') ||
         code.toUpperCase().startsWith('LT-') ||
-        groupStr.startsWith('1.') ||
+        (!isOneStopCode && (rawType.startsWith('1.') || groupStr.startsWith('1.')))
+    ) {
+        return 'luutru_records';
+    }
+
+    if (
+        code.startsWith('2.') ||
+        (!isOneStopCode && (rawType.startsWith('2.') || groupStr.startsWith('2.')))
+    ) {
+        return 'land_records';
+    }
+
+    if (
+        code.startsWith('3.') ||
+        (!isOneStopCode && (rawType.startsWith('3.') || groupStr.startsWith('3.')))
+    ) {
+        return 'dangky_records';
+    }
+
+    return null;
+};
+
+/**
+ * Định tuyến bảng dữ liệu suy đoán:
+ * - Ưu tiên kiểm tra tiền tố 1.x, 2.x, 3.x, LT-
+ * - Sau đó kiểm tra nhóm, phòng ban, từ khóa
+ */
+export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' | null => {
+    const explicit = getExplicitGroup(record);
+    if (explicit) return explicit;
+
+    const rawType = String(record.recordType || record.content || '').trim();
+    const groupStr = String(record.group || '').trim();
+
+    // 1. Nhóm Lưu trữ
+    if (
         isArchiveRecordType(record.recordType) ||
         isArchiveRecordType(record.content)
     ) {
         return 'luutru_records';
     }
 
-    // Nhóm 3.x -> Tổ Cấp giấy / Đăng ký (dangky_records)
+    // 2. Nhóm Đo đạc (2.x)
+    if (groupStr.includes('Đo đạc')) {
+        return 'land_records';
+    }
+
+    // 3. Nhóm Đăng ký / Cấp giấy (3.x)
     if (
-        shortType.startsWith('3.') ||
-        rawType.startsWith('3.') ||
-        code.startsWith('3.') ||
-        groupStr.startsWith('3.') ||
         groupStr.includes('Đăng ký') ||
         groupStr.includes('Cấp GCN') ||
-        groupStr.includes('Cấp giấy') ||
-        isCertificateRecordType(record)
+        groupStr.includes('Cấp giấy')
     ) {
         return 'dangky_records';
     }
 
-    // Nhóm 2.x -> Tổ Đo đạc (land_records)
-    if (
-        shortType.startsWith('2.') ||
-        rawType.startsWith('2.') ||
-        code.startsWith('2.') ||
-        groupStr.startsWith('2.') ||
-        groupStr.includes('Đo đạc')
-    ) {
-        return 'land_records';
-    }
-
-    // 2. Phân loại theo phòng ban/bộ phận nếu không phân định được theo mã thủ tục
+    // 4. Phân loại theo phòng ban/bộ phận
     const deptStr = String((record as any).department || '').trim().toLowerCase();
     if (deptStr.includes('lưu trữ') || deptStr.includes('luu tru')) {
         return 'luutru_records';
     }
+    if (deptStr.includes('đo đạc') || deptStr.includes('do dac')) {
+        return 'land_records';
+    }
     if (deptStr.includes('đăng ký') || deptStr.includes('cấp giấy') || deptStr.includes('dang ky') || deptStr.includes('cap giay')) {
         return 'dangky_records';
     }
-    if (deptStr.includes('đo đạc') || deptStr.includes('do dac')) {
-        return 'land_records';
+
+    // 5. Kiểm tra từ khóa loại hồ sơ cấp giấy
+    if (isCertificateRecordType(record)) {
+        return 'dangky_records';
     }
 
     // Tra cứu nhanh từ Cache nếu không có recordType
@@ -128,20 +163,75 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
         const found = cached.find(r => (record.id && r.id === record.id) || (record.code && r.code === record.code));
         if (found) {
-            if (found.sourceTable === 'dangky_records') return 'dangky_records';
-            if (found.sourceTable === 'luutru_records') return 'luutru_records';
-            if (found.sourceTable === 'land_records') return 'land_records';
-            if (found.recordType || found.content) {
-                return getTargetTable(found);
+            if (found.recordType || found.content || found.group) {
+                const inferredFromFound = getInferredTable({ ...found, id: undefined, code: undefined });
+                if (inferredFromFound) return inferredFromFound;
             }
         }
     }
 
-    return 'land_records';
+    return null;
+};
+
+export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
+    const normalizeSource = (s?: string) => {
+        if (s === 'archive_records') return 'luutru_records';
+        if (s === 'dangky_records' || s === 'land_records' || s === 'luutru_records') return s;
+        return null;
+    };
+
+    const validSource = normalizeSource(record.sourceTable);
+    const explicitGroup = getExplicitGroup(record);
+
+    // RULE 1: Nếu record có tiền tố chỉ định rõ ràng (1.x, 2.x, 3.x, LT-) thì KIỂM TRA XUNG ĐỘT VỚI SOURCETABLE
+    if (explicitGroup) {
+        if (validSource && validSource !== explicitGroup) {
+            console.error(`[ROUTING_GUARD][BLOCK] Record ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}: sourceTable (${validSource}) conflicts with inferred group table (${explicitGroup}).`);
+            throw new Error(`ROUTING_CONFLICT: Record code/group/type indicates '${explicitGroup}' but sourceTable is specified as '${validSource}'. Mutation blocked.`);
+        }
+        return explicitGroup;
+    }
+
+    // RULE 2: Nếu không có tiền tố 1.x, 2.x, 3.x, LT- nhưng có sourceTable hợp lệ -> Tin tưởng sourceTable!
+    if (validSource) {
+        return validSource;
+    }
+
+    // RULE 3: Nếu không có sourceTable -> Suy đoán theo getInferredTable
+    const inferredTable = getInferredTable(record);
+    if (inferredTable) return inferredTable;
+
+    // RULE 4: BẮT BUỘC BLOCK ROUTING_UNRESOLVED
+    console.error(`[ROUTING_GUARD][UNRESOLVED] Unable to resolve target table for record:`, record);
+    throw new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for record (ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}). Mutation blocked.`);
+};
+
+export interface RoutingValidationResult {
+    valid: boolean;
+    targetTable: 'dangky_records' | 'land_records' | 'luutru_records';
+    originalSourceTable?: string;
+    warning?: string;
+}
+
+/**
+ * Data Integrity Guard: Kiểm tra định tuyến bảng dữ liệu tuyệt đối (Single Source of Truth).
+ * Tự động phát hiện và chặn ghi nhầm bảng giữa:
+ * - 1.x -> luutru_records
+ * - 2.x -> land_records
+ * - 3.x -> dangky_records
+ */
+export const validateRecordRouting = (record: Partial<RecordFile>): RoutingValidationResult => {
+    const targetTable = getTargetTable(record);
+    return {
+        valid: true,
+        targetTable,
+        originalSourceTable: record.sourceTable
+    };
 };
 
 /**
  * Tự động xóa bản ghi trùng lặp ở các bảng sai (loại bỏ hoàn toàn lưu sai bảng / đa bảng)
+ * TUYỆT ĐỐI TUÂN THỦ: Chỉ xóa khi có bằng chứng rõ ràng (cùng ID/mã, đã xác nhận tồn tại ở keepTable, không phải 2 hồ sơ nghiệp vụ khác nhau)
  */
 export const purgeRecordFromOtherTables = async (
     id?: string,
@@ -149,25 +239,49 @@ export const purgeRecordFromOtherTables = async (
     keepTable?: 'dangky_records' | 'land_records' | 'luutru_records'
 ) => {
     if (!isConfigured || (!id && !code) || !keepTable) return;
-    const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
-    const otherTables = allTables.filter(t => t !== keepTable);
 
     const safeId = id && isValidUUID(id) ? id.trim() : null;
     const safeCode = code && code.trim().length > 3 && !code.includes('?') ? code.trim() : null;
 
     if (!safeId && !safeCode) return;
 
-    for (const tbl of otherTables) {
-        try {
-            if (safeId) {
-                await supabase.from(tbl).delete().eq('id', safeId);
-            }
-            if (safeCode) {
-                await supabase.from(tbl).delete().eq('code', safeCode);
-            }
-        } catch {
-            // Không ngắt luồng nếu bảng đó không có bản ghi
+    try {
+        // 1. Kiểm tra xác nhận bản ghi mục tiêu đã thực sự tồn tại trong keepTable
+        let query = supabase.from(keepTable).select('id, code, customerName');
+        if (safeId) query = query.eq('id', safeId);
+        else if (safeCode) query = query.eq('code', safeCode);
+
+        const { data: keepData, error: keepErr } = await query.limit(1);
+        if (keepErr || !keepData || keepData.length === 0) {
+            console.warn(`[PURGE_GUARD] Aborting purge: Record not confirmed in keepTable ${keepTable} (ID: ${safeId}, Code: ${safeCode}).`);
+            return;
         }
+
+        const keepRecord = keepData[0];
+        const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
+        const otherTables = allTables.filter(t => t !== keepTable);
+
+        for (const tbl of otherTables) {
+            let otherQuery = supabase.from(tbl).select('id, code, customerName');
+            if (safeId) otherQuery = otherQuery.eq('id', safeId);
+            else if (safeCode) otherQuery = otherQuery.eq('code', safeCode);
+
+            const { data: otherData } = await otherQuery.limit(1);
+            if (otherData && otherData.length > 0) {
+                const otherRecord = otherData[0];
+                const isExactSameId = safeId && otherRecord.id === safeId;
+                const isSameCustomer = (otherRecord.customerName && keepRecord.customerName && otherRecord.customerName.trim().toLowerCase() === keepRecord.customerName.trim().toLowerCase());
+                
+                if (isExactSameId || isSameCustomer) {
+                    console.log(`[PURGE_GUARD] Purging confirmed duplicate record from ${tbl} (ID: ${otherRecord.id}, Code: ${otherRecord.code})`);
+                    await supabase.from(tbl).delete().eq('id', otherRecord.id);
+                } else {
+                    console.warn(`[PURGE_GUARD] Preserving record in ${tbl} with code ${safeCode} because it appears to be a distinct business record from keepTable ${keepTable}.`);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn(`[PURGE_GUARD] Error during verified purge check:`, e);
     }
 };
 
@@ -179,30 +293,29 @@ export const purgeBatchFromOtherTables = async (
     codes: string[],
     keepTable: 'dangky_records' | 'land_records' | 'luutru_records'
 ) => {
-    if (!isConfigured || !keepTable) return;
+    if (!isConfigured || !keepTable || !ids || ids.length === 0) return;
     const validIds = ids.filter(id => id && isValidUUID(id));
-    const validCodes = codes.filter(code => code && code.trim().length > 3 && !code.includes('?'));
-    if (validIds.length === 0 && validCodes.length === 0) return;
+    if (validIds.length === 0) return;
 
-    const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
-    const otherTables = allTables.filter(t => t !== keepTable);
+    try {
+        const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
+        const otherTables = allTables.filter(t => t !== keepTable);
 
-    for (const tbl of otherTables) {
-        try {
-            const CHUNK = 200;
-            if (validIds.length > 0) {
-                for (let i = 0; i < validIds.length; i += CHUNK) {
-                    await supabase.from(tbl).delete().in('id', validIds.slice(i, i + CHUNK));
+        // Chỉ xóa khi ID chính xác trùng nhau và đã được xác nhận lưu vào keepTable
+        for (const tbl of otherTables) {
+            const CHUNK = 100;
+            for (let i = 0; i < validIds.length; i += CHUNK) {
+                const chunkIds = validIds.slice(i, i + CHUNK);
+                const { data } = await supabase.from(tbl).select('id').in('id', chunkIds);
+                if (data && data.length > 0) {
+                    const duplicateIds = data.map((d: any) => d.id);
+                    await supabase.from(tbl).delete().in('id', duplicateIds);
+                    console.log(`[PURGE_GUARD] Purged ${duplicateIds.length} confirmed duplicate IDs from ${tbl}.`);
                 }
             }
-            if (validCodes.length > 0) {
-                for (let i = 0; i < validCodes.length; i += CHUNK) {
-                    await supabase.from(tbl).delete().in('code', validCodes.slice(i, i + CHUNK));
-                }
-            }
-        } catch {
-            // bỏ qua lỗi
         }
+    } catch (e) {
+        console.warn(`[PURGE_GUARD] Error during batch verified purge:`, e);
     }
 };
 
@@ -371,47 +484,8 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
     );
     const allBlankIds = new Set([...blankInLandIds, ...blankInDangkyIds, ...blankInLuutruIds]);
 
-    if (misplacedInDangky.length > 0 || misplacedInLand.length > 0 || allBlankIds.size > 0) {
-        console.log(`[Auto-Fix] Phát hiện ${misplacedInDangky.length} sai ở dangky, ${misplacedInLand.length} sai ở land_records, ${allBlankIds.size} dòng trống. Đang tự động xử lý...`);
-        setTimeout(async () => {
-            try {
-                const landFixesFromDangky = misplacedInDangky.filter(r => getTargetTable(r) === 'land_records');
-                const luutruFixesFromDangky = misplacedInDangky.filter(r => getTargetTable(r) === 'luutru_records');
-
-                if (landFixesFromDangky.length > 0) {
-                    await supabase.from('land_records').upsert(landFixesFromDangky.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-                    await purgeBatchFromOtherTables(landFixesFromDangky.map(r => r.id), landFixesFromDangky.map(r => r.code), 'land_records');
-                }
-                if (luutruFixesFromDangky.length > 0) {
-                    await supabase.from('luutru_records').upsert(luutruFixesFromDangky.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-                    await purgeBatchFromOtherTables(luutruFixesFromDangky.map(r => r.id), luutruFixesFromDangky.map(r => r.code), 'luutru_records');
-                }
-
-                const luutruFixesFromLand = misplacedInLand.filter(r => getTargetTable(r) === 'luutru_records');
-                const dangkyFixesFromLand = misplacedInLand.filter(r => getTargetTable(r) === 'dangky_records');
-
-                if (luutruFixesFromLand.length > 0) {
-                    await supabase.from('luutru_records').upsert(luutruFixesFromLand.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-                    await purgeBatchFromOtherTables(luutruFixesFromLand.map(r => r.id), luutruFixesFromLand.map(r => r.code), 'luutru_records');
-                }
-                if (dangkyFixesFromLand.length > 0) {
-                    await supabase.from('dangky_records').upsert(dangkyFixesFromLand.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-                    await purgeBatchFromOtherTables(dangkyFixesFromLand.map(r => r.id), dangkyFixesFromLand.map(r => r.code), 'dangky_records');
-                }
-
-                if (blankInLandIds.size > 0) {
-                    await supabase.from('land_records').delete().in('id', Array.from(blankInLandIds));
-                }
-                if (blankInDangkyIds.size > 0) {
-                    await supabase.from('dangky_records').delete().in('id', Array.from(blankInDangkyIds));
-                }
-                if (blankInLuutruIds.size > 0) {
-                    await supabase.from('luutru_records').delete().in('id', Array.from(blankInLuutruIds));
-                }
-            } catch (err) {
-                console.error("[Auto-Fix Misplaced/Blank Records] Lỗi khi xử lý:", err);
-            }
-        }, 300);
+    if (misplacedInDangky.length > 0 || misplacedInLand.length > 0) {
+        console.warn(`⚠️ [Fetch Warning] Phát hiện ${misplacedInDangky.length} hồ sơ có thể sai bảng ở dangky_records, ${misplacedInLand.length} ở land_records. Giữ nguyên dữ liệu, không tự động di chuyển hoặc xóa.`);
     }
     
     const rawList = [...dangky, ...land, ...luutru];
@@ -432,34 +506,20 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
     });
 
     // 2. [QUAN TRỌNG NHẤT] Hợp nhất các hồ sơ đang chờ đồng bộ (Sync Queue)
-    // Đảm bảo không ghi đè dữ liệu Cloud mới hơn bằng bản ghi pending cũ (như khi vừa lui bước rồi tiến lên Đã giao 1 cửa)
+    // fetchRecords TUYỆT ĐỐI KHÔNG tự ý xóa items trong Sync Queue
     const pendingItems = await getPendingSyncItems();
     for (const item of pendingItems) {
         const pending = item.record;
         if (!pending || !pending.id) continue;
+
+        if (item.action === 'DELETE') {
+            // Bản ghi đã bị xóa offline, loại bỏ khỏi danh sách hiển thị
+            uniqueMap.delete(pending.id);
+            continue;
+        }
+
         const cloudRecord = uniqueMap.get(pending.id);
         if (cloudRecord) {
-            const getRecordTime = (r: RecordFile): number => {
-                let maxT = 0;
-                if ((r as any).updatedAt) maxT = Math.max(maxT, new Date((r as any).updatedAt).getTime() || 0);
-                if (Array.isArray(r.statusLogs) && r.statusLogs.length > 0) {
-                    r.statusLogs.forEach((l: any) => {
-                        if (l?.changedAt) maxT = Math.max(maxT, new Date(l.changedAt).getTime() || 0);
-                    });
-                }
-                return maxT;
-            };
-            const cloudTime = getRecordTime(cloudRecord);
-            const pendingTime = Math.max(
-                getRecordTime(pending),
-                item.queuedAt ? new Date(item.queuedAt).getTime() : 0
-            );
-
-            if (cloudTime > pendingTime) {
-                console.log(`[SyncEngine] Gỡ bỏ bản ghi pending lỗi thời của ${pending.code || pending.id} do Cloud đã có dữ liệu mới hơn.`);
-                await removePendingRecord(pending.id, pending.code);
-                continue;
-            }
             uniqueMap.set(pending.id, { ...cloudRecord, ...pending, _isOfflineSaved: true });
         } else {
             uniqueMap.set(pending.id, { ...pending, _isOfflineSaved: true });
@@ -888,31 +948,48 @@ const syncCacheOnBatchUpdate = async (batchUpdates: Partial<RecordFile>[]) => {
     }
 };
 
-export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
-    if (!isConfigured) {
-        await addPendingRecord(record, 'CREATE');
-        syncCacheOnCreate({ ...record, _isOfflineSaved: true });
-        return { ...record, _isOfflineSaved: true };
+export const createRecordApi = async (record: RecordFile, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records'): Promise<RecordFile | null> => {
+    const { targetTable } = validateRecordRouting(record);
+
+    if (expectedTargetTable && targetTable !== expectedTargetTable) {
+        throw new Error(`[SYNC_ROUTING_CONFLICT] Target table in queue (${expectedTargetTable}) conflicts with record routing table (${targetTable}). Record ID: ${record.id}`);
+    }
+
+    const standardId = (record.id && isValidUUID(record.id)) ? record.id : generateStandardUUID();
+    let finalCode = record.code ? record.code.trim() : '';
+    const isArchive = targetTable === 'luutru_records';
+    const isInvalidOrEmptyCode = !finalCode || 
+                                 finalCode.includes('?') || 
+                                 finalCode.toUpperCase() === 'HS' || 
+                                 finalCode === '--' ||
+                                 finalCode.toLowerCase() === 'chưa có mã';
+
+    const validReceivedDate = keepOnlyDate(record.receivedDate) || new Date().toISOString().split('T')[0];
+    const assignedGroup = targetTable === 'dangky_records' 
+        ? '3. Đăng ký đất đai, cấp GCN' 
+        : (targetTable === 'luutru_records' ? '1. Cung cấp thông tin, dữ liệu đất đai' : '2. Đo đạc bản đồ');
+
+    if (!isOnline()) {
+        if (isInvalidOrEmptyCode) {
+            finalCode = `OFF-${Date.now().toString().slice(-6)}`;
+        }
+        const offlineRecord: RecordFile = {
+            ...record,
+            id: standardId,
+            code: finalCode,
+            receivedDate: validReceivedDate,
+            status: record.status || RecordStatus.RECEIVED,
+            sourceTable: targetTable,
+            group: assignedGroup,
+            _isOfflineSaved: true
+        };
+        await addPendingRecord(offlineRecord, 'CREATE', targetTable);
+        syncCacheOnCreate(offlineRecord);
+        return offlineRecord;
     }
 
     let recordToSave: RecordFile = record;
     try {
-        let finalCode = record.code ? record.code.trim() : '';
-        const targetTable = getTargetTable(recordToSave);
-        const isArchive = targetTable === 'luutru_records';
-        const isCert = targetTable === 'dangky_records' || isCertificateRecordType(recordToSave);
-
-        // NGUYÊN TẮC QUAN TRỌNG: Ưu tiên tuyệt đối mã hồ sơ do người dùng nhập vào tại tất cả các module chuyên môn (Đo đạc, Lưu trữ, Cấp giấy...).
-        // Chỉ khi người dùng KHÔNG nhập mã (để trống, khoảng trắng, hoặc ký hiệu tạm '?' / 'HS'), hệ thống mới tự sinh mã mới.
-        const isInvalidOrEmptyCode = !finalCode || 
-                                     finalCode.includes('?') || 
-                                     finalCode.toUpperCase() === 'HS' || 
-                                     finalCode === '--' ||
-                                     finalCode.toLowerCase() === 'chưa có mã';
-
-        // Luôn đảm bảo id là chuẩn UUID RFC4122 để không bị lỗi 22P02 của PostgreSQL
-        const standardId = (recordToSave.id && isValidUUID(recordToSave.id)) ? recordToSave.id : generateStandardUUID();
-
         if (isInvalidOrEmptyCode) {
             finalCode = await getNextGlobalRecordCode(
                 record.receivedDate || new Date().toISOString(), 
@@ -922,17 +999,8 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 record.ward || ''
             );
         } else {
-            // NGUYÊN TẮC BẢO MẬT VÀ CHỐNG TRÙNG MÃ 100%:
-            // Cho dù người dùng tự nhập mã hay giao diện sinh mã, hệ thống luôn kiểm tra
-            // và tự động giải quyết xung đột mã trên Cloud DB ngay trước khi insert
             finalCode = await resolveGuaranteedUniqueCode(finalCode, standardId);
         }
-        
-        const validReceivedDate = keepOnlyDate(record.receivedDate) || new Date().toISOString().split('T')[0];
-
-        const assignedGroup = targetTable === 'dangky_records' 
-            ? '3. Đăng ký đất đai, cấp GCN' 
-            : (targetTable === 'luutru_records' ? '1. Cung cấp thông tin, dữ liệu đất đai' : '2. Đo đạc bản đồ');
 
         recordToSave = { 
             ...record, 
@@ -990,233 +1058,283 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             // Gỡ khỏi hàng đợi chờ đồng bộ vì đã lên Cloud thành công 100%
             await removePendingRecord(result.id);
             syncCacheOnCreate(result);
-            // Dọn dẹp bản ghi cũ nếu có ở các bảng khác
-            purgeRecordFromOtherTables(result.id, result.code, targetTable);
             return { ...result, _isOfflineSaved: false };
         }
         return { ...recordToSave, _isOfflineSaved: false };
     } catch (error: any) {
         logError("createRecordApi", error, true);
-        console.warn(`[Offline Queue] Lưu hồ sơ ${recordToSave.code || recordToSave.id} vào hàng đợi cục bộ để tự động đẩy lên Cloud sau.`);
-        // Lưu hồ sơ vào hàng đợi đồng bộ bền vững (Sync Queue)
-        await addPendingRecord(recordToSave, 'CREATE');
-        syncCacheOnCreate({ ...recordToSave, _isOfflineSaved: true });
-        return { ...recordToSave, _isOfflineSaved: true };
+        if (isTransientError(error)) {
+            console.warn(`[Offline Queue] Lưu hồ sơ ${recordToSave.code || recordToSave.id} vào hàng đợi cục bộ để tự động đẩy lên Cloud sau.`);
+            await addPendingRecord(recordToSave, 'CREATE', targetTable);
+            syncCacheOnCreate({ ...recordToSave, _isOfflineSaved: true });
+            return { ...recordToSave, _isOfflineSaved: true };
+        }
+        throw error;
     }
 };
 
-export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
-    console.log(`[MUTATION] Start`);
-    console.log(`[MUTATION] Record: ${record.code || record.id}`);
-    console.log(`[MUTATION] New status: ${record.status}`);
-    console.log(`[MUTATION] Supabase UPDATE: START`);
+export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records'): Promise<RecordFile | null> => {
+    if (!record || !record.id) {
+        throw new Error("[MUTATION] Error: Record ID is required for update operation.");
+    }
+
+    const { targetTable } = validateRecordRouting(record);
+
+    if (expectedTargetTable && targetTable !== expectedTargetTable) {
+        throw new Error(`[SYNC_ROUTING_CONFLICT] Target table in queue (${expectedTargetTable}) conflicts with record routing table (${targetTable}). Record ID: ${record.id}`);
+    }
+
+    console.log(`[MUTATION][START] updateRecordApi for ID: ${record.id}, Code: ${record.code}`);
+    console.log(`[MUTATION][ROUTING] Resolved target table: ${targetTable}`);
 
     // 0. Khóa bảo vệ thời gian thực chống giật lùi trạng thái
     markRecordsRecentlyUpdated([record]);
 
-    if (!isConfigured) {
-        console.log(`[MUTATION] Supabase offline mode (isConfigured=false). Saved offline.`);
-        await addPendingRecord(record, 'UPDATE');
-        syncCacheOnUpdate({ ...record, _isOfflineSaved: true });
-        return { ...record, _isOfflineSaved: true };
+    if (!isOnline()) {
+        console.log(`[MUTATION] Supabase offline mode (isOnline=false). Saved to offline queue.`);
+        const offlineRecord = { ...record, sourceTable: targetTable, _isOfflineSaved: true };
+        await addPendingRecord(offlineRecord, 'UPDATE', targetTable);
+        syncCacheOnUpdate(offlineRecord);
+        return offlineRecord;
     }
+
+    // Lấy previousUpdatedAt từ record truyền vào
+    let previousUpdatedAt = record.updated_at || (record as any).updatedAt;
+
+    // Nếu record không có previousUpdatedAt, phải đọc record hiện tại từ DB trước khi UPDATE để lấy updated_at
+    if (!previousUpdatedAt && isOnline()) {
+        try {
+            console.log(`[MUTATION][CONCURRENCY] Fetching existing updated_at before UPDATE for ID: ${record.id}`);
+            const { data: fetchRes, error: fetchErr } = await supabase
+                .from(targetTable)
+                .select('updated_at')
+                .eq('id', record.id)
+                .single();
+            if (fetchRes && !fetchErr) {
+                previousUpdatedAt = fetchRes.updated_at;
+                console.log(`[MUTATION][CONCURRENCY] Found existing updated_at in DB: ${previousUpdatedAt}`);
+            }
+        } catch (fetchError) {
+            console.warn(`[MUTATION][CONCURRENCY] Failed to fetch existing updated_at before update:`, fetchError);
+        }
+    }
+
     try {
-        const primaryTable = (record.sourceTable && ['dangky_records', 'land_records', 'luutru_records'].includes(record.sourceTable))
-            ? (record.sourceTable as 'dangky_records' | 'land_records' | 'luutru_records')
-            : getTargetTable(record);
-
-        const candidateTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = Array.from(new Set([
-            primaryTable,
-            getTargetTable(record),
-            'land_records',
-            'dangky_records',
-            'luutru_records'
-        ]));
-
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
         if (!payload.updated_at) {
             payload.updated_at = new Date().toISOString();
         }
-        let updatedData: any[] | null = null;
-        let finalTable: 'dangky_records' | 'land_records' | 'luutru_records' = primaryTable;
-        let lastError: any = null;
 
-        for (const tbl of candidateTables) {
-            try {
-                let { data, error } = await supabase.from(tbl).update(payload).eq('id', record.id).select();
+        console.log(`[MUTATION][SUPABASE_EXEC] Executing UPDATE on table '${targetTable}' for ID: ${record.id} with where updated_at = ${previousUpdatedAt}`);
 
-                if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-                    console.warn(`⚠️ [22P02 Fallback] Retrying update on ${tbl} with 22P02 sanitized payload...`);
-                    const fallback22P02Payload = sanitizePayloadFor22P02(payload);
-                    const res = await supabase.from(tbl).update(fallback22P02Payload).eq('id', record.id).select();
-                    data = res.data;
-                    error = res.error;
-                }
+        let query = supabase.from(targetTable).update(payload).eq('id', record.id);
+        if (previousUpdatedAt) {
+            query = query.eq('updated_at', previousUpdatedAt);
+        }
+        let { data, error } = await query.select();
 
-                if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp') || String(error.message || '').includes('time'))) {
-                    console.warn(`⚠️ [Date Fallback] Retrying update on ${tbl} with date sanitized payload...`);
-                    const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
-                    const res = await supabase.from(tbl).update(fallbackDatePayload).eq('id', record.id).select();
-                    data = res.data;
-                    error = res.error;
-                }
-
-                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-                    console.warn(`⚠️ [Fallback] Database is missing columns on ${tbl}. Retrying without new columns...`);
-                    const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
-                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-                    const res = await supabase.from(tbl).update(fallbackPayload).eq('id', record.id).select();
-                    data = res.data;
-                    error = res.error;
-                }
-
-                if (!error && data && data.length > 0) {
-                    updatedData = data;
-                    finalTable = tbl;
-                    lastError = null;
-                    break;
-                }
-                if (error) lastError = error;
-            } catch (err) {
-                lastError = err;
+        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+            console.warn(`⚠️ [22P02 Fallback] Retrying update on ${targetTable} with sanitized payload...`);
+            const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+            let fallbackQuery = supabase.from(targetTable).update(fallback22P02Payload).eq('id', record.id);
+            if (previousUpdatedAt) {
+                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
             }
+            const res = await fallbackQuery.select();
+            data = res.data;
+            error = res.error;
         }
 
-        // Nếu không tìm thấy bản ghi nào ở cả 3 bảng để UPDATE (0 rows matched), thực hiện upsert vào targetTable chuẩn
-        if (!updatedData || updatedData.length === 0) {
-            const targetTable = getTargetTable(record);
-            const upsertPayload = sanitizeData(record, RECORD_DB_COLUMNS);
-            const upsertRes = await supabase.from(targetTable).upsert([upsertPayload]).select();
-            if (!upsertRes.error && upsertRes.data && upsertRes.data.length > 0) {
-                updatedData = upsertRes.data;
-                finalTable = targetTable;
-            } else if (lastError || upsertRes.error) {
-                throw (lastError || upsertRes.error);
+        if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp'))) {
+            console.warn(`⚠️ [Date Fallback] Retrying update on ${targetTable} with date sanitized payload...`);
+            const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
+            let fallbackQuery = supabase.from(targetTable).update(fallbackDatePayload).eq('id', record.id);
+            if (previousUpdatedAt) {
+                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
             }
+            const res = await fallbackQuery.select();
+            data = res.data;
+            error = res.error;
         }
 
-        if (!updatedData || updatedData.length === 0) {
-            throw new Error("Supabase UPDATE returned 0 records modified");
+        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+            console.warn(`⚠️ [Column Fallback] Missing optional columns on ${targetTable}. Retrying...`);
+            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
+            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
+            let fallbackQuery = supabase.from(targetTable).update(fallbackPayload).eq('id', record.id);
+            if (previousUpdatedAt) {
+                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
+            }
+            const res = await fallbackQuery.select();
+            data = res.data;
+            error = res.error;
         }
 
-        console.log(`[MUTATION] Supabase UPDATE: SUCCESS`);
+        if (error) {
+            console.error(`[MUTATION][ERROR] Supabase UPDATE failed on ${targetTable}:`, error);
+            throw error;
+        }
 
-        const result = mapRecordFromDb({ ...record, ...(updatedData?.[0] || {}), sourceTable: finalTable }) as RecordFile;
+        if (!data || data.length === 0) {
+            const { data: checkData } = await supabase.from(targetTable).select('id, updated_at').eq('id', record.id);
+            if (checkData && checkData.length > 0) {
+                const currentDbUpdatedAt = checkData[0].updated_at;
+                if (currentDbUpdatedAt !== previousUpdatedAt) {
+                    console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${record.id} in ${targetTable} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                    throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${record.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
+                }
+            }
+            console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${record.id}`);
+            throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${record.id} was not found in table ${targetTable}.`);
+        }
+
+        const result = mapRecordFromDb({ ...record, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
-            console.log(`[MUTATION] VERIFY: SUCCESS (ID: ${result.id}, Status: ${result.status})`);
+            console.log(`[MUTATION][VERIFY] SUCCESS - Record verified in DB (ID: ${result.id}, Table: ${targetTable}, Status: ${result.status})`);
             await removePendingRecord(result.id);
             markRecordsRecentlyUpdated([result]);
             
-            // Sync cache and memory ONLY after Supabase confirmation
             const memIdx = MOCK_RECORDS.findIndex(r => r.id === result.id);
             if (memIdx !== -1) {
                 MOCK_RECORDS[memIdx] = { ...MOCK_RECORDS[memIdx], ...result };
             }
             syncCacheOnUpdate(result);
-            purgeRecordFromOtherTables(result.id, result.code, finalTable);
 
-            console.log(`[MUTATION] React State: UPDATED`);
+            console.log(`[MUTATION][STATE_COMMIT] React State & Cache UPDATED for ID: ${result.id}`);
             return { ...result, _isOfflineSaved: false };
         }
-        throw new Error("Không thể map dữ liệu phản hồi từ Supabase.");
+        throw new Error("Failed to map updated response from Supabase.");
     } catch (error: any) {
-        console.error(`[MUTATION] Supabase UPDATE: ERROR`, error);
-        console.warn(`[MUTATION] React State: NOT COMMITTED`);
+        console.error(`[MUTATION][FAIL] Supabase UPDATE failed for ID ${record.id}`, error);
         logError("updateRecordApi", error, true);
-        await addPendingRecord(record, 'UPDATE');
+        
+        if (isTransientError(error)) {
+            const offlineRecord = { ...record, sourceTable: targetTable, _isOfflineSaved: true };
+            await addPendingRecord(offlineRecord, 'UPDATE', targetTable);
+            syncCacheOnUpdate(offlineRecord);
+            return offlineRecord;
+        }
         throw error;
     }
 };
 
 export const saveRecord = updateRecordApi;
 
-export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
-    console.log(`[MUTATION] Start updateRecordFieldsApi for record ID: ${id}`);
-    console.log(`[MUTATION] Supabase UPDATE: START`);
+export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records'): Promise<RecordFile | null> => {
+    const fullRecord = { id, ...fields };
+    const { targetTable } = validateRecordRouting(fullRecord);
+
+    if (expectedTargetTable && targetTable !== expectedTargetTable) {
+        throw new Error(`[SYNC_ROUTING_CONFLICT] Target table in queue (${expectedTargetTable}) conflicts with record routing table (${targetTable}). Record ID: ${id}`);
+    }
+
+    console.log(`[MUTATION][START] updateRecordFieldsApi for ID: ${id}`);
+    console.log(`[MUTATION][ROUTING] Resolved target table: ${targetTable}`);
 
     // 0. Khóa bảo vệ thời gian thực chống giật lùi trạng thái
-    markRecordsRecentlyUpdated([{ id, ...fields }]);
+    markRecordsRecentlyUpdated([fullRecord]);
 
     if (!isConfigured) {
         console.log(`[MUTATION] Supabase offline mode (isConfigured=false). Saved offline.`);
-        const fallbackRecord = { id, ...fields, _isOfflineSaved: true } as RecordFile;
-        await addPendingRecord(fallbackRecord, 'UPDATE');
+        const fallbackRecord = { ...fullRecord, sourceTable: targetTable, _isOfflineSaved: true } as RecordFile;
+        await addPendingRecord(fallbackRecord, 'UPDATE', targetTable);
         syncCacheOnUpdate(fallbackRecord);
         return fallbackRecord;
     }
+
+    // Lấy previousUpdatedAt từ fields truyền vào hoặc fetch trực tiếp từ DB
+    let previousUpdatedAt = (fields as any).updated_at || (fields as any).updatedAt;
+
+    if (!previousUpdatedAt && isConfigured) {
+        try {
+            console.log(`[MUTATION][CONCURRENCY] Fetching existing updated_at before fields UPDATE for ID: ${id}`);
+            const { data: fetchRes, error: fetchErr } = await supabase
+                .from(targetTable)
+                .select('updated_at')
+                .eq('id', id)
+                .single();
+            if (fetchRes && !fetchErr) {
+                previousUpdatedAt = fetchRes.updated_at;
+                console.log(`[MUTATION][CONCURRENCY] Found existing updated_at in DB for fields: ${previousUpdatedAt}`);
+            }
+        } catch (fetchError) {
+            console.warn(`[MUTATION][CONCURRENCY] Failed to fetch existing updated_at before fields update:`, fetchError);
+        }
+    }
+
     try {
-        const primaryTable = (fields.sourceTable && ['dangky_records', 'land_records', 'luutru_records'].includes(fields.sourceTable))
-            ? (fields.sourceTable as 'dangky_records' | 'land_records' | 'luutru_records')
-            : getTargetTable({ id, ...fields });
-
-        const candidateTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = Array.from(new Set([
-            primaryTable,
-            getTargetTable({ id, ...fields }),
-            'land_records',
-            'dangky_records',
-            'luutru_records'
-        ]));
-
-        const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
+        const payload = sanitizeData(fullRecord as any, RECORD_DB_COLUMNS);
         if (!payload.updated_at) {
             payload.updated_at = new Date().toISOString();
         }
         delete payload.id;
 
-        let updatedData: any[] | null = null;
-        let finalTable: 'dangky_records' | 'land_records' | 'luutru_records' = primaryTable;
-        let lastError: any = null;
+        console.log(`[MUTATION][SUPABASE_EXEC] Executing UPDATE fields on table '${targetTable}' for ID: ${id} with where updated_at = ${previousUpdatedAt}`);
 
-        for (const tbl of candidateTables) {
-            try {
-                let { data, error } = await supabase.from(tbl).update(payload).eq('id', id).select();
+        let query = supabase.from(targetTable).update(payload).eq('id', id);
+        if (previousUpdatedAt) {
+            query = query.eq('updated_at', previousUpdatedAt);
+        }
+        let { data, error } = await query.select();
 
-                if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-                    console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi on ${tbl} with 22P02 sanitized payload...`);
-                    const fallback22P02Payload = sanitizePayloadFor22P02(payload);
-                    const res = await supabase.from(tbl).update(fallback22P02Payload).eq('id', id).select();
-                    data = res.data;
-                    error = res.error;
-                }
-
-                if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp') || String(error.message || '').includes('time'))) {
-                    console.warn(`⚠️ [Date Fallback] Retrying updateRecordFieldsApi on ${tbl} with date sanitized payload...`);
-                    const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
-                    const res = await supabase.from(tbl).update(fallbackDatePayload).eq('id', id).select();
-                    data = res.data;
-                    error = res.error;
-                }
-
-                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-                    console.warn(`⚠️ [Fallback] Database is missing columns on ${tbl}. Retrying without new columns...`);
-                    const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
-                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-                    const res = await supabase.from(tbl).update(fallbackPayload).eq('id', id).select();
-                    data = res.data;
-                    error = res.error;
-                }
-
-                if (!error && data && data.length > 0) {
-                    updatedData = data;
-                    finalTable = tbl;
-                    lastError = null;
-                    break;
-                }
-                if (error) lastError = error;
-            } catch (err) {
-                lastError = err;
+        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+            console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi on ${targetTable}...`);
+            const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+            let fallbackQuery = supabase.from(targetTable).update(fallback22P02Payload).eq('id', id);
+            if (previousUpdatedAt) {
+                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
             }
+            const res = await fallbackQuery.select();
+            data = res.data;
+            error = res.error;
         }
 
-        if (!updatedData || updatedData.length === 0) {
-            throw (lastError || new Error("Supabase UPDATE returned 0 rows"));
+        if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp'))) {
+            console.warn(`⚠️ [Date Fallback] Retrying updateRecordFieldsApi on ${targetTable}...`);
+            const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
+            let fallbackQuery = supabase.from(targetTable).update(fallbackDatePayload).eq('id', id);
+            if (previousUpdatedAt) {
+                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
+            }
+            const res = await fallbackQuery.select();
+            data = res.data;
+            error = res.error;
         }
 
-        console.log(`[MUTATION] Supabase UPDATE: SUCCESS`);
+        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+            console.warn(`⚠️ [Column Fallback] Retrying updateRecordFieldsApi on ${targetTable}...`);
+            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
+            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
+            let fallbackQuery = supabase.from(targetTable).update(fallbackPayload).eq('id', id);
+            if (previousUpdatedAt) {
+                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
+            }
+            const res = await fallbackQuery.select();
+            data = res.data;
+            error = res.error;
+        }
 
-        const result = mapRecordFromDb({ id, ...fields, ...(updatedData?.[0] || {}), sourceTable: finalTable }) as RecordFile;
+        if (error) {
+            console.error(`[MUTATION][ERROR] Supabase UPDATE fields failed on ${targetTable}:`, error);
+            throw error;
+        }
+
+        if (!data || data.length === 0) {
+            const { data: checkData } = await supabase.from(targetTable).select('id, updated_at').eq('id', id);
+            if (checkData && checkData.length > 0) {
+                const currentDbUpdatedAt = checkData[0].updated_at;
+                if (currentDbUpdatedAt !== previousUpdatedAt) {
+                    console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${id} in ${targetTable} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                    throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${id} in table ${targetTable} was modified by another user or session. Please refresh.`);
+                }
+            }
+            console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE fields returned 0 modified rows on ${targetTable} for ID: ${id}`);
+            throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${id} was not found in table ${targetTable}.`);
+        }
+
+        const result = mapRecordFromDb({ id, ...fields, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
-            console.log(`[MUTATION] VERIFY: SUCCESS (ID: ${result.id})`);
+            console.log(`[MUTATION][VERIFY] SUCCESS - Verified fields update in DB (ID: ${result.id}, Table: ${targetTable})`);
             await removePendingRecord(result.id);
             markRecordsRecentlyUpdated([result]);
 
@@ -1225,64 +1343,340 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
                 MOCK_RECORDS[memIdx] = { ...MOCK_RECORDS[memIdx], ...result };
             }
             syncCacheOnUpdate(result);
-            purgeRecordFromOtherTables(result.id, result.code, finalTable);
 
-            console.log(`[MUTATION] React State: UPDATED`);
+            console.log(`[MUTATION][STATE_COMMIT] React State & Cache UPDATED for ID: ${result.id}`);
             return { ...result, _isOfflineSaved: false };
         }
-        throw new Error("Không thể map kết quả cập nhật từ Supabase.");
+        throw new Error("Failed to map updated fields response from Supabase.");
     } catch (error: any) {
-        console.error(`[MUTATION] Supabase UPDATE: ERROR`, error);
-        console.warn(`[MUTATION] React State: NOT COMMITTED`);
+        console.error(`[MUTATION][FAIL] updateRecordFieldsApi failed for ID: ${id}`, error);
         logError("updateRecordFieldsApi", error, true);
-        const fallbackRecord = { id, ...fields, _isOfflineSaved: true } as RecordFile;
-        await addPendingRecord(fallbackRecord, 'UPDATE');
+        
+        if (isTransientError(error)) {
+            const fallbackRecord = { ...fullRecord, sourceTable: targetTable, _isOfflineSaved: true } as RecordFile;
+            await addPendingRecord(fallbackRecord, 'UPDATE', targetTable);
+            syncCacheOnUpdate(fallbackRecord);
+            return fallbackRecord;
+        }
         throw error;
     }
 };
 
-export const deleteRecordApi = async (id: string): Promise<boolean> => {
-    if (!isConfigured) return true;
+export const deleteRecordApi = async (id: string, record?: Partial<RecordFile>): Promise<boolean> => {
+    let targetTable: 'dangky_records' | 'land_records' | 'luutru_records' | null = null;
+    
+    const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+    const found = cached.find(r => r.id === id);
+    const mergedRecord = { ...found, ...record, id };
+
     try {
-        const { error: landErr } = await supabase.from('land_records').delete().eq('id', id);
-        if (landErr) {
-            await supabase.from('dangky_records').delete().eq('id', id);
+        targetTable = getTargetTable(mergedRecord);
+    } catch (error: any) {
+        console.error(`[ROUTING_GUARD][UNRESOLVED] Unable to resolve target table for record ID: ${id}. Delete blocked.`, error);
+        throw error;
+    }
+
+    if (!targetTable) {
+        const unresolvedErr = new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for record ID: ${id}. Delete blocked.`);
+        console.error(`[ROUTING_GUARD][UNRESOLVED]`, unresolvedErr);
+        throw unresolvedErr;
+    }
+
+    if (!isOnline()) {
+        await addPendingRecord({ id } as RecordFile, 'DELETE', targetTable);
+        syncCacheOnDelete(id);
+        return true;
+    }
+
+    try {
+        console.log(`[MUTATION][DELETE] Deleting record ID ${id} from target table ${targetTable}`);
+        const { error } = await supabase.from(targetTable).delete().eq('id', id);
+        if (error) {
+            if (isTransientError(error)) {
+                console.warn(`[DELETE_SINGLE] Transient error deleting record ID ${id}. Enqueueing to offline sync.`, error);
+                await addPendingRecord({ id } as RecordFile, 'DELETE', targetTable);
+                syncCacheOnDelete(id);
+                return true;
+            } else {
+                console.error(`[DELETE_SINGLE] Database/Permanent error deleting record ID ${id}. Blocking.`, error);
+                throw error;
+            }
         }
-        await supabase.from('luutru_records').delete().eq('id', id);
         syncCacheOnDelete(id);
         return true;
     } catch (error) {
         logError("deleteRecordApi", error, true);
-        syncCacheOnDelete(id);
-        return true;
+        throw error;
     }
 };
 
-export const deleteRecordsBatchApi = async (ids: string[], onProgress?: (processed: number, total: number) => void): Promise<boolean> => {
+export const deleteRecordsBatchApi = async (
+    ids: string[], 
+    recordsOrProgress?: Partial<RecordFile>[] | ((processed: number, total: number) => void),
+    onProgressParam?: (processed: number, total: number) => void
+): Promise<boolean> => {
     if (!ids || ids.length === 0) return true;
-    
-    // Always sync local cache first
-    await syncCacheOnBatchDelete(ids);
 
-    if (!isConfigured) return true;
-    try {
-        const CHUNK_SIZE = 100;
-        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-            const chunk = ids.slice(i, i + CHUNK_SIZE);
-            await supabase.from('land_records').delete().in('id', chunk);
-            await supabase.from('dangky_records').delete().in('id', chunk);
-            await supabase.from('luutru_records').delete().in('id', chunk);
-            if (onProgress) onProgress(Math.min(i + CHUNK_SIZE, ids.length), ids.length);
+    const recordHints: Partial<RecordFile>[] = Array.isArray(recordsOrProgress) ? recordsOrProgress : [];
+    const onProgress = typeof recordsOrProgress === 'function' ? recordsOrProgress : onProgressParam;
+
+    const landIds: string[] = [];
+    const dangkyIds: string[] = [];
+    const luutruIds: string[] = [];
+    const unresolvedIds: string[] = [];
+    const duplicateIds: string[] = [];
+
+    const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+    const cachedMap = new Map<string, Partial<RecordFile>>();
+    cached.forEach(r => {
+        if (r && r.id) cachedMap.set(r.id, r);
+    });
+    recordHints.forEach(r => {
+        if (r && r.id) cachedMap.set(r.id, { ...(cachedMap.get(r.id) || {}), ...r });
+    });
+
+    if (isOnline()) {
+        try {
+            const [landRes, dangkyRes, luutruRes] = await Promise.all([
+                supabase.from('land_records').select('id').in('id', ids),
+                supabase.from('dangky_records').select('id').in('id', ids),
+                supabase.from('luutru_records').select('id').in('id', ids)
+            ]);
+
+            const landSet = new Set((landRes.data || []).map(r => r.id));
+            const dangkySet = new Set((dangkyRes.data || []).map(r => r.id));
+            const luutruSet = new Set((luutruRes.data || []).map(r => r.id));
+
+            for (const id of ids) {
+                const foundInTables: string[] = [];
+                if (landSet.has(id)) foundInTables.push('land_records');
+                if (dangkySet.has(id)) foundInTables.push('dangky_records');
+                if (luutruSet.has(id)) foundInTables.push('luutru_records');
+
+                const count = foundInTables.length;
+
+                if (count === 0) {
+                    const found = cachedMap.get(id);
+                    if (found) {
+                        try {
+                            const targetTable = getTargetTable(found);
+                            if (targetTable === 'land_records') landIds.push(id);
+                            else if (targetTable === 'dangky_records') dangkyIds.push(id);
+                            else if (targetTable === 'luutru_records') luutruIds.push(id);
+                            else unresolvedIds.push(id);
+                        } catch {
+                            unresolvedIds.push(id);
+                        }
+                    } else {
+                        unresolvedIds.push(id);
+                    }
+                } else if (count === 1) {
+                    const singleTable = foundInTables[0];
+                    if (singleTable === 'land_records') landIds.push(id);
+                    else if (singleTable === 'dangky_records') dangkyIds.push(id);
+                    else if (singleTable === 'luutru_records') luutruIds.push(id);
+                } else {
+                    console.error(`[MUTATION][DELETE_BATCH][DUPLICATE_ID_CONFLICT] ID=${id} TABLES=${foundInTables.join(',')}`);
+                    duplicateIds.push(id);
+                }
+            }
+        } catch (dbError) {
+            console.error("[MUTATION][DELETE_BATCH] DB resolve failed, using cache fallback", dbError);
+            for (const id of ids) {
+                const found = cachedMap.get(id);
+                if (found) {
+                    try {
+                        const targetTable = getTargetTable(found);
+                        if (targetTable === 'land_records') landIds.push(id);
+                        else if (targetTable === 'dangky_records') dangkyIds.push(id);
+                        else if (targetTable === 'luutru_records') luutruIds.push(id);
+                        else unresolvedIds.push(id);
+                    } catch {
+                        unresolvedIds.push(id);
+                    }
+                } else {
+                    unresolvedIds.push(id);
+                }
+            }
         }
+    } else {
+        for (const id of ids) {
+            const found = cachedMap.get(id);
+            if (found) {
+                try {
+                    const targetTable = getTargetTable(found);
+                    if (targetTable === 'land_records') landIds.push(id);
+                    else if (targetTable === 'dangky_records') dangkyIds.push(id);
+                    else if (targetTable === 'luutru_records') luutruIds.push(id);
+                    else unresolvedIds.push(id);
+                } catch {
+                    unresolvedIds.push(id);
+                }
+            } else {
+                unresolvedIds.push(id);
+            }
+        }
+    }
+
+    if (duplicateIds.length > 0) {
+        const duplicateErr = new Error(`DUPLICATE_ID_CONFLICT: Duplicate ID conflict for IDs: ${duplicateIds.join(', ')}. Batch delete blocked.`);
+        console.error(`[ROUTING_GUARD][DUPLICATE_ID_CONFLICT]`, duplicateErr);
+        throw duplicateErr;
+    }
+
+    if (unresolvedIds.length > 0) {
+        const unresolvedErr = new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for IDs: ${unresolvedIds.join(', ')}. Batch delete blocked.`);
+        console.error(`[ROUTING_GUARD][UNRESOLVED]`, unresolvedErr);
+        throw unresolvedErr;
+    }
+
+    if (!isOnline()) {
+        for (const id of landIds) {
+            await addPendingRecord({ id } as RecordFile, 'DELETE', 'land_records');
+        }
+        for (const id of dangkyIds) {
+            await addPendingRecord({ id } as RecordFile, 'DELETE', 'dangky_records');
+        }
+        for (const id of luutruIds) {
+            await addPendingRecord({ id } as RecordFile, 'DELETE', 'luutru_records');
+        }
+        await syncCacheOnBatchDelete(ids);
+        return true;
+    }
+
+    try {
+        const successfullyDeletedIds: string[] = [];
+        const totalToProcess = landIds.length + dangkyIds.length + luutruIds.length;
+
+        if (landIds.length > 0) {
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < landIds.length; i += CHUNK_SIZE) {
+                const chunk = landIds.slice(i, i + CHUNK_SIZE);
+                const { error } = await supabase.from('land_records').delete().in('id', chunk);
+                if (error) {
+                    if (isTransientError(error)) {
+                        console.warn(`[DELETE_BATCH] Transient error deleting land_records chunk. Enqueueing to offline sync.`, error);
+                        for (const id of chunk) {
+                            await addPendingRecord({ id } as RecordFile, 'DELETE', 'land_records');
+                        }
+                    } else {
+                        console.error(`[DELETE_BATCH] Database error deleting land_records chunk. Blocking.`, error);
+                        throw error;
+                    }
+                } else {
+                    successfullyDeletedIds.push(...chunk);
+                }
+                if (onProgress) onProgress(successfullyDeletedIds.length, totalToProcess);
+            }
+        }
+
+        if (dangkyIds.length > 0) {
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < dangkyIds.length; i += CHUNK_SIZE) {
+                const chunk = dangkyIds.slice(i, i + CHUNK_SIZE);
+                const { error } = await supabase.from('dangky_records').delete().in('id', chunk);
+                if (error) {
+                    if (isTransientError(error)) {
+                        console.warn(`[DELETE_BATCH] Transient error deleting dangky_records chunk. Enqueueing to offline sync.`, error);
+                        for (const id of chunk) {
+                            await addPendingRecord({ id } as RecordFile, 'DELETE', 'dangky_records');
+                        }
+                    } else {
+                        console.error(`[DELETE_BATCH] Database error deleting dangky_records chunk. Blocking.`, error);
+                        throw error;
+                    }
+                } else {
+                    successfullyDeletedIds.push(...chunk);
+                }
+                if (onProgress) onProgress(successfullyDeletedIds.length, totalToProcess);
+            }
+        }
+
+        if (luutruIds.length > 0) {
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < luutruIds.length; i += CHUNK_SIZE) {
+                const chunk = luutruIds.slice(i, i + CHUNK_SIZE);
+                const { error } = await supabase.from('luutru_records').delete().in('id', chunk);
+                if (error) {
+                    if (isTransientError(error)) {
+                        console.warn(`[DELETE_BATCH] Transient error deleting luutru_records chunk. Enqueueing to offline sync.`, error);
+                        for (const id of chunk) {
+                            await addPendingRecord({ id } as RecordFile, 'DELETE', 'luutru_records');
+                        }
+                    } else {
+                        console.error(`[DELETE_BATCH] Database error deleting luutru_records chunk. Blocking.`, error);
+                        throw error;
+                    }
+                } else {
+                    successfullyDeletedIds.push(...chunk);
+                }
+                if (onProgress) onProgress(successfullyDeletedIds.length, totalToProcess);
+            }
+        }
+
+        if (successfullyDeletedIds.length > 0) {
+            await syncCacheOnBatchDelete(successfullyDeletedIds);
+        }
+
         return true;
     } catch (error) {
         logError("deleteRecordsBatchApi", error, true);
-        return true;
+        throw error;
     }
 };
 
 export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: (processed: number, total: number) => void): Promise<boolean> => {
-    if (!isConfigured) return true;
+    if (!records || records.length === 0) return true;
+
+    if (!isOnline()) {
+        console.log(`[MUTATION] createRecordsBatchApi offline mode (isOnline=false). Enqueueing ${records.length} records...`);
+        const preparedRecords: RecordFile[] = [];
+
+        for (const r of records) {
+            let finalCode = (r.code || '').trim();
+            if (!finalCode || finalCode.includes('?') || finalCode.toUpperCase() === 'HS' || finalCode === '--') {
+                finalCode = `OFF-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+            }
+
+            const recordPayload = { ...r, code: finalCode };
+            if (!recordPayload.id || !isValidUUID(recordPayload.id)) {
+                recordPayload.id = generateStandardUUID();
+            }
+
+            let targetTable: 'dangky_records' | 'land_records' | 'luutru_records';
+            try {
+                targetTable = getTargetTable(recordPayload);
+            } catch (routingErr) {
+                console.error(`[ROUTING_GUARD][UNRESOLVED] createRecordsBatchApi blocked for offline record:`, routingErr);
+                throw routingErr;
+            }
+
+            recordPayload.sourceTable = targetTable;
+            recordPayload._isOfflineSaved = true;
+            preparedRecords.push(recordPayload);
+        }
+
+        // Enqueue tất cả các bản ghi. Chỉ khi toàn bộ persistence thành công mới đồng bộ cache
+        for (const pr of preparedRecords) {
+            await addPendingRecord(pr, 'CREATE', pr.sourceTable as any);
+        }
+
+        try {
+            const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+            preparedRecords.forEach(r => {
+                if (!cached.some(c => c.id === r.id)) {
+                    cached.unshift(r);
+                }
+            });
+            saveToCache(CACHE_KEYS.RECORDS, cached);
+        } catch (e) {
+            console.error("Error syncing cache for batch create", e);
+        }
+
+        if (onProgress) onProgress(preparedRecords.length, preparedRecords.length);
+        return true;
+    }
+
     try {
         const landPayload: any[] = [];
         const dangkyPayload: any[] = [];
@@ -1305,8 +1699,8 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
             seenCodesInBatch.add(finalCode.toLowerCase());
             
             const recordPayload = { ...r, code: finalCode };
-            if (!recordPayload.id) {
-                recordPayload.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
+            if (!recordPayload.id || !isValidUUID(recordPayload.id)) {
+                recordPayload.id = generateStandardUUID();
             }
             
             const targetTable = getTargetTable(recordPayload);
@@ -1349,11 +1743,14 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                     const { error: fallbackError } = await supabase.from(table).insert(fallbackPayload);
                     if (fallbackError) throw fallbackError;
                 } else if (error) {
-                    if (table === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205')) {
-                        await supabase.from('land_records').insert(chunk);
-                        return;
+                    if (isTransientError(error)) {
+                        console.warn(`[CREATE_BATCH] Transient network error inserting into ${table}. Enqueueing chunk to offline sync.`, error);
+                        for (const item of chunk) {
+                            await addPendingRecord(item as RecordFile, 'CREATE', table);
+                        }
+                    } else {
+                        throw error;
                     }
-                    throw error;
                 }
             }
         };
@@ -1689,15 +2086,31 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
     // 0. Khóa bảo vệ thời gian thực cho toàn bộ hồ sơ vừa chuyển trạng thái (ngăn chặn polling nền đè lùi trạng thái)
     markRecordsRecentlyUpdated(updates);
 
-    if (!isConfigured) {
-        console.log(`[MUTATION] Supabase offline mode (isConfigured=false). Saved offline.`);
-        updates.forEach(up => {
+    if (!isOnline()) {
+        console.log(`[MUTATION] Supabase offline mode (isOnline=false). Enqueueing ${updates.length} updates to sync queue.`);
+        const idToExistingMap = new Map<string, RecordFile>();
+        MOCK_RECORDS.forEach(r => idToExistingMap.set(r.id, r));
+
+        const fullMergedUpdates: RecordFile[] = updates.map(u => {
+            const existing = u.id ? idToExistingMap.get(u.id) : undefined;
+            const merged = { ...(existing || {}), ...u, _isOfflineSaved: true } as RecordFile;
+            merged.sourceTable = getTargetTable(merged);
+            return merged;
+        });
+
+        // 1. Lưu vào Sync Queue trước (Persistence-First)
+        for (const item of fullMergedUpdates) {
+            await addPendingRecord(item, 'UPDATE', item.sourceTable as any);
+        }
+
+        // 2. Chỉ cập nhật RAM & Cache sau khi đã persist vào Queue thành công
+        fullMergedUpdates.forEach(up => {
             const idx = MOCK_RECORDS.findIndex(r => r.id === up.id);
             if (idx !== -1) {
                 MOCK_RECORDS[idx] = { ...MOCK_RECORDS[idx], ...up } as RecordFile;
             }
         });
-        syncCacheOnBatchUpdate(updates);
+        await syncCacheOnBatchUpdate(fullMergedUpdates);
         saveToCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
         if (onProgress) onProgress(updates.length, updates.length);
         return { success: true, count: updates.length };
@@ -1787,17 +2200,18 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         const hasRejections = results.some(res => res.status === 'rejected');
         if (hasRejections) {
             console.error(`[MUTATION] Supabase UPDATE: ERROR inside updateRecordsBatchById`);
-            console.warn(`[MUTATION] React State: NOT COMMITTED`);
-            results.forEach((res, index) => {
+            console.warn(`[MUTATION] React State: NOT COMMITTED to live UI until queue confirmed`);
+            for (let index = 0; index < results.length; index++) {
+                const res = results[index];
                 if (res.status === 'rejected') {
                     const table = index === 0 ? 'land_records' : index === 1 ? 'dangky_records' : 'luutru_records';
                     const rows = index === 0 ? landRows : index === 1 ? dangkyRows : luutruRows;
-                    rows.forEach(r => {
-                        addPendingRecord(r as RecordFile, 'UPDATE', table).catch(e => console.error(e));
-                    });
+                    for (const r of rows) {
+                        await addPendingRecord({ ...r, _isOfflineSaved: true } as RecordFile, 'UPDATE', table);
+                    }
                 }
-            });
-            return { success: false, count: 0, error: 'Lỗi đồng bộ dữ liệu tới Supabase' };
+            }
+            return { success: false, count: 0, error: 'Lỗi đồng bộ dữ liệu tới Supabase. Đã lưu vào hàng đợi đồng bộ.' };
         }
 
         console.log(`[MUTATION] Supabase UPDATE: SUCCESS for ${updates.length} records`);
@@ -1830,9 +2244,10 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         console.error(`[MUTATION] Supabase UPDATE: ERROR`, error);
         console.warn(`[MUTATION] React State: NOT COMMITTED`);
         logError("updateRecordsBatchById", error);
-        updates.forEach(u => {
-            addPendingRecord(u as RecordFile, 'UPDATE').catch(e => console.error(e));
-        });
+        for (const u of updates) {
+            const table = getTargetTable(u as RecordFile);
+            await addPendingRecord({ ...u, _isOfflineSaved: true } as RecordFile, 'UPDATE', table);
+        }
         return { success: false, count: 0, error };
     }
 };
@@ -1844,23 +2259,48 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
             const targetTable = getTargetTable(r);
             const payload = sanitizeData(r, RECORD_DB_COLUMNS);
             
-            // Cập nhật đồng thời theo cả cột id và cột code
+            const previousUpdatedAt = r.updated_at || (r as any).updatedAt;
+
             let query = supabase.from(targetTable).update(payload);
-            if (r.id && r.code) {
-                query = query.or(`id.eq.${r.id},code.eq.${r.code}`);
-            } else if (r.id) {
+            
+            if (r.id) {
                 query = query.eq('id', r.id);
             } else if (r.code) {
                 query = query.eq('code', r.code);
             } else {
                 continue;
             }
+
+            if (previousUpdatedAt) {
+                query = query.eq('updated_at', previousUpdatedAt);
+            }
             
-            const { error } = await query;
+            let { data, error } = await query.select();
             if (error) {
                 console.warn(`⚠️ [bulkUpdateDangKyRecordsApi] Error updating record ${r.id || r.code} in ${targetTable}:`, error);
-                // Thử lại duy nhất trên targetTable đã chỉ định
-                await supabase.from(targetTable).update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
+                let retryQuery = supabase.from(targetTable).update(payload).eq('id', r.id);
+                if (previousUpdatedAt) {
+                    retryQuery = retryQuery.eq('updated_at', previousUpdatedAt);
+                }
+                const res = await retryQuery.select();
+                data = res.data;
+                error = res.error;
+                if (error) throw error;
+            }
+
+            if (!data || data.length === 0) {
+                if (r.id) {
+                    const { data: checkData } = await supabase.from(targetTable).select('id, updated_at').eq('id', r.id);
+                    if (checkData && checkData.length > 0) {
+                        const currentDbUpdatedAt = checkData[0].updated_at;
+                        if (currentDbUpdatedAt !== previousUpdatedAt) {
+                            console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${r.id} in bulkUpdate was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                            throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${r.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
+                        }
+                    }
+                    console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${r.id}`);
+                    throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${r.id} was not found in table ${targetTable}.`);
+                }
             } else {
                 purgeRecordFromOtherTables(r.id, r.code, targetTable);
             }
@@ -1869,7 +2309,7 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
         return true;
     } catch (error) {
         logError("bulkUpdateDangKyRecordsApi", error, true);
-        return false;
+        throw error;
     }
 };
 

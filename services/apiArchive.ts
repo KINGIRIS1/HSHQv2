@@ -1,11 +1,22 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02 } from './apiCore';
 import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated } from './apiRecords';
+import { addPendingRecord } from './syncQueueService';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
 import { setIndexedDBItem, getIndexedDBItem } from './storageService';
 
 // --- TYPES ---
+export interface SaveArchiveResult {
+    success: boolean;
+    persisted: boolean;
+    queued: boolean;
+    offline: boolean;
+    record?: ArchiveRecord;
+    errorCode?: string;
+    message?: string;
+}
+
 export interface ArchiveRecord {
     id: string;
     created_at?: string;
@@ -79,10 +90,6 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
     }
 
     const batchVal = row.exportBatch || row.export_batch || row.data?.exportBatch || row.data?.danh_sach || null;
-
-    if (batchVal && status !== RecordStatus.WITHDRAWN && status !== RecordStatus.REJECTED && status !== RecordStatus.RETURNED) {
-        status = RecordStatus.HANDOVER;
-    }
 
     return {
         id: row.id,
@@ -160,11 +167,6 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
     else if (rawSt === 'handover' || rawSt === 'handed_over' || rawSt === 'completed' || rawSt === 'returned' || rawSt === 'giao_1_cua' || rawSt === 'giao_hs' || rawSt === 'da_giao') st = 'completed';
     else if (rawSt === 'withdrawn') st = 'withdrawn';
     else if (rawSt === 'rejected') st = 'rejected';
-
-    // BẮT BUỘC: Nếu hồ sơ đã được chốt đợt giao/xuất (batchVal), bảo tồn trạng thái 'completed' (Đã giao 1 cửa)
-    if (batchVal && st !== 'withdrawn' && st !== 'rejected') {
-        st = 'completed';
-    }
 
     const extraData = {
         ...(typeof row.data === 'object' && row.data !== null ? row.data : {}),
@@ -244,9 +246,6 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
     else if (rawSt === 'rejected') status = RecordStatus.REJECTED;
 
     const exportBatchVal = r.exportBatch || d.exportBatch || d.danh_sach || null;
-    if (exportBatchVal && status !== RecordStatus.WITHDRAWN && status !== RecordStatus.REJECTED && status !== RecordStatus.RETURNED) {
-        status = RecordStatus.HANDOVER;
-    }
 
     const effectiveCode = r.so_hieu || d.code || (r as any).code || '';
     const payload = {
@@ -509,21 +508,6 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             }
         }
 
-        // Tự động kiểm tra thêm bản ghi lưu trữ chưa chuyển đổi từ land_records để không sót hồ sơ
-        try {
-            const { data: landData } = await supabase
-                .from('land_records')
-                .select('*')
-                .or('recordType.ilike.%sao lục%,recordType.ilike.%công văn%,recordType.ilike.%1.1%,recordType.ilike.%1.2%,recordType.ilike.%cung cấp%')
-                .limit(500);
-            if (landData && landData.length > 0) {
-                const mappedLand = landData.map(item => mapLuutruDbToArchiveRecord(item)).filter(r => r.type === type);
-                allData = [...allData, ...mappedLand];
-            }
-        } catch (e) {
-            // Không ngắt luồng nếu land_records không có
-        }
-
         // Khử trùng lặp 100% bằng Map theo id hoặc số hiệu tránh trùng
         const uniqueMap = new Map<string, ArchiveRecord>();
         allData.forEach(r => {
@@ -533,21 +517,6 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             }
         });
         const result = Array.from(uniqueMap.values());
-
-        // Kiểm tra và tự động gộp các đợt lẻ chưa tạo đợt vào đợt lớn nhất theo ngày xuất
-        const unbatchedCandidates = result.filter(r => {
-            const isDone = r.status === 'completed' || Boolean(r.data?.ngay_hoan_thanh) || Boolean(r.data?.exportDate);
-            const noBatch = !r.exportBatch || String(r.exportBatch).trim() === '';
-            return isDone && noBatch;
-        });
-
-        if (unbatchedCandidates.length > 0) {
-            autoAssignDailyHighestBatchToUnbatchedRecords(type).then(res => {
-                if (res.updatedCount > 0) {
-                    console.log(`⚡ [Auto-Batch] Đã tự động gom ${res.updatedCount} hồ sơ lẻ vào ${res.batchName}`);
-                }
-            }).catch(e => console.warn('Auto-batch background warn:', e));
-        }
 
         saveToCache(CACHE_KEY_ARCHIVE, result);
         return result;
@@ -559,7 +528,8 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
     }
 };
 
-export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise<ArchiveRecord | null> => {
+export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise<SaveArchiveResult> => {
+    let fullRecord = { ...record };
     if (!isConfigured) {
         if (record.id) {
             const idx = MOCK_ARCHIVE.findIndex(r => r.id === record.id);
@@ -578,28 +548,33 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 } as ArchiveRecord;
                 MOCK_ARCHIVE[idx] = merged;
                 saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
-                return merged;
+                const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(merged));
+                await addPendingRecord(recFile, 'UPDATE', 'luutru_records');
+                return { success: true, persisted: false, queued: true, offline: true, record: merged };
             }
         } else {
             const newRec = { 
                 ...record, 
-                id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9), 
+                id: record.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9)), 
                 created_at: new Date().toISOString() 
             } as ArchiveRecord;
             MOCK_ARCHIVE.unshift(newRec);
             saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
-            return newRec;
+            const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(newRec));
+            await addPendingRecord(recFile, 'CREATE', 'luutru_records');
+            return { success: true, persisted: false, queued: true, offline: true, record: newRec };
         }
-        return null;
+        return { success: false, persisted: false, queued: false, offline: true, errorCode: 'OFFLINE_NOT_FOUND', message: 'Record not found in offline memory' };
     }
+    let existingRows: any = null;
     try {
-        let fullRecord = record;
         if (record.id) {
-            const { data: existingRows } = await supabase
+            const res = await supabase
                 .from('luutru_records')
                 .select('*')
                 .eq('id', record.id)
                 .single();
+            existingRows = res.data;
             if (existingRows) {
                 const currentArch = mapLuutruDbToArchiveRecord(existingRows);
                 fullRecord = {
@@ -616,42 +591,58 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             }
         }
 
-        const isDone = fullRecord.status === 'completed' || (fullRecord as any).status === 'HANDOVER' || (fullRecord as any).status === 'signed';
-        const hasNoBatch = !fullRecord.exportBatch && (!fullRecord.data || !fullRecord.data.exportBatch) && (!fullRecord.data || !fullRecord.data.danh_sach);
-        if (isDone && hasNoBatch) {
-            const targetDate = (fullRecord as any).exportDate || fullRecord.data?.exportDate || fullRecord.data?.ngay_hoan_thanh || new Date().toISOString().split('T')[0];
-            const autoBatchName = await getOrGenerateDailyHighestBatch(fullRecord.type || 'archive', targetDate);
-            fullRecord.exportBatch = autoBatchName;
-            if (!fullRecord.data) fullRecord.data = {};
-            fullRecord.data.exportBatch = autoBatchName;
-            fullRecord.data.danh_sach = autoBatchName;
-            fullRecord.data.exportDate = targetDate;
-            fullRecord.data.ngay_hoan_thanh = targetDate;
-        }
-
         const payload = mapArchiveRecordToLuutruDb(fullRecord);
 
         if (record.id) {
-            let { data, error } = await supabase.from('luutru_records').update(payload).eq('id', record.id).select();
+            let previousUpdatedAt = (record as any).updated_at || (record as any).updatedAt || (record.data && (record.data.updated_at || record.data.updatedAt));
+            if (!previousUpdatedAt && existingRows) {
+                previousUpdatedAt = existingRows.updated_at;
+            }
+
+            let query = supabase.from('luutru_records').update(payload).eq('id', record.id);
+            if (previousUpdatedAt) {
+                query = query.eq('updated_at', previousUpdatedAt);
+            }
+            let { data, error } = await query.select();
             
             if (error && (error.code === '42703' || String(error.message || '').includes('column') || error.code === 'PGRST204')) {
                 const fallbackPayload = { ...payload };
                 OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
-                const res = await supabase.from('luutru_records').update(fallbackPayload).eq('id', record.id).select();
+                let fallbackQuery = supabase.from('luutru_records').update(fallbackPayload).eq('id', record.id);
+                if (previousUpdatedAt) {
+                    fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
+                }
+                const res = await fallbackQuery.select();
                 data = res.data;
                 error = res.error;
             }
 
             if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
                 const cleanPayload = sanitizePayloadFor22P02(payload);
-                const res = await supabase.from('luutru_records').update(cleanPayload).eq('id', record.id).select();
+                let fallbackQuery = supabase.from('luutru_records').update(cleanPayload).eq('id', record.id);
+                if (previousUpdatedAt) {
+                    fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
+                }
+                const res = await fallbackQuery.select();
                 data = res.data;
                 error = res.error;
             }
 
             if (error) throw error;
-            const resRec = data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
-            if (resRec && data && data.length > 0) {
+            if (!data || data.length === 0) {
+                const { data: checkData } = await supabase.from('luutru_records').select('id, updated_at').eq('id', record.id);
+                if (checkData && checkData.length > 0) {
+                    const currentDbUpdatedAt = checkData[0].updated_at;
+                    if (currentDbUpdatedAt !== previousUpdatedAt) {
+                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Archive Record ID ${record.id} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                        throw new Error(`CONCURRENCY_CONFLICT: Archive Record with ID ${record.id} was modified by another user or session. Please refresh.`);
+                    }
+                }
+                console.error(`[MUTATION][ARCHIVE_UPDATE_NOT_FOUND] ID ${record.id} not found in luutru_records.`);
+                throw new Error(`[UPDATE_NOT_FOUND] Archive record with ID ${record.id} was not found in luutru_records.`);
+            }
+            const resRec = mapLuutruDbToArchiveRecord(data[0]);
+            if (resRec) {
                 if (resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
                     updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
                 }
@@ -659,7 +650,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 markRecordsRecentlyUpdated([mappedFile]);
             }
             memoryArchiveRecordsCache = null;
-            return resRec;
+            return { success: true, persisted: true, queued: false, offline: false, record: resRec };
         } else {
             let { data, error } = await supabase.from('luutru_records').insert([payload]).select();
             
@@ -679,7 +670,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             }
 
             if (error) throw error;
-            const resRec = data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
+            const resRec = data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : undefined;
             if (resRec && data && data.length > 0) {
                 if (resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
                     updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
@@ -688,11 +679,62 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 markRecordsRecentlyUpdated([mappedFile]);
             }
             memoryArchiveRecordsCache = null;
-            return resRec;
+            return { success: true, persisted: true, queued: false, offline: false, record: resRec };
         }
     } catch (error: any) {
         logError("saveArchiveRecord", error);
-        return null;
+
+        const errStr = String(error?.message || error || '').toLowerCase();
+        const errCode = String(error?.code || '').toLowerCase();
+
+        const isRouting = errStr.includes('routing_conflict') || errStr.includes('routing_unresolved');
+        const isConcurrency = errStr.includes('concurrency_conflict') || errCode === '40901' || errStr.includes('modified by another user');
+        const isUpdateNotFound = errStr.includes('update_not_found');
+        const isValidation = errCode.startsWith('23') || errCode === '22p02' || errCode === '22007' || errCode === '22008' || 
+                             errStr.includes('invalid input') || errStr.includes('constraint') || errStr.includes('violat') || 
+                             errStr.includes('invalid uuid') || errStr.includes('invalid date') || errStr.includes('invalid status');
+
+        const isNetworkOrTempDb = errStr.includes('failed to fetch') || errStr.includes('networkerror') || 
+                                  errStr.includes('timeout') || errStr.includes('connection refused') || 
+                                  errStr.includes('transient') || errStr.includes('connection failure') ||
+                                  errStr.includes('load failed') || errCode === 'ebusy' || errCode === 'enotfound';
+
+        const shouldQueue = isNetworkOrTempDb || (!isRouting && !isConcurrency && !isUpdateNotFound && !isValidation);
+
+        if (shouldQueue) {
+            console.log("[MUTATION][ARCHIVE_SAVE] Transient/Network error detected. Saving to pending offline queue.");
+            const payload = mapArchiveRecordToLuutruDb(fullRecord);
+            const recFile = mapArchiveDbToRecordFile(payload);
+            try {
+                await addPendingRecord(recFile, record.id ? 'UPDATE' : 'CREATE', 'luutru_records');
+                return {
+                    success: true,
+                    persisted: false,
+                    queued: true,
+                    offline: true,
+                    record: fullRecord as ArchiveRecord
+                };
+            } catch (qErr: any) {
+                return {
+                    success: false,
+                    persisted: false,
+                    queued: false,
+                    offline: false,
+                    errorCode: 'QUEUE_ERROR',
+                    message: `Failed to save to offline queue: ${String(qErr)}`
+                };
+            }
+        } else {
+            console.warn(`[MUTATION][ARCHIVE_SAVE] Hard error (Validation/Routing/Concurrency) detected. Skipping queue. Error: ${errStr}`);
+            return {
+                success: false,
+                persisted: false,
+                queued: false,
+                offline: false,
+                errorCode: isConcurrency ? 'CONCURRENCY_CONFLICT' : (isRouting ? 'ROUTING_ERROR' : (isUpdateNotFound ? 'UPDATE_NOT_FOUND' : 'VALIDATION_ERROR')),
+                message: error?.message || String(error)
+            };
+        }
     }
 };
 
@@ -718,14 +760,19 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
 
 export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): Promise<boolean> => {
     if (!isConfigured) {
-        records.forEach(r => {
+        for (const r of records) {
+            const newId = r.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9));
             const newRec = { 
                 ...r, 
-                id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9), 
+                id: newId, 
                 created_at: new Date().toISOString() 
             } as ArchiveRecord;
             MOCK_ARCHIVE.unshift(newRec);
-        });
+
+            const payload = mapArchiveRecordToLuutruDb(newRec);
+            const recFile = mapArchiveDbToRecordFile(payload);
+            await addPendingRecord(recFile, 'CREATE', 'luutru_records');
+        }
         saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
         return true;
     }
@@ -740,8 +787,48 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
         }
         if (error) throw error;
         return true;
-    } catch (error) {
+    } catch (error: any) {
         logError("importArchiveRecords", error, true);
+
+        const errStr = String(error?.message || error || '').toLowerCase();
+        const errCode = String(error?.code || '').toLowerCase();
+
+        const isValidation = errCode.startsWith('23') || errCode === '22p02' || errCode === '22007' || errCode === '22008' || 
+                             errStr.includes('invalid input') || errStr.includes('constraint') || errStr.includes('violat') || 
+                             errStr.includes('invalid uuid') || errStr.includes('invalid date') || errStr.includes('invalid status');
+
+        const isNetworkOrTempDb = errStr.includes('failed to fetch') || errStr.includes('networkerror') || 
+                                  errStr.includes('timeout') || errStr.includes('connection refused') || 
+                                  errStr.includes('transient') || errStr.includes('connection failure') ||
+                                  errStr.includes('load failed') || errCode === 'ebusy' || errCode === 'enotfound';
+
+        const shouldQueue = isNetworkOrTempDb || !isValidation;
+
+        if (shouldQueue) {
+            console.log("[MUTATION][ARCHIVE_IMPORT] Transient/Network error detected on import. Pushing imported records to pending queue...");
+            for (const r of records) {
+                const payload = mapArchiveRecordToLuutruDb(r);
+                const recFile = mapArchiveDbToRecordFile(payload);
+                try {
+                    await addPendingRecord(recFile, 'CREATE', 'luutru_records');
+                } catch (queueErr) {
+                    console.error("Failed to add imported record to pending queue:", queueErr);
+                }
+            }
+
+            records.forEach(r => {
+                const newRec = { 
+                    ...r, 
+                    id: r.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9)), 
+                    created_at: new Date().toISOString() 
+                } as ArchiveRecord;
+                MOCK_ARCHIVE.unshift(newRec);
+            });
+            saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+
+            return true;
+        }
+
         return false;
     }
 };
@@ -767,19 +854,9 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
             .in('id', ids);
             
         if (fetchError) throw fetchError;
-        if (!currentRecords || currentRecords.length === 0) return true;
-
-        const isDoneBatch = updates.status === 'completed' || (updates as any).status === 'HANDOVER';
-        const hasNoBatchInUpdates = !updates.exportBatch && (!updates.data || !updates.data.exportBatch) && (!updates.data || !updates.data.danh_sach);
-        if (isDoneBatch && hasNoBatchInUpdates) {
-            const dateVal = (updates as any).exportDate || updates.data?.exportDate || updates.data?.ngay_hoan_thanh || new Date().toISOString().split('T')[0];
-            const autoBatch = await getOrGenerateDailyHighestBatch('archive', dateVal);
-            updates.exportBatch = autoBatch;
-            if (!updates.data) updates.data = {};
-            updates.data.exportBatch = autoBatch;
-            updates.data.danh_sach = autoBatch;
-            updates.data.exportDate = dateVal;
-            updates.data.ngay_hoan_thanh = dateVal;
+        if (!currentRecords || currentRecords.length === 0) {
+            console.error(`[MUTATION][UPDATE_NOT_FOUND] Records with IDs ${ids.join(', ')} not found in luutru_records.`);
+            throw new Error(`[UPDATE_NOT_FOUND] Records with IDs ${ids.join(', ')} were not found in luutru_records.`);
         }
 
         const updatedPayloads = currentRecords.map(r => {
@@ -795,31 +872,61 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
             return mapArchiveRecordToLuutruDb(mergedArch);
         });
 
-        let { error: upsertError } = await supabase.from('luutru_records').upsert(updatedPayloads);
-        if (upsertError && (upsertError.code === '42703' || String(upsertError.message || '').includes('column') || upsertError.code === 'PGRST204')) {
-            const fallbackPayloads = updatedPayloads.map(p => {
-                const fp = { ...p };
-                OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fp[col]);
-                return fp;
-            });
-            const res = await supabase.from('luutru_records').upsert(fallbackPayloads);
-            upsertError = res.error;
+        for (const payload of updatedPayloads) {
+            const curRec = currentRecords.find(cr => cr.id === payload.id);
+            const previousUpdatedAt = curRec ? curRec.updated_at : null;
+
+            let query = supabase.from('luutru_records').update(payload).eq('id', payload.id);
+            if (previousUpdatedAt) {
+                query = query.eq('updated_at', previousUpdatedAt);
+            }
+            let { data, error: updateError } = await query.select();
+
+            if (updateError && (updateError.code === '42703' || String(updateError.message || '').includes('column') || updateError.code === 'PGRST204')) {
+                const fallbackPayload = { ...payload };
+                OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                let fallbackQuery = supabase.from('luutru_records').update(fallbackPayload).eq('id', payload.id);
+                if (previousUpdatedAt) {
+                    fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
+                }
+                const res = await fallbackQuery.select();
+                data = res.data;
+                updateError = res.error;
+            }
+
+            if (updateError && (updateError.code === '22P02' || String(updateError.message || '').includes('22P02'))) {
+                const cleanPayload = sanitizePayloadFor22P02(payload);
+                let fallbackQuery = supabase.from('luutru_records').update(cleanPayload).eq('id', payload.id);
+                if (previousUpdatedAt) {
+                    fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
+                }
+                const res = await fallbackQuery.select();
+                data = res.data;
+                updateError = res.error;
+            }
+
+            if (updateError) throw updateError;
+            if (!data || data.length === 0) {
+                const { data: checkData } = await supabase.from('luutru_records').select('id, updated_at').eq('id', payload.id);
+                if (checkData && checkData.length > 0) {
+                    const currentDbUpdatedAt = checkData[0].updated_at;
+                    if (currentDbUpdatedAt !== previousUpdatedAt) {
+                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Archive Record ID ${payload.id} in batch was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                        throw new Error(`CONCURRENCY_CONFLICT: Archive Record with ID ${payload.id} was modified by another user or session. Please refresh.`);
+                    }
+                }
+                console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on luutru_records for ID: ${payload.id}`);
+                throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${payload.id} was not found in luutru_records.`);
+            }
         }
 
-        if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02'))) {
-            const cleanPayload = sanitizePayloadFor22P02(updatedPayloads);
-            const res = await supabase.from('luutru_records').upsert(cleanPayload);
-            upsertError = res.error;
-        }
-
-        if (upsertError) throw upsertError;
         const mappedFiles = updatedPayloads.map(p => mapArchiveDbToRecordFile(p));
         markRecordsRecentlyUpdated(mappedFiles);
         memoryArchiveRecordsCache = null;
         return true;
     } catch (error) {
         logError("updateArchiveRecordsBatch", error, true);
-        return false;
+        throw error;
     }
 };
 
@@ -884,38 +991,6 @@ export const fetchListsByDate = async (type: string | undefined, date: string): 
         luutruData?.forEach((r: any) => {
             const batchVal = r.exportBatch || r.data?.exportBatch || r.data?.danh_sach;
             const dateVal = r.exportDate || r.completedWorkDate || r.data?.ngay_hoan_thanh || r.data?.exportDate;
-            if (batchVal) {
-                if (!cleanDate || (dateVal && dateVal.startsWith(cleanDate))) {
-                    lists.add(String(batchVal).trim());
-                }
-            }
-        });
-
-        // Query land_records
-        const { data: landData } = await supabase
-            .from('land_records')
-            .select('completed_date, export_batch, export_date')
-            .not('export_batch', 'is', null);
-
-        landData?.forEach((r: any) => {
-            const batchVal = r.export_batch || r.exportBatch;
-            const dateVal = r.export_date || r.exportDate || r.completed_date;
-            if (batchVal) {
-                if (!cleanDate || (dateVal && dateVal.startsWith(cleanDate))) {
-                    lists.add(String(batchVal).trim());
-                }
-            }
-        });
-
-        // Query dangky_records
-        const { data: dangkyData } = await supabase
-            .from('dangky_records')
-            .select('completed_date, export_batch, export_date')
-            .not('export_batch', 'is', null);
-
-        dangkyData?.forEach((r: any) => {
-            const batchVal = r.export_batch || r.exportBatch;
-            const dateVal = r.export_date || r.exportDate || r.completed_date;
             if (batchVal) {
                 if (!cleanDate || (dateVal && dateVal.startsWith(cleanDate))) {
                     lists.add(String(batchVal).trim());
@@ -1057,7 +1132,7 @@ export const createArchiveBatch = async (
         }
 
         if (recordIds.length > 0 && isConfigured) {
-            // Update luutru_records
+            // Update luutru_records ONLY
             try {
                 await updateArchiveRecordsBatch(recordIds, {
                     status: 'completed',
@@ -1072,48 +1147,6 @@ export const createArchiveBatch = async (
                 });
             } catch (err) {
                 console.warn('⚠️ updateArchiveRecordsBatch inside createArchiveBatch safely caught:', err);
-            }
-
-            // Update land_records (thử cả camelCase và snake_case)
-            try {
-                const { error: err1 } = await supabase.from('land_records').update({
-                    exportBatch: finalBatchName,
-                    exportDate: handoverDate,
-                    updated_at: nowIso,
-                    status: 'HANDOVER'
-                }).in('id', recordIds);
-                
-                if (err1) {
-                    await supabase.from('land_records').update({
-                        export_batch: finalBatchName,
-                        export_date: handoverDate,
-                        updated_at: nowIso,
-                        status: 'HANDOVER'
-                    }).in('id', recordIds);
-                }
-            } catch (err) {
-                console.warn('⚠️ land_records update inside createArchiveBatch safely caught:', err);
-            }
-
-            // Update dangky_records (thử cả camelCase và snake_case)
-            try {
-                const { error: err2 } = await supabase.from('dangky_records').update({
-                    exportBatch: finalBatchName,
-                    exportDate: handoverDate,
-                    updated_at: nowIso,
-                    status: 'HANDOVER'
-                }).in('id', recordIds);
-
-                if (err2) {
-                    await supabase.from('dangky_records').update({
-                        export_batch: finalBatchName,
-                        export_date: handoverDate,
-                        updated_at: nowIso,
-                        status: 'HANDOVER'
-                    }).in('id', recordIds);
-                }
-            } catch (err) {
-                console.warn('⚠️ dangky_records update inside createArchiveBatch safely caught:', err);
             }
         }
 

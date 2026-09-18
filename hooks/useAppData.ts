@@ -8,7 +8,7 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
-import { migrateArchiveRecordsFromLandRecords, fetchAllArchiveRecordsAsRecordFiles } from '../services/apiArchive';
+import { fetchAllArchiveRecordsAsRecordFiles } from '../services/apiArchive';
 import { getIndexedDBItem } from '../services/storageService';
 import { getPendingSyncCount, syncPendingRecordsToCloud, generateStandardUUID } from '../services/syncQueueService';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
@@ -16,27 +16,43 @@ import { migrateUnbatchedRecords, deduplicateRecords } from '../utils/appHelpers
 import { connectionManager } from '../services/connectionService';
 import { syncGoogleDriveConfigFromCloud } from '../services/attachmentStorage';
 
+const getRecordTs = (r: any): number => {
+    if (!r) return 0;
+    const str = r.updated_at || r.updatedAt || r.statusChangedAt || r.createdAt || r.created_at;
+    if (!str) return 0;
+    const ts = Date.parse(String(str));
+    return isNaN(ts) ? 0 : ts;
+};
+
 /**
  * Hàm đối chiếu bảo vệ dữ liệu cục bộ:
- * Đảm bảo các hồ sơ đang lưu ngoại tuyến HOẶC vừa được người dùng thao tác chuyển bước trong 45s
- * KHÔNG bao giờ bị tiến trình tải nền hoặc đồng bộ từ máy chủ giật lùi trạng thái.
+ * Dựa trên timestamp/version (updated_at/updatedAt):
+ * Nếu dữ liệu local hoặc vừa update có timestamp mới hơn DB -> KHÔNG bị ghi đè lùi trạng thái.
  */
 const reconcileWithProtectedRecords = (incomingRecords: RecordFile[], currentPrev: RecordFile[]): RecordFile[] => {
-    const now = Date.now();
-    const protectedMap = new Map<string, RecordFile>();
-    currentPrev.forEach(r => {
-        if (r._isOfflineSaved) {
-            protectedMap.set(r.id, r);
-        } else {
-            const recent = RECENTLY_UPDATED_RECORDS.get(r.id);
-            if (recent && (now - recent.updatedAt < 45000)) {
-                protectedMap.set(r.id, { ...r, ...recent.record });
-            }
-        }
-    });
+    const currentMap = new Map<string, RecordFile>();
+    currentPrev.forEach(r => currentMap.set(r.id, r));
 
-    if (protectedMap.size === 0) return incomingRecords;
-    return incomingRecords.map(r => protectedMap.get(r.id) || r);
+    return incomingRecords.map(incoming => {
+        const local = currentMap.get(incoming.id);
+        if (!local) return incoming;
+
+        if (local._isOfflineSaved) return local;
+
+        const recent = RECENTLY_UPDATED_RECORDS.get(incoming.id);
+        const localTs = Math.max(getRecordTs(local), recent?.updatedAt || 0);
+        const incomingTs = getRecordTs(incoming);
+
+        if (recent) {
+            if (incoming.status !== recent.record.status && incomingTs <= recent.updatedAt) {
+                return { ...incoming, ...recent.record, status: recent.record.status };
+            }
+        } else if (localTs > incomingTs && local.status !== incoming.status) {
+            return local;
+        }
+
+        return incoming;
+    });
 };
 
 export const useAppData = (currentUser: User | null) => {
@@ -300,18 +316,15 @@ export const useAppData = (currentUser: User | null) => {
     useEffect(() => {
         if (!supabase) return;
 
-        // Chạy migration ngầm nếu còn bản ghi lưu trữ tồn đọng trong land_records
-        migrateArchiveRecordsFromLandRecords().catch(e => console.warn("Archive migration error:", e));
-
         const handleRealtimeUpdate = (newRow: any, table: 'land_records' | 'luutru_records' | 'dangky_records') => {
             const updated = mapRecordFromDb({ ...newRow, sourceTable: table }) as RecordFile;
             setRecords(prev => {
-                const now = Date.now();
                 const recent = RECENTLY_UPDATED_RECORDS.get(newRow.id);
-                if (recent && (now - recent.updatedAt < 20000)) {
-                    // Nếu ở client vừa thao tác chuyển bước trong 20s mà payload máy chủ trả về có trạng thái khác, ưu tiên trạng thái client
-                    if (updated.status !== recent.record.status) {
-                        return prev.map(r => r.id === newRow.id ? { ...r, ...updated, ...recent.record } : r);
+                const incomingTs = getRecordTs(updated);
+                
+                if (recent) {
+                    if (updated.status !== recent.record.status && incomingTs <= recent.updatedAt) {
+                        return prev.map(r => r.id === newRow.id ? { ...r, ...updated, ...recent.record, status: recent.record.status } : r);
                     }
                 }
                 return prev.map(r => r.id === newRow.id ? { ...r, ...updated } : r);
@@ -643,9 +656,7 @@ export const useAppData = (currentUser: User | null) => {
     const handleAddOrUpdateRecord = async (recordData: any): Promise<RecordFile | null> => {
         const isEdit = recordData.id && records.find(r => r.id === recordData.id);
         if (isEdit) {
-            // Optimistic update: Cập nhật bộ nhớ UI ngay lập tức 0ms
-            setRecords(prev => prev.map(r => r.id === recordData.id ? { ...r, ...recordData } : r));
-
+            // Xác nhận ghi thành công vào CSDL hoặc hàng đợi offline an toàn trước khi cập nhật React State
             const updated = await updateRecordApi(recordData);
             if (updated) {
                 setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
@@ -653,13 +664,12 @@ export const useAppData = (currentUser: User | null) => {
                 setPendingSyncCount(count);
                 return updated;
             }
-            return recordData as RecordFile;
+            return null;
         } else {
             const standardId = (recordData.id && String(recordData.id).includes('-')) ? recordData.id : generateStandardUUID();
             const tempRecord = { ...recordData, id: standardId };
-            // Optimistic insert: Hiển thị ngay hồ sơ mới trên UI
-            setRecords(prev => [tempRecord, ...prev.filter(r => r.id !== standardId)]);
 
+            // Xác nhận tạo thành công vào CSDL hoặc hàng đợi offline an toàn trước khi cập nhật React State
             const newRecord = await createRecordApi(tempRecord);
             if (newRecord) {
                 setRecords(prev => [newRecord, ...prev.filter(r => r.id !== newRecord.id)]);
@@ -667,23 +677,36 @@ export const useAppData = (currentUser: User | null) => {
                 setPendingSyncCount(count);
                 return newRecord;
             }
-            return tempRecord;
+            return null;
         }
     };
 
     const handleDeleteRecord = async (id: string) => {
-        const success = await deleteRecordApi(id);
-        if (success) {
-            setRecords(prev => prev.filter(r => r.id !== id));
+        try {
+            const success = await deleteRecordApi(id);
+            if (success) {
+                setRecords(prev => prev.filter(r => r.id !== id));
+            }
+            return success;
+        } catch (error) {
+            console.error("[useAppData] Delete record failed:", error);
+            throw error;
         }
-        return success;
     };
 
     const handleBatchDeleteRecords = async (ids: string[]) => {
         if (!ids || ids.length === 0) return true;
-        setRecords(prev => prev.filter(r => !ids.includes(r.id)));
-        const success = await deleteRecordsBatchApi(ids);
-        return success;
+        try {
+            // Optimistically update memory only if no error occurs, or we can update it after delete success
+            const success = await deleteRecordsBatchApi(ids);
+            if (success) {
+                setRecords(prev => prev.filter(r => !ids.includes(r.id)));
+            }
+            return success;
+        } catch (error) {
+            console.error("[useAppData] Batch delete records failed:", error);
+            throw error;
+        }
     };
 
     const handleImportRecords = async (newRecords: RecordFile[], onProgress?: (processed: number, total: number) => void) => {

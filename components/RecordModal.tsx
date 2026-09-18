@@ -792,7 +792,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 }
             } else if (field === 'approvalDate') {
                 if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED && updated.status !== RecordStatus.RETURNED && updated.status !== RecordStatus.HANDOVER) {
-                    updated.status = RecordStatus.SIGNED;
+                    updated.status = isCapGiay ? RecordStatus.PENDING_HANDOVER : RecordStatus.SIGNED;
                 }
             } else if (field === 'submissionDate' || field === 'checkedDate') {
                 if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED && updated.status !== RecordStatus.RETURNED && updated.status !== RecordStatus.HANDOVER && updated.status !== RecordStatus.SIGNED) {
@@ -818,7 +818,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 }
             } else if (field === 'assignedDate') {
                 if (updated.status === RecordStatus.RECEIVED) {
-                    if (isArchive) {
+                    if (isCapGiay) {
+                        updated.status = RecordStatus.APPRAISAL;
+                    } else if (isArchive) {
                         updated.status = RecordStatus.ASSIGNED;
                     } else if (isFieldWorkProcedure(updated.recordType || '')) {
                         updated.status = RecordStatus.FIELD_WORK;
@@ -845,7 +847,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             updated.assignedDate = new Date().toISOString().split('T')[0];
           }
           if (updated.status === RecordStatus.RECEIVED) {
-            if (isArchiveRecordType(updated.recordType || '')) {
+            if (isCapGiay) {
+              updated.status = RecordStatus.APPRAISAL;
+            } else if (isArchiveRecordType(updated.recordType || '')) {
               updated.status = RecordStatus.ASSIGNED;
             } else if (isFieldWorkProcedure(updated.recordType || '')) {
               updated.status = RecordStatus.FIELD_WORK;

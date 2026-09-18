@@ -445,9 +445,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             }
         };
         
-        const saved = await saveArchiveRecord(newRecord);
-        if (saved) {
-            setEditingId(saved.id);
+        const result = await saveArchiveRecord(newRecord);
+        if (result && (result.persisted || result.queued) && result.record) {
+            setEditingId(result.record.id);
             loadData();
         }
     };

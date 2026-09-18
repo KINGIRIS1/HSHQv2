@@ -59,16 +59,14 @@ export const getIndexedDBContracts = async (): Promise<Contract[]> => {
     return getLocalContracts();
 };
 
-const setLocalContracts = (contracts: Contract[]) => {
+const setLocalContracts = async (contracts: Contract[]): Promise<void> => {
+    // Lưu bền vững vào IndexedDB trước
+    await setIndexedDBItem(LOCAL_CONTRACTS_KEY, contracts);
     memoryContractsCache = contracts;
     // Tuyệt đối không lưu vào LocalStorage để không bao giờ bị lỗi quota 5MB
     try {
         localStorage.removeItem(LOCAL_CONTRACTS_KEY);
     } catch (_) {}
-    // Lưu bền vững vào IndexedDB (dung lượng không giới hạn)
-    setIndexedDBItem(LOCAL_CONTRACTS_KEY, contracts).catch((err) => {
-        console.error("Lỗi ghi IndexedDB contracts:", err);
-    });
 };
 
 export const mapContractToDbSnake = (c: Contract) => ({
@@ -189,7 +187,7 @@ export const createContractApi = async (contract: Contract): Promise<boolean> =>
         } else {
             updatedContracts.unshift(contract);
         }
-        setLocalContracts(updatedContracts);
+        await setLocalContracts(updatedContracts);
 
         // 2. Thử đồng bộ lên Cloud Supabase nếu có kết nối
         if (isConfigured) {
@@ -229,10 +227,10 @@ export const updateContractApi = async (contract: Contract): Promise<boolean> =>
         const index = updatedContracts.findIndex(c => c.id === contract.id || (c.code && c.code === contract.code));
         if (index >= 0) {
             updatedContracts[index] = contract;
-            setLocalContracts(updatedContracts);
+            await setLocalContracts(updatedContracts);
         } else {
             updatedContracts.unshift(contract);
-            setLocalContracts(updatedContracts);
+            await setLocalContracts(updatedContracts);
         }
 
         // 2. Thử đồng bộ lên Supabase
@@ -270,7 +268,7 @@ export const deleteContractApi = async (id: string): Promise<boolean> => {
             contracts = await getIndexedDBContracts();
         }
         const filtered = contracts.filter(c => c.id !== id);
-        setLocalContracts(filtered);
+        await setLocalContracts(filtered);
 
         // 2. Xóa trên Cloud Supabase
         if (isConfigured) {

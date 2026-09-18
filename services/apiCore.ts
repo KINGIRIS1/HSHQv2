@@ -22,6 +22,78 @@ export const CACHE_KEYS = {
 };
 
 // --- HELPERS ---
+export const isTransientError = (error: any): boolean => {
+    if (!error) return false;
+    const msg = String(error.message || error).toLowerCase();
+    const code = String(error.code || '');
+    
+    // Check if offline
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.onLine === false) {
+        return true;
+    }
+    
+    // Network/Fetch/Timeout error keywords
+    if (
+        msg.includes('failed to fetch') ||
+        msg.includes('fetch failed') ||
+        msg.includes('network error') ||
+        msg.includes('networkerror') ||
+        msg.includes('timeout') ||
+        msg.includes('connection lost') ||
+        msg.includes('connection refused') ||
+        msg.includes('offline') ||
+        code === 'FETCH_ERROR' ||
+        code === 'TypeError'
+    ) {
+        return true;
+    }
+    
+    // Permanent/Database constraints/Routing/Validation errors are NOT transient
+    const permanentCodes = [
+        '23505', // unique_violation
+        '23503', // foreign_key_violation
+        '23502', // not_null_violation
+        '22P02', // invalid_text_representation
+        '42703', // undefined_column
+        '42P01', // undefined_table
+        'PGRST116',
+        'PGRST204',
+        'PGRST200',
+        '23514', // check_violation
+        '42501', // permission_denied
+    ];
+    if (permanentCodes.includes(code)) {
+        return false;
+    }
+
+    if (
+        msg.includes('validation_error') ||
+        msg.includes('validation error') ||
+        msg.includes('routing_unresolved') ||
+        msg.includes('routing_conflict') ||
+        msg.includes('duplicate_id_conflict') ||
+        msg.includes('concurrency_conflict') ||
+        msg.includes('update_not_found') ||
+        msg.includes('constraint') ||
+        msg.includes('permission denied') ||
+        msg.includes('unauthorized') ||
+        msg.includes('invalid input') ||
+        msg.includes('invalid uuid') ||
+        msg.includes('sync_routing_conflict')
+    ) {
+        return false;
+    }
+
+    if (error.status && error.status >= 500 && error.status <= 599) {
+        return true;
+    }
+    if (error.status && error.status >= 400 && error.status <= 499) {
+        return false;
+    }
+
+    return false;
+};
+
 export const saveToCache = (key: string, data: any) => {
     // 1. Nếu là danh sách hồ sơ: Lưu 100% toàn bộ vào IndexedDB, KHÔNG lưu vào LocalStorage để tránh giới hạn 5MB và lỗi cắt 50 hồ sơ
     if (key === CACHE_KEYS.RECORDS) {
@@ -606,6 +678,16 @@ export const mapRecordFromDb = (item: any): any => {
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
 
+    // Dữ liệu phục vụ bổ sung hồ sơ
+    r.previousStatus = val(r.previousStatus, r.previousstatus, r.previous_status, r.supplementReturnStatus, r.supplementreturnstatus, r.supplement_return_status);
+    r.supplementReturnStatus = val(r.supplementReturnStatus, r.supplementreturnstatus, r.supplement_return_status, r.previousStatus, r.previousstatus, r.previous_status);
+    r.supplementReason = val(r.supplementReason, r.supplementreason, r.supplement_reason, r.pendingSupplementReason, r.pendingsupplementreason, r.pending_supplement_reason);
+    r.supplementRequestedBy = val(r.supplementRequestedBy, r.supplementrequestedby, r.supplement_requested_by);
+    r.supplementRequestedAt = val(r.supplementRequestedAt, r.supplementrequestedat, r.supplement_requested_at, r.supplementRequestDate, r.supplementrequestdate, r.supplement_request_date);
+    r.supplementStartedAt = val(r.supplementStartedAt, r.supplementstartedat, r.supplement_started_at);
+    r.supplementCompletedBy = val(r.supplementCompletedBy, r.supplementcompletedby, r.supplement_completed_by, r.supplementConfirmedBy, r.supplementconfirmedby, r.supplement_confirmed_by);
+    r.supplementCompletedAt = val(r.supplementCompletedAt, r.supplementcompletedat, r.supplement_completed_at, r.supplementReturnedDate, r.supplementreturneddate, r.supplement_returned_date);
+
     // Mappings cho quy trình đo đạc 2 bước (Ngoại nghiệp & Nội nghiệp)
     r.surveyorId = val(r.surveyorId, r.surveyorid, r.surveyor_id);
     r.surveyAssignedDate = keepOnlyDate(val(r.surveyAssignedDate, r.surveyassigneddate, r.survey_assigned_date));
@@ -635,11 +717,6 @@ export const mapRecordFromDb = (item: any): any => {
         rawStatus = RecordStatus.RECEIVED;
     }
 
-    // Nếu hồ sơ có đợt xuất (exportBatch/exportDate) mà không bị Rút/Từ chối -> Tự động đưa về HANDOVER
-    if ((r.exportBatch || r.exportDate) && rawStatus !== RecordStatus.WITHDRAWN && rawStatus !== RecordStatus.REJECTED && rawStatus !== RecordStatus.RETURNED) {
-        rawStatus = RecordStatus.HANDOVER;
-    }
-
     const currentStatus = rawStatus;
     const isArchive = isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records';
     const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
@@ -663,8 +740,6 @@ export const mapRecordFromDb = (item: any): any => {
             r.status = currentStatus as RecordStatus;
         } else if (r.resultReturnedDate) {
             r.status = RecordStatus.RETURNED;
-        } else if (r.completedDate || r.exportDate) {
-            r.status = RecordStatus.HANDOVER;
         } else if (r.approvalDate) {
             r.status = RecordStatus.SIGNED;
         } else if (r.submissionDate || r.submittedTo) {

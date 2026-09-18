@@ -115,8 +115,14 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     taxPaymentDate: dbItem.taxPaymentDate || '',
     printCertDate: dbItem.printCertDate || '',
     pendingHandoverDate: dbItem.pendingHandoverDate || '',
-    previousStatus: dbItem.previousStatus || '',
-    supplementReason: dbItem.supplementReason || '',
+    previousStatus: dbItem.previousStatus || dbItem.supplementReturnStatus || '',
+    supplementReturnStatus: dbItem.supplementReturnStatus || dbItem.previousStatus || '',
+    supplementReason: dbItem.supplementReason || dbItem.pendingSupplementReason || '',
+    supplementRequestedBy: dbItem.supplementRequestedBy || '',
+    supplementRequestedAt: dbItem.supplementRequestedAt || dbItem.supplementRequestDate || '',
+    supplementStartedAt: dbItem.supplementStartedAt || dbItem.supplementRequestedAt || '',
+    supplementCompletedBy: dbItem.supplementCompletedBy || dbItem.supplementConfirmedBy || '',
+    supplementCompletedAt: dbItem.supplementCompletedAt || dbItem.supplementReturnedDate || '',
     statusLogs,
     dossierComponents,
     attachedFiles,
@@ -197,7 +203,13 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.printCertDate !== undefined) payload.printCertDate = record.printCertDate || null;
   if (record.pendingHandoverDate !== undefined) payload.pendingHandoverDate = record.pendingHandoverDate || null;
   if (record.previousStatus !== undefined) payload.previousStatus = record.previousStatus;
+  if (record.supplementReturnStatus !== undefined) payload.supplementReturnStatus = record.supplementReturnStatus;
   if (record.supplementReason !== undefined) payload.supplementReason = record.supplementReason;
+  if (record.supplementRequestedBy !== undefined) payload.supplementRequestedBy = record.supplementRequestedBy;
+  if (record.supplementRequestedAt !== undefined) payload.supplementRequestedAt = record.supplementRequestedAt;
+  if (record.supplementStartedAt !== undefined) payload.supplementStartedAt = record.supplementStartedAt;
+  if (record.supplementCompletedBy !== undefined) payload.supplementCompletedBy = record.supplementCompletedBy;
+  if (record.supplementCompletedAt !== undefined) payload.supplementCompletedAt = record.supplementCompletedAt;
 
   if (record.statusLogs !== undefined) payload.statusLogs = record.statusLogs;
   if (record.dossierComponents !== undefined) payload.dossierComponents = record.dossierComponents;
@@ -227,41 +239,17 @@ export const fetchDangkyRecords = async (): Promise<RecordFile[]> => {
 
     const mapped = (data || []).map(mapDangkyRecordFromDb);
 
-    // Tự động phân loại và di chuyển các hồ sơ bị phân nhầm vào dangky_records
+    // Kiểm tra log nếu có hồ sơ bị phân nhầm bảng (giữ nguyên READ ONLY, không tự động di chuyển)
     const misplacedForLuutru = mapped.filter(r => getTargetTable(r) === 'luutru_records');
     const misplacedForLand = mapped.filter(r => getTargetTable(r) === 'land_records');
-
-    // Tự động phát hiện các dòng hoàn toàn trống rác
     const blankRecords = mapped.filter(r => isBlankRecord(r));
 
-    const blankIds = new Set(blankRecords.map(r => r.id).filter(Boolean));
-    const misplacedIds = new Set([
-      ...misplacedForLuutru.map(r => r.id),
-      ...misplacedForLand.map(r => r.id)
-    ].filter(Boolean));
-
-    if (misplacedForLuutru.length > 0 || misplacedForLand.length > 0 || blankIds.size > 0) {
-      console.log(`[DangKy Auto-Fix] Phát hiện ${misplacedForLuutru.length} nhầm Lưu trữ, ${misplacedForLand.length} nhầm Đo đạc, ${blankIds.size} dòng trống. Đang tự động xử lý...`);
-      setTimeout(async () => {
-        try {
-          if (misplacedForLuutru.length > 0) {
-            await supabase.from('luutru_records').upsert(misplacedForLuutru.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-            await supabase.from(TABLE_NAME).delete().in('id', misplacedForLuutru.map(r => r.id));
-          }
-          if (misplacedForLand.length > 0) {
-            await supabase.from('land_records').upsert(misplacedForLand.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-            await supabase.from(TABLE_NAME).delete().in('id', misplacedForLand.map(r => r.id));
-          }
-          if (blankIds.size > 0) {
-            await supabase.from(TABLE_NAME).delete().in('id', Array.from(blankIds));
-          }
-        } catch (cleanErr) {
-          console.error("[DangKy Auto-Fix] Lỗi khi dọn dẹp bản ghi nhầm/trống:", cleanErr);
-        }
-      }, 300);
+    if (misplacedForLuutru.length > 0 || misplacedForLand.length > 0) {
+      console.warn(`[DangKy API Warning] Phát hiện ${misplacedForLuutru.length} hồ sơ Lưu trữ và ${misplacedForLand.length} hồ sơ Đo đạc nằm trong bảng dangky_records. Giữ nguyên dữ liệu, không tự động di chuyển.`);
     }
 
-    return mapped.filter(r => !blankIds.has(r.id) && !misplacedIds.has(r.id));
+    const blankIds = new Set(blankRecords.map(r => r.id).filter(Boolean));
+    return mapped.filter(r => !blankIds.has(r.id));
   } catch (err) {
     console.error(`[DangKy API] Lỗi khi tải danh sách hồ sơ:`, err);
     connectionManager.reportNetworkError('fetchDangkyRecords', err);

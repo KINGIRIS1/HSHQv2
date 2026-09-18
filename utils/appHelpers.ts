@@ -1,7 +1,25 @@
 
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificateRecordType } from '../constants';
-import { CAP_GIAY_STEP_ORDER } from './capGiayStateMachine';
+import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificateRecordType, isSurveyRecordType, isArchiveRecord } from '../constants';
+import { CAP_GIAY_STEP_ORDER, getCapGiayWorkflowStage } from './capGiayStateMachine';
+import { getDodacWorkflowStage } from './dodacStateMachine';
+import { getLuuTruWorkflowStage } from './luuTruStateMachine';
+
+/**
+ * Unified Workflow Stage Resolver for Dashboard, Report, Filter, KPI, SLA
+ */
+export function getWorkflowStage(record: Partial<RecordFile>): { stageIndex: number; stageName: string; category: string } {
+    if (!record) return { stageIndex: 0, stageName: 'Chưa xác định', category: 'TIEN_TRINH' };
+    const isCapGiay = isCertificateRecordType(record) || (record as any).sourceTable === 'dangky_records' || record.group === '3. Đăng ký đất đai, cấp GCN';
+    if (isCapGiay) {
+        return getCapGiayWorkflowStage(record);
+    }
+    const isLuuTru = isArchiveRecord(record) || (record as any).sourceTable === 'luutru_records';
+    if (isLuuTru) {
+        return getLuuTruWorkflowStage(record);
+    }
+    return getDodacWorkflowStage(record);
+}
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -872,14 +890,6 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 
         // Đồng bộ trạng thái sang HANDOVER nếu hồ sơ đã có đợt xuất (trừ khi là rút/từ chối/trả dân)
         let status = r.status;
-        if (currentBatch && currentBatch !== 'NOT_BATCHED') {
-            if (status !== RecordStatus.WITHDRAWN && status !== RecordStatus.REJECTED && status !== RecordStatus.RETURNED) {
-                if (status !== RecordStatus.HANDOVER) {
-                    status = RecordStatus.HANDOVER;
-                    hasChanges = true;
-                }
-            }
-        }
 
         const isHandedOver = status === RecordStatus.HANDOVER || status === RecordStatus.RETURNED || Boolean((r as any).is_handover);
         const missingBatch = !currentBatch || String(currentBatch).trim() === '' || currentBatch === 'NOT_BATCHED';
@@ -1158,6 +1168,18 @@ export function isOfficeOnlySurveyProcedure(recordType: string | null | undefine
  */
 export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordStatus {
     if (!record) return RecordStatus.RECEIVED;
+
+    if (record.status && Object.values(RecordStatus).includes(record.status as RecordStatus)) {
+        return record.status as RecordStatus;
+    }
+
+    // Module Cấp giấy sử dụng State Machine 14 trạng thái riêng, không tự suy luận theo logic Đo đạc
+    const isCapGiay = isCertificateRecordType(record.recordType || '') || 
+        (record as any).sourceTable === 'dangky_records' || 
+        record.group === '3. Đăng ký đất đai, cấp GCN';
+    if (isCapGiay) {
+        return (record.status as RecordStatus) || RecordStatus.RECEIVED;
+    }
     
     // Nếu hồ sơ đã bị từ chối / rút hồ sơ
     if (record.status === RecordStatus.WITHDRAWN || record.status === RecordStatus.REJECTED) {
@@ -1167,11 +1189,6 @@ export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordSta
     // 1. Đã trả kết quả (Dân đã nhận kết quả)
     if (record.resultReturnedDate) {
         return RecordStatus.RETURNED;
-    }
-
-    // 2. Đã giao 1 cửa / Hoàn thành xuất đợt
-    if (record.completedDate || record.exportDate) {
-        return RecordStatus.HANDOVER;
     }
 
     // 3. Đã ký duyệt
@@ -1288,6 +1305,10 @@ export function getDerivedStatusFromDates(
     record: Partial<RecordFile>,
     options?: { isArchive?: boolean }
 ): RecordStatus {
+    if (record.status && Object.values(RecordStatus).includes(record.status as RecordStatus)) {
+        return record.status as RecordStatus;
+    }
+
     // Module Cấp giấy không tự suy luận từ mốc ngày cũ (bảo đảm sạch dữ liệu và không lazy migration)
     const isCapGiay = isCertificateRecordType(record.recordType || '') || 
         (record as any).sourceTable === 'dangky_records' || 
@@ -1310,15 +1331,6 @@ export function getDerivedStatusFromDates(
     // 1. Mốc Đã trả kết quả
     if (record.resultReturnedDate && String(record.resultReturnedDate).trim() !== '') {
         return RecordStatus.RETURNED;
-    }
-
-    // 2. Mốc Đã hoàn thành / Bàn giao 1 cửa
-    if (
-        (record.completedDate && String(record.completedDate).trim() !== '') ||
-        (record.exportDate && String(record.exportDate).trim() !== '') ||
-        (record.exportBatch !== undefined && record.exportBatch !== null && String(record.exportBatch).trim() !== '')
-    ) {
-        return RecordStatus.HANDOVER;
     }
 
     // 3. Mốc Đã ký duyệt

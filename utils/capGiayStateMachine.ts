@@ -222,10 +222,94 @@ export const CAP_GIAY_STEP_ORDER: Record<string, number> = {
 
 export const getCapGiayNextMainStatus = getNextCapGiayStatus;
 
+export function getAllowedCapGiayTransitions(
+  currentStatus: RecordStatus | string,
+  previousStatus?: RecordStatus | string | null
+): CapGiayStatus[] {
+  if (
+    currentStatus === RecordStatus.RETURNED ||
+    currentStatus === RecordStatus.WITHDRAWN ||
+    currentStatus === RecordStatus.REJECTED
+  ) {
+    return [];
+  }
+
+  if (currentStatus === RecordStatus.PENDING_SUPPLEMENT) {
+    const target = previousStatus && isCapGiayStatus(previousStatus) ? (previousStatus as CapGiayStatus) : null;
+    return target ? [target] : [];
+  }
+
+  const allowed: CapGiayStatus[] = [];
+  const next = getNextCapGiayStatus(currentStatus);
+  const prev = getPreviousCapGiayStatus(currentStatus);
+
+  if (next) allowed.push(next);
+  if (prev) allowed.push(prev);
+
+  allowed.push(RecordStatus.PENDING_SUPPLEMENT, RecordStatus.WITHDRAWN, RecordStatus.REJECTED);
+  return Array.from(new Set(allowed));
+}
+
+export function getCapGiayWorkflowStage(record: Partial<RecordFile>): { stageIndex: number; stageName: string; category: string } {
+  const status = record.status;
+  switch (status) {
+    case RecordStatus.RECEIVED:
+      return { stageIndex: 1, stageName: 'Tiếp nhận', category: 'TIEN_TRINH' };
+    case RecordStatus.APPRAISAL:
+      return { stageIndex: 2, stageName: 'Thẩm định', category: 'TIEN_TRINH' };
+    case RecordStatus.TAX_TRANSFER:
+    case RecordStatus.PENDING_TAX_KV7:
+    case RecordStatus.PENDING_TAX_PAYMENT:
+      return { stageIndex: 3, stageName: 'Nghĩa vụ tài chính', category: 'TIEN_TRINH' };
+    case RecordStatus.PENDING_PRINT_CERT:
+    case RecordStatus.PENDING_CHECK:
+      return { stageIndex: 4, stageName: 'In GCN & Kiểm tra', category: 'TIEN_TRINH' };
+    case RecordStatus.PENDING_SIGN:
+    case RecordStatus.PENDING_HANDOVER:
+    case RecordStatus.HANDOVER:
+      return { stageIndex: 5, stageName: 'Phê duyệt & Bàn giao', category: 'TIEN_TRINH' };
+    case RecordStatus.RETURNED:
+      return { stageIndex: 6, stageName: 'Đã trả kết quả', category: 'HOAN_THANH' };
+    case RecordStatus.PENDING_SUPPLEMENT:
+      return { stageIndex: 12, stageName: 'Chờ bổ sung', category: 'BO_SUNG' };
+    case RecordStatus.WITHDRAWN:
+      return { stageIndex: 13, stageName: 'CSD rút hồ sơ', category: 'KET_THUC' };
+    case RecordStatus.REJECTED:
+      return { stageIndex: 14, stageName: 'Huỷ hồ sơ', category: 'KET_THUC' };
+    default:
+      return { stageIndex: 0, stageName: 'Chưa xác định', category: 'TIEN_TRINH' };
+  }
+}
+
+export function handleCapGiaySupplement(
+  record: Partial<RecordFile>,
+  reason?: string,
+  requestedBy?: string
+): Partial<RecordFile> {
+  if (record.status === RecordStatus.PENDING_SUPPLEMENT) {
+    throw new Error('Hồ sơ đã ở trạng thái Chờ bổ sung.');
+  }
+  const current = record.status || RecordStatus.RECEIVED;
+  if (!isCapGiayStatus(current)) {
+    throw new Error(`Trạng thái "${current}" không hợp lệ để tạo yêu cầu bổ sung trong Module Cấp giấy.`);
+  }
+  const now = new Date().toISOString();
+  return {
+    status: RecordStatus.PENDING_SUPPLEMENT,
+    previousStatus: current,
+    supplementReturnStatus: current,
+    supplementReason: reason || record.supplementReason || null,
+    supplementRequestedBy: requestedBy || null,
+    supplementRequestedAt: now,
+    supplementStartedAt: now,
+  };
+}
+
 export function resumeFromSupplement(record: RecordFile): { nextStatus: RecordStatus; updates: Partial<RecordFile> } {
   const targetStatus = (record.supplementReturnStatus as RecordStatus) || (record.previousStatus as RecordStatus);
   if (!targetStatus || !isCapGiayStatus(targetStatus)) {
-    throw new Error('Không xác định được trạng thái trước đó (previousStatus / supplementReturnStatus) để phục hồi hồ sơ.');
+    console.error('CRITICAL: Thiếu supplementReturnStatus / previousStatus khi hoàn thành bổ sung:', record);
+    throw new Error('Không xác định được trạng thái trước khi bổ sung (supplementReturnStatus) để phục hồi hồ sơ.');
   }
   const now = new Date().toISOString();
   return {
