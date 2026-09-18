@@ -397,10 +397,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
             updateData.ngay_hoan_thanh = handoverDate;
             updateData.danh_sach = listName;
+            updateData.exportBatch = listName;
+            updateData.exportDate = handoverDate;
 
             await saveArchiveRecord({ 
                 ...pendingCompletionRecord, 
                 status: 'completed',
+                exportBatch: listName,
                 data: updateData
             });
             
@@ -420,9 +423,12 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
 
             const updates = {
                 status: 'completed' as any,
+                exportBatch: listName,
                 data: {
                     ngay_hoan_thanh: handoverDate,
                     danh_sach: listName,
+                    exportBatch: listName,
+                    exportDate: handoverDate,
                     history: [historyEntry]
                 }
             };

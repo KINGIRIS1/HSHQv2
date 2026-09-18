@@ -672,17 +672,36 @@ export function getPureBatchNumber(batch: number | string | null | undefined): s
     return '';
 }
 
+export function getRecordModuleKey(r: Partial<RecordFile>): 'luutru' | 'dangky' | 'dodac' {
+    if (r.sourceTable === 'luutru_records' || isArchiveRecordType(r.recordType || '')) {
+        return 'luutru';
+    }
+    if (r.sourceTable === 'dangky_records' || isCertificateRecordType(r.recordType || '') || r.group === '3. Đăng ký đất đai, cấp GCN') {
+        return 'dangky';
+    }
+    return 'dodac';
+}
+
 /**
- * Thuật toán tính số đợt kế tiếp trong ngày theo thứ tự liên tục (1, 2, 3...)
+ * Thuật toán tính số đợt kế tiếp trong ngày theo thứ tự liên tục (1, 2, 3...) cho từng module/tab
  * Không bao giờ bị nhảy cóc, tự động lấp đầy các khoảng trống nếu có.
  */
-export function calculateNextBatchNumberForDate(records: RecordFile[], targetDateStr?: string | null): { nextNum: number; existingBatches: number[] } {
+export function calculateNextBatchNumberForDate(
+    records: RecordFile[], 
+    targetDateStr?: string | null,
+    moduleKey?: string | null
+): { nextNum: number; existingBatches: number[] } {
     const targetDate = targetDateStr ? parseSafeDate(targetDateStr) : new Date();
     const targetKey = targetDate ? formatDateKey(targetDate) : formatDateKey(new Date());
 
     const batchNumbersSet = new Set<number>();
 
     records.forEach(r => {
+        if (moduleKey) {
+            const rMod = getRecordModuleKey(r);
+            if (rMod !== moduleKey) return;
+        }
+
         const rawDate = r.exportDate || (r as any).data?.ngay_hoan_thanh || r.completedWorkDate || r.completedDate;
         if (!rawDate) return;
         const d = parseSafeDate(rawDate);
@@ -838,13 +857,9 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch || (r as any).data?.exportBatch || (r as any).data?.danh_sach || null;
 
-        // Chuẩn hóa tên đợt xuất chỉ lưu duy nhất số đợt
+        // Giữ nguyên tên/mã đợt cũ nếu đã có, không tự biến đổi hay đổi tên
         if (currentBatch && currentBatch !== 'NOT_BATCHED') {
-            const pureNum = getPureBatchNumber(currentBatch);
-            if (pureNum && pureNum !== String(currentBatch)) {
-                currentBatch = pureNum;
-                hasChanges = true;
-            }
+            currentBatch = String(currentBatch);
         }
 
         // Tự động bù ngày xuất nếu hồ sơ có đợt xuất nhưng bị thiếu ngày xuất

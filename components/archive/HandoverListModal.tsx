@@ -37,12 +37,10 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
         });
         setNewListName(`Đợt ${maxBatch + 1}`);
         
-        // Default selection logic
+        // Default selection logic: Mặc định luôn chọn Tạo mới đợt độc lập
+        setMode('new');
         if (lists.length > 0) {
-            setSelectedList(lists[lists.length - 1]); // Default to latest existing
-            setMode('existing'); // Default to existing if available
-        } else {
-            setMode('new');
+            setSelectedList(lists[lists.length - 1]);
         }
     };
 

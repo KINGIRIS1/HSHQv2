@@ -1,6 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02 } from './apiCore';
-import { updateArchiveCounterIfHigher } from './apiRecords';
+import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated } from './apiRecords';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
 import { setIndexedDBItem, getIndexedDBItem } from './storageService';
@@ -147,6 +147,8 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
 
     let st: ArchiveRecord['status'] = 'draft';
     const rawSt = String(row.status || '').toLowerCase();
+    const batchVal = row.exportBatch || row.export_batch || row.data?.exportBatch || row.data?.danh_sach || null;
+
     if (rawSt === 'assigned') st = 'assigned';
     else if (rawSt === 'in_progress' || rawSt === 'inprogress') st = 'assigned';
     else if (rawSt === 'executed' || rawSt === 'completed_work') st = 'executed';
@@ -155,9 +157,14 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
     else if (rawSt === 'checked') st = 'checked';
     else if (rawSt === 'pending_sign') st = 'pending_sign';
     else if (rawSt === 'signed') st = 'signed';
-    else if (rawSt === 'handover' || rawSt === 'handed_over' || rawSt === 'completed' || rawSt === 'returned') st = 'completed';
+    else if (rawSt === 'handover' || rawSt === 'handed_over' || rawSt === 'completed' || rawSt === 'returned' || rawSt === 'giao_1_cua' || rawSt === 'giao_hs' || rawSt === 'da_giao') st = 'completed';
     else if (rawSt === 'withdrawn') st = 'withdrawn';
     else if (rawSt === 'rejected') st = 'rejected';
+
+    // BẮT BUỘC: Nếu hồ sơ đã được chốt đợt giao/xuất (batchVal), bảo tồn trạng thái 'completed' (Đã giao 1 cửa)
+    if (batchVal && st !== 'withdrawn' && st !== 'rejected') {
+        st = 'completed';
+    }
 
     const extraData = {
         ...(typeof row.data === 'object' && row.data !== null ? row.data : {}),
@@ -179,7 +186,7 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
         assignedTo: row.assignedTo,
         assigned_date: row.assignedDate,
         assignedDate: row.assignedDate,
-        ngay_hoan_thanh: row.completedWorkDate,
+        ngay_hoan_thanh: row.completedWorkDate || row.exportDate || row.data?.ngay_hoan_thanh,
         completedWorkDate: row.completedWorkDate,
         area: row.area,
         address: row.address,
@@ -190,12 +197,12 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
         privateNotes: row.privateNotes,
         personalNotes: row.personalNotes,
         recordType: row.recordType,
-        exportBatch: row.exportBatch,
-        exportDate: row.exportDate,
+        exportBatch: batchVal ? String(batchVal) : row.exportBatch,
+        exportDate: row.exportDate || row.data?.ngay_hoan_thanh,
         resultReturnedDate: row.resultReturnedDate,
         receiverName: row.receiverName,
         receiptNumber: row.receiptNumber,
-        isHandedOver: row.isHandedOver
+        isHandedOver: row.isHandedOver || st === 'completed'
     };
 
     return {
@@ -208,7 +215,7 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
         trich_yeu: row.content || row.trich_yeu || '',
         ngay_thang: row.receivedDate || row.ngay_thang || (row.created_at ? row.created_at.split('T')[0] : ''),
         noi_nhan_gui: row.customerName || row.noi_nhan_gui || '',
-        exportBatch: row.exportBatch || null,
+        exportBatch: batchVal ? String(batchVal) : null,
         data: extraData
     };
 };
@@ -231,7 +238,7 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
     else if (rawSt === 'checked') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'signed') status = RecordStatus.SIGNED;
-    else if (rawSt === 'completed' || rawSt === 'handover' || rawSt === 'handed_over') status = RecordStatus.HANDOVER;
+    else if (rawSt === 'completed' || rawSt === 'handover' || rawSt === 'handed_over' || rawSt === 'giao_1_cua' || rawSt === 'giao_hs') status = RecordStatus.HANDOVER;
     else if (rawSt === 'returned') status = RecordStatus.RETURNED;
     else if (rawSt === 'withdrawn') status = RecordStatus.WITHDRAWN;
     else if (rawSt === 'rejected') status = RecordStatus.REJECTED;
@@ -615,9 +622,14 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
             if (error) throw error;
             const resRec = data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
-            if (resRec && resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
-                updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
+            if (resRec && data && data.length > 0) {
+                if (resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
+                    updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
+                }
+                const mappedFile = mapArchiveDbToRecordFile(data[0]);
+                markRecordsRecentlyUpdated([mappedFile]);
             }
+            memoryArchiveRecordsCache = null;
             return resRec;
         } else {
             let { data, error } = await supabase.from('luutru_records').insert([payload]).select();
@@ -639,9 +651,14 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
             if (error) throw error;
             const resRec = data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
-            if (resRec && resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
-                updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
+            if (resRec && data && data.length > 0) {
+                if (resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
+                    updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
+                }
+                const mappedFile = mapArchiveDbToRecordFile(data[0]);
+                markRecordsRecentlyUpdated([mappedFile]);
             }
+            memoryArchiveRecordsCache = null;
             return resRec;
         }
     } catch (error: any) {
@@ -754,6 +771,9 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         }
 
         if (upsertError) throw upsertError;
+        const mappedFiles = updatedPayloads.map(p => mapArchiveDbToRecordFile(p));
+        markRecordsRecentlyUpdated(mappedFiles);
+        memoryArchiveRecordsCache = null;
         return true;
     } catch (error) {
         logError("updateArchiveRecordsBatch", error, true);
@@ -796,12 +816,14 @@ export const fetchLuutruHandoverBatches = async (): Promise<Array<{ batch: strin
     }
 };
 
-export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string): Promise<string[]> => {
+export const fetchListsByDate = async (type: 'saoluc' | 'congvan' | 'vaoso', date: string): Promise<string[]> => {
     if (!isConfigured) {
         const lists = new Set<string>();
         MOCK_ARCHIVE.forEach(r => {
-            if (r.type === type && r.data?.ngay_hoan_thanh === date && r.data?.danh_sach) {
-                lists.add(r.data.danh_sach);
+            if ((r.type === type || !type) && r.data?.danh_sach) {
+                if (!date || r.data?.ngay_hoan_thanh === date || r.data?.exportDate === date) {
+                    lists.add(r.data.danh_sach);
+                }
             }
         });
         return Array.from(lists).sort();
@@ -810,15 +832,20 @@ export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string)
     try {
         const { data, error } = await supabase
             .from('luutru_records')
-            .select('completedWorkDate, notes')
-            .not('completedWorkDate', 'is', null);
+            .select('completedWorkDate, exportBatch, exportDate, data')
+            .not('exportBatch', 'is', null);
 
         if (error) return [];
 
         const lists = new Set<string>();
         data?.forEach((r: any) => {
-            if (r.completedWorkDate?.startsWith(date) && r.notes) {
-                lists.add(r.notes);
+            const batchVal = r.exportBatch || r.data?.exportBatch || r.data?.danh_sach;
+            const dateVal = r.exportDate || r.completedWorkDate || r.data?.ngay_hoan_thanh || r.data?.exportDate;
+            
+            if (batchVal) {
+                if (!date || (dateVal && dateVal.startsWith(date))) {
+                    lists.add(String(batchVal).trim());
+                }
             }
         });
         
@@ -826,5 +853,69 @@ export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string)
     } catch (error) {
         logError(`fetchListsByDate-${type}`, error, true);
         return [];
+    }
+};
+
+export interface ArchiveBatchItem {
+    id?: string;
+    batch_name: string;
+    batch_number?: number;
+    module_type?: string;
+    created_at?: string;
+    record_ids?: string[];
+    record_count?: number;
+}
+
+export const createArchiveBatch = async (
+    batchName: string,
+    recordIds: string[],
+    moduleType: string = 'archive',
+    handoverDate: string = new Date().toISOString().split('T')[0]
+): Promise<{ success: boolean; batchName: string; count: number }> => {
+    try {
+        const nowIso = new Date().toISOString();
+        let finalBatchName = batchName ? batchName.trim() : '';
+        
+        if (!finalBatchName) {
+            const existingBatches = await fetchLuutruHandoverBatches();
+            const numbers = existingBatches
+                .map(b => parseInt(b.batch.replace(/\D/g, ''), 10))
+                .filter(n => !isNaN(n));
+            const maxNum = numbers.length > 0 ? Math.max(...numbers) : 0;
+            finalBatchName = `Đợt ${maxNum + 1}`;
+        }
+
+        if (isConfigured) {
+            try {
+                await supabase.from('archive_batches').insert([{
+                    batch_name: finalBatchName,
+                    module_type: moduleType,
+                    record_ids: recordIds,
+                    record_count: recordIds.length,
+                    created_at: nowIso
+                }]);
+            } catch (tblErr) {
+                console.warn('⚠️ archive_batches table insert safely caught:', tblErr);
+            }
+        }
+
+        if (recordIds.length > 0) {
+            await updateArchiveRecordsBatch(recordIds, {
+                status: 'completed',
+                exportBatch: finalBatchName,
+                data: {
+                    exportBatch: finalBatchName,
+                    exportDate: handoverDate,
+                    ngay_hoan_thanh: handoverDate,
+                    danh_sach: finalBatchName,
+                    updated_at: nowIso
+                }
+            });
+        }
+
+        return { success: true, batchName: finalBatchName, count: recordIds.length };
+    } catch (error) {
+        logError('createArchiveBatch', error, true);
+        return { success: false, batchName, count: 0 };
     }
 };

@@ -25,7 +25,7 @@ export const RECORD_DB_COLUMNS = [
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
     'attachedFiles', 'dossierComponents',
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
-    'sourceTable', 'previousStatus', 'supplementReason', 'supplementRequestDate', 'supplementReturnedDate'
+    'sourceTable', 'previousStatus', 'supplementReason', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
 ];
 
 /**
@@ -1022,6 +1022,9 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         ]));
 
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
+        if (!payload.updated_at) {
+            payload.updated_at = new Date().toISOString();
+        }
         let updatedData: any[] | null = null;
         let finalTable: 'dangky_records' | 'land_records' | 'luutru_records' = primaryTable;
         let lastError: any = null;
@@ -1122,6 +1125,9 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
         ]));
 
         const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
+        if (!payload.updated_at) {
+            payload.updated_at = new Date().toISOString();
+        }
         delete payload.id;
 
         let updatedData: any[] | null = null;

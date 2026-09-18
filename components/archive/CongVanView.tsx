@@ -486,10 +486,13 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             const updateData: any = { ...pendingCompletionRecord.data, history: newHistory };
             updateData.ngay_hoan_thanh = handoverDate;
             updateData.danh_sach = listName;
+            updateData.exportBatch = listName;
+            updateData.exportDate = handoverDate;
 
             await saveArchiveRecord({ 
                 ...pendingCompletionRecord, 
                 status: 'completed',
+                exportBatch: listName,
                 data: updateData
             });
             
@@ -509,9 +512,12 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
             const updates = {
                 status: 'completed' as any,
+                exportBatch: listName,
                 data: {
                     ngay_hoan_thanh: handoverDate,
                     danh_sach: listName,
+                    exportBatch: listName,
+                    exportDate: handoverDate,
                     history: [historyEntry]
                 }
             };

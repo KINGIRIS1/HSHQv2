@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import { getWardLabel, GROUPS } from '../constants';
-import { formatDateDDMMYYYY, formatBatchName, parseSafeDate, formatDateKey, getPureBatchNumber, calculateNextBatchNumberForDate } from '../utils/appHelpers';
+import { formatDateDDMMYYYY, formatBatchName, parseSafeDate, formatDateKey, getPureBatchNumber, calculateNextBatchNumberForDate, getRecordModuleKey } from '../utils/appHelpers';
 import { fetchChinhLyRecords } from '../services/apiUtilities';
 
 interface AddToBatchModalProps {
@@ -47,9 +47,19 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
     return targetRecords.map(r => `${r.id}_${r.needsMapCorrection ? 1 : 0}`).join(',');
   }, [isOpen, targetRecords]);
 
-  // Tính số đợt tiếp theo trong ngày hôm nay một cách chuẩn xác, liên tục, không nhảy cóc
+  const moduleKey = useMemo(() => {
+    if (targetRecords && targetRecords.length > 0) {
+      return getRecordModuleKey(targetRecords[0]);
+    }
+    if (records && records.length > 0) {
+      return getRecordModuleKey(records[0]);
+    }
+    return null;
+  }, [targetRecords, records]);
+
+  // Tính số đợt tiếp theo trong ngày hôm nay một cách chuẩn xác, liên tục, không nhảy cóc cho riêng từng module/tab
   const nextBatchInfo = useMemo(() => {
-      const { nextNum } = calculateNextBatchNumberForDate(records, todayStr);
+      const { nextNum } = calculateNextBatchNumberForDate(records, todayStr, moduleKey);
       const todayFmt = formatDateDDMMYYYY(todayStr);
       const fullBatchName = `Đợt ${nextNum} - Ngày ${todayFmt}`;
 
@@ -58,13 +68,14 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
           batchName: fullBatchName,
           date: new Date().toISOString()
       };
-  }, [records, todayStr]);
+  }, [records, todayStr, moduleKey]);
 
-  // Danh sách đợt đã có (Sắp xếp theo ngày và đợt từ lớn đến nhỏ - mới nhất xếp đầu)
+  // Danh sách đợt đã có của riêng Tab/Module hiện tại
   const historyBatches = useMemo(() => {
       const batches: Record<string, { label: string, date: string, count: number, fullDate: string, timestamp: number }> = {};
       
       records.forEach(r => {
+          if (moduleKey && getRecordModuleKey(r) !== moduleKey) return;
           if (r.exportBatch && String(r.exportBatch).trim() !== '' && String(r.exportBatch) !== 'NOT_BATCHED') {
               const rawDate = r.exportDate || r.completedDate || r.receivedDate;
               const datePart = rawDate ? String(rawDate).split('T')[0] : '';
@@ -144,7 +155,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
           }
           return b.label.localeCompare(a.label, undefined, { numeric: true });
       });
-  }, [records]);
+  }, [records, moduleKey]);
 
   const selectExistingMode = () => {
       setMode('existing');
