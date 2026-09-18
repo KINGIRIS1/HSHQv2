@@ -527,11 +527,11 @@ export const mapRecordFromDb = (item: any): any => {
     const r = { ...item };
     
     // Helper to get first non-null/non-undefined value
-    const val = (camel: any, lower: any, snake: any) => {
-        if (camel !== undefined && camel !== null) return camel;
-        if (lower !== undefined && lower !== null) return lower;
-        if (snake !== undefined && snake !== null) return snake;
-        return camel;
+    const val = (...args: any[]) => {
+        for (const a of args) {
+            if (a !== undefined && a !== null) return a;
+        }
+        return undefined;
     };
 
     // Ưu tiên 100% trạng thái status chính thức được lưu trong cơ sở dữ liệu
@@ -579,7 +579,7 @@ export const mapRecordFromDb = (item: any): any => {
     
     r.resultReturnedDate = keepOnlyDate(val(r.resultReturnedDate, r.resultreturneddate, r.result_returned_date));
     
-    r.exportBatch = val(r.exportBatch, r.exportbatch, r.export_batch);
+    r.exportBatch = val(r.exportBatch, r.exportbatch, r.export_batch, r.data?.exportBatch, r.data?.danh_sach);
     r.exportDate = keepOnlyDate(val(r.exportDate, r.exportdate, r.export_date));
     r.handoverWard = val(r.handoverWard, r.handoverward, r.handover_ward);
     
@@ -613,7 +613,31 @@ export const mapRecordFromDb = (item: any): any => {
     r.officeCompletedDate = keepOnlyDate(val(r.officeCompletedDate, r.officecompleteddate, r.office_completed_date));
 
     // TỰ ĐỘNG CHUẨN HÓA TRẠNG THÁI: ƯU TIÊN TUYỆT ĐỐI TRẠNG THÁI CHÍNH THỨC TRONG CSDL
-    const currentStatus = (r.status || '').trim();
+    let rawStatus = String(val(r.status, r.trang_thai) || '').trim().toUpperCase();
+    if (rawStatus === 'HANDOVER' || rawStatus === 'COMPLETED' || rawStatus === 'HANDED_OVER' || rawStatus === 'GIAO_1_CUA' || rawStatus === 'GIAO 1 CỬA' || rawStatus === 'GIAO_HS') {
+        rawStatus = RecordStatus.HANDOVER;
+    } else if (rawStatus === 'RETURNED' || rawStatus === 'TRA_DAN') {
+        rawStatus = RecordStatus.RETURNED;
+    } else if (rawStatus === 'SIGNED' || rawStatus === 'DA_KY') {
+        rawStatus = RecordStatus.SIGNED;
+    } else if (rawStatus === 'PENDING_SIGN' || rawStatus === 'DA_TRINH' || rawStatus === 'TRINH_KY') {
+        rawStatus = RecordStatus.PENDING_SIGN;
+    } else if (rawStatus === 'PENDING_CHECK' || rawStatus === 'CHO_KIEM_TRA') {
+        rawStatus = RecordStatus.PENDING_CHECK;
+    } else if (rawStatus === 'COMPLETED_WORK' || rawStatus === 'EXECUTED' || rawStatus === 'DA_THUC_HIEN') {
+        rawStatus = RecordStatus.COMPLETED_WORK;
+    } else if (rawStatus === 'ASSIGNED' || rawStatus === 'GIAO_NV') {
+        rawStatus = RecordStatus.ASSIGNED;
+    } else if (rawStatus === 'RECEIVED' || rawStatus === 'TIEP_NHAN') {
+        rawStatus = RecordStatus.RECEIVED;
+    }
+
+    // Nếu hồ sơ có đợt xuất (exportBatch/exportDate) mà không bị Rút/Từ chối -> Tự động đưa về HANDOVER
+    if ((r.exportBatch || r.exportDate) && rawStatus !== RecordStatus.WITHDRAWN && rawStatus !== RecordStatus.REJECTED && rawStatus !== RecordStatus.RETURNED) {
+        rawStatus = RecordStatus.HANDOVER;
+    }
+
+    const currentStatus = rawStatus;
     const isArchive = isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records';
     const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
 

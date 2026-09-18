@@ -1668,6 +1668,23 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         fullMergedUpdates.forEach(u => {
             const table = getTargetTable(u);
             const sanitizedRow = sanitizeData(u, RECORD_DB_COLUMNS);
+
+            if (u.exportBatch || u.exportDate || u.handoverWard) {
+                const currentData = (typeof sanitizedRow.data === 'object' && sanitizedRow.data !== null) ? { ...sanitizedRow.data } : {};
+                if (u.exportBatch) {
+                    currentData.exportBatch = u.exportBatch;
+                    currentData.danh_sach = u.exportBatch;
+                }
+                if (u.exportDate) {
+                    currentData.exportDate = u.exportDate;
+                    currentData.ngay_hoan_thanh = u.exportDate;
+                }
+                if (u.handoverWard) {
+                    currentData.handoverWard = u.handoverWard;
+                }
+                sanitizedRow.data = currentData;
+            }
+
             if (table === 'luutru_records') {
                 luutruRows.push(sanitizedRow);
             } else if (table === 'dangky_records') {

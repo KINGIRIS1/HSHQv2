@@ -836,7 +836,7 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     };
 
     const migratedRecords = records.map(r => {
-        let currentBatch = r.exportBatch;
+        let currentBatch = r.exportBatch || (r as any).data?.exportBatch || (r as any).data?.danh_sach || null;
 
         // Chuẩn hóa tên đợt xuất chỉ lưu duy nhất số đợt
         if (currentBatch && currentBatch !== 'NOT_BATCHED') {

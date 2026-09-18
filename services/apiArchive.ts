@@ -54,6 +54,36 @@ export const OPTIONAL_ARCHIVE_COLUMNS = [
 
 // --- CONVERSION HELPERS ---
 export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
+    let rawSt = String(row.status || '').trim().toUpperCase();
+    let status = RecordStatus.RECEIVED;
+    if (rawSt === 'HANDOVER' || rawSt === 'COMPLETED' || rawSt === 'HANDED_OVER' || rawSt === 'GIAO_1_CUA' || rawSt === 'GIAO_HS') {
+        status = RecordStatus.HANDOVER;
+    } else if (rawSt === 'RETURNED' || rawSt === 'TRA_DAN') {
+        status = RecordStatus.RETURNED;
+    } else if (rawSt === 'SIGNED' || rawSt === 'DA_KY') {
+        status = RecordStatus.SIGNED;
+    } else if (rawSt === 'PENDING_SIGN' || rawSt === 'CHECKED' || rawSt === 'TRINH_KY') {
+        status = RecordStatus.PENDING_SIGN;
+    } else if (rawSt === 'PENDING_CHECK' || rawSt === 'CHO_KIEM_TRA') {
+        status = RecordStatus.PENDING_CHECK;
+    } else if (rawSt === 'COMPLETED_WORK' || rawSt === 'EXECUTED' || rawSt === 'DA_THUC_HIEN') {
+        status = RecordStatus.COMPLETED_WORK;
+    } else if (rawSt === 'ASSIGNED' || rawSt === 'IN_PROGRESS' || rawSt === 'GIAO_NV') {
+        status = RecordStatus.ASSIGNED;
+    } else if (rawSt === 'WITHDRAWN') {
+        status = RecordStatus.WITHDRAWN;
+    } else if (rawSt === 'REJECTED') {
+        status = RecordStatus.REJECTED;
+    } else if (Object.values(RecordStatus).includes(row.status as RecordStatus)) {
+        status = row.status as RecordStatus;
+    }
+
+    const batchVal = row.exportBatch || row.export_batch || row.data?.exportBatch || row.data?.danh_sach || null;
+
+    if (batchVal && status !== RecordStatus.WITHDRAWN && status !== RecordStatus.REJECTED && status !== RecordStatus.RETURNED) {
+        status = RecordStatus.HANDOVER;
+    }
+
     return {
         id: row.id,
         code: row.code || row.so_hieu || row.id,
@@ -82,14 +112,14 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
         completedWorkDate: row.completedWorkDate || null,
         approvalDate: row.approvalDate || null,
         completedDate: row.completedDate || null,
-        status: (row.status as RecordStatus) || RecordStatus.RECEIVED,
+        status: status,
         notes: row.notes || null,
         privateNotes: row.privateNotes || null,
         personalNotes: row.personalNotes || null,
         authorizedBy: row.authorizedBy || null,
         authDocType: row.authDocType || null,
         otherDocs: row.otherDocs || null,
-        exportBatch: row.exportBatch || row.data?.danh_sach || null,
+        exportBatch: batchVal ? String(batchVal) : null,
         exportDate: row.exportDate || row.completedWorkDate || (row.data?.ngay_hoan_thanh) || null,
         handoverWard: row.handoverWard || null,
         measurementNumber: row.measurementNumber || null,
@@ -100,7 +130,7 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
         receiptNumber: row.receiptNumber || null,
         resultReturnedDate: row.resultReturnedDate || null,
         receiverName: row.receiverName || null,
-        isHandedOver: row.isHandedOver || false,
+        isHandedOver: row.isHandedOver || status === RecordStatus.HANDOVER,
         data: row.data || {},
         sourceTable: 'luutru_records'
     };
@@ -201,10 +231,15 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
     else if (rawSt === 'checked') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'signed') status = RecordStatus.SIGNED;
-    else if (rawSt === 'completed' || rawSt === 'handover') status = RecordStatus.HANDOVER;
+    else if (rawSt === 'completed' || rawSt === 'handover' || rawSt === 'handed_over') status = RecordStatus.HANDOVER;
     else if (rawSt === 'returned') status = RecordStatus.RETURNED;
     else if (rawSt === 'withdrawn') status = RecordStatus.WITHDRAWN;
     else if (rawSt === 'rejected') status = RecordStatus.REJECTED;
+
+    const exportBatchVal = r.exportBatch || d.exportBatch || d.danh_sach || null;
+    if (exportBatchVal && status !== RecordStatus.WITHDRAWN && status !== RecordStatus.REJECTED && status !== RecordStatus.RETURNED) {
+        status = RecordStatus.HANDOVER;
+    }
 
     const effectiveCode = r.so_hieu || d.code || (r as any).code || '';
     const payload = {
@@ -240,12 +275,13 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
         phoneNumber: d.phoneNumber || null,
         cccd: d.cccd || null,
         customerAddress: d.customerAddress || null,
-        exportBatch: r.exportBatch || d.exportBatch || d.danh_sach || null,
+        exportBatch: exportBatchVal ? String(exportBatchVal) : null,
         exportDate: d.exportDate || d.ngay_hoan_thanh || null,
+        handoverWard: d.handoverWard || null,
         resultReturnedDate: d.resultReturnedDate || null,
         receiverName: d.receiverName || null,
         receiptNumber: d.receiptNumber || null,
-        isHandedOver: d.isHandedOver || false
+        isHandedOver: d.isHandedOver || status === RecordStatus.HANDOVER
     };
 
     return sanitizeData(payload, ARCHIVE_DB_COLUMNS);
