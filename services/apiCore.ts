@@ -123,7 +123,17 @@ export const logError = (context: string, error: any, silent: boolean = false) =
             connectionManager.reportNetworkError(context, error);
         }
     } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
-        const missingTable = context.includes('Contract') ? 'contracts' : (context.includes('DangKy') ? 'dangky_records' : 'luutru_records');
+        const fullErrStr = `${context} ${msg} ${details}`.toLowerCase();
+        let missingTable = 'land_records';
+        if (fullErrStr.includes('luutru_records') || fullErrStr.includes('luutru') || fullErrStr.includes('lưu trữ')) {
+            missingTable = 'luutru_records';
+        } else if (fullErrStr.includes('dangky_records') || fullErrStr.includes('dangky') || fullErrStr.includes('đăng ký')) {
+            missingTable = 'dangky_records';
+        } else if (fullErrStr.includes('contract')) {
+            missingTable = 'contracts';
+        } else if (fullErrStr.includes('land_records') || fullErrStr.includes('land') || fullErrStr.includes('đo đạc')) {
+            missingTable = 'land_records';
+        }
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu '${missingTable}' chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
         if (!silent) {
             alert(`LỖI BẢNG DỮ LIỆU: Bảng '${missingTable}' chưa được tạo trên Supabase!\n\nVui lòng truy cập SQL Editor trên Supabase và chạy lệnh SQL tạo bảng tương ứng.\n\nHoặc vào giao diện "Quản lý / Kiểm tra Database" trong hệ thống để xem mã SQL khởi tạo đầy đủ.`);

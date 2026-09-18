@@ -1536,6 +1536,37 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         allModifiedRecords.push(merged as RecordFile);
                         updateCount++;
                     }
+                } else {
+                    // Nếu mã chưa tồn tại trong DB khi Cập nhật, tự động thêm mới vào đúng bảng phù hợp (mặc định land_records)
+                    const newRecord = { ...excelRecord };
+                    if (!newRecord.id || !isValidUUID(newRecord.id)) {
+                        newRecord.id = generateStandardUUID();
+                    }
+                    const rTypeStr = String(newRecord.recordType || '').trim();
+                    let targetTable: 'land_records' | 'luutru_records' | 'dangky_records' = 'land_records';
+                    
+                    if (newRecord.sourceTable === 'dangky_records' || isCertificateRecordType(rTypeStr) || rTypeStr.startsWith('3.')) {
+                        targetTable = 'dangky_records';
+                    } else if (newRecord.sourceTable === 'luutru_records' || isArchiveRecordType(rTypeStr) || rTypeStr.startsWith('1.')) {
+                        targetTable = 'luutru_records';
+                    } else {
+                        targetTable = 'land_records';
+                    }
+                    
+                    if (targetTable === 'land_records' || !isArchiveRecordType(newRecord.recordType || '')) {
+                        newRecord.status = deriveActualSurveyStatus(newRecord);
+                    }
+                    
+                    const sanitized = sanitizeData(newRecord, RECORD_DB_COLUMNS);
+                    if (targetTable === 'luutru_records') {
+                        luutruUpdates.push(sanitized);
+                    } else if (targetTable === 'dangky_records') {
+                        dangkyUpdates.push(sanitized);
+                    } else {
+                        landUpdates.push(sanitized);
+                    }
+                    allModifiedRecords.push(newRecord as RecordFile);
+                    updateCount++;
                 }
             });
 
@@ -1562,9 +1593,11 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         });
                         const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
                         if (fallbackError) {
+                            (fallbackError as any).context = `forceUpdateRecordsBatchApi (${table})`;
                             throw fallbackError;
                         }
                     } else if (upsertError) {
+                        (upsertError as any).context = `forceUpdateRecordsBatchApi (${table})`;
                         throw upsertError;
                     }
                 }
@@ -1588,8 +1621,9 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
 
         return { success: true, count: updateCount };
 
-    } catch (error) {
-        logError("forceUpdateRecordsBatchApi", error);
+    } catch (error: any) {
+        const ctx = error?.context || "forceUpdateRecordsBatchApi (land_records)";
+        logError(ctx, error);
         return { success: false, count: 0 };
     }
 };
