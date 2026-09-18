@@ -329,6 +329,9 @@ const fetchPageDirectWithRetry = async (
 export type TierProgressCallback = (tier: 1 | 2 | 3, recordsSoFar: RecordFile[], isComplete: boolean) => void;
 
 export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<RecordFile[]> => {
+  console.log(`[SYNC] Start fetchRecords`);
+  console.log(`[SYNC] Fetch from Supabase`);
+
   if (!isConfigured) {
       console.warn("Supabase chưa được cấu hình.");
       const pending = await getPendingRecords();
@@ -411,10 +414,19 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
     }
     
     const rawList = [...dangky, ...land, ...luutru];
+    const now = Date.now();
     rawList.forEach(item => {
         const mapped = mapRecordFromDb(item);
         if (mapped && mapped.id && !allBlankIds.has(mapped.id)) {
-            uniqueMap.set(mapped.id, mapped);
+            const recent = RECENTLY_UPDATED_RECORDS.get(mapped.id);
+            if (recent && (now - recent.updatedAt < 60000)) {
+                console.log(`[SYNC] Record: ${mapped.code || mapped.id}`);
+                console.log(`[SYNC] Server status: ${mapped.status}`);
+                console.log(`[SYNC] Protection active (Client recent status: ${recent.record.status}). Keeping recent status.`);
+                uniqueMap.set(mapped.id, { ...mapped, ...recent.record });
+            } else {
+                uniqueMap.set(mapped.id, mapped);
+            }
         }
     });
 
@@ -454,7 +466,7 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
     }
 
     const finalRecords = Array.from(uniqueMap.values());
-    console.log(`[FetchRecords] Đã nạp thành công ${finalRecords.length} hồ sơ (trong đó có ${pendingItems.length} hồ sơ chờ đồng bộ)`);
+    console.log(`[SYNC] Apply state (${finalRecords.length} records ready)`);
 
     if (finalRecords.length > 0) {
         saveToCache(CACHE_KEYS.RECORDS, finalRecords);
@@ -993,17 +1005,16 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 };
 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
+    console.log(`[MUTATION] Start`);
+    console.log(`[MUTATION] Record: ${record.code || record.id}`);
+    console.log(`[MUTATION] New status: ${record.status}`);
+    console.log(`[MUTATION] Supabase UPDATE: START`);
+
     // 0. Khóa bảo vệ thời gian thực chống giật lùi trạng thái
     markRecordsRecentlyUpdated([record]);
 
-    // 1. ĐỒNG BỘ TỨC THỜI VÀO RAM VÀ BỘ NHỚ ĐỆM (INSTANT CACHE SYNC)
-    const memIdx = MOCK_RECORDS.findIndex(r => r.id === record.id);
-    if (memIdx !== -1) {
-        MOCK_RECORDS[memIdx] = { ...MOCK_RECORDS[memIdx], ...record };
-    }
-    syncCacheOnUpdate(record);
-
     if (!isConfigured) {
+        console.log(`[MUTATION] Supabase offline mode (isConfigured=false). Saved offline.`);
         await addPendingRecord(record, 'UPDATE');
         syncCacheOnUpdate({ ...record, _isOfflineSaved: true });
         return { ...record, _isOfflineSaved: true };
@@ -1078,34 +1089,55 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
             if (!upsertRes.error && upsertRes.data && upsertRes.data.length > 0) {
                 updatedData = upsertRes.data;
                 finalTable = targetTable;
-            } else if (lastError) {
-                throw lastError;
+            } else if (lastError || upsertRes.error) {
+                throw (lastError || upsertRes.error);
             }
         }
 
+        if (!updatedData || updatedData.length === 0) {
+            throw new Error("Supabase UPDATE returned 0 records modified");
+        }
+
+        console.log(`[MUTATION] Supabase UPDATE: SUCCESS`);
+
         const result = mapRecordFromDb({ ...record, ...(updatedData?.[0] || {}), sourceTable: finalTable }) as RecordFile;
         if (result) {
+            console.log(`[MUTATION] VERIFY: SUCCESS (ID: ${result.id}, Status: ${result.status})`);
             await removePendingRecord(result.id);
+            markRecordsRecentlyUpdated([result]);
+            
+            // Sync cache and memory ONLY after Supabase confirmation
+            const memIdx = MOCK_RECORDS.findIndex(r => r.id === result.id);
+            if (memIdx !== -1) {
+                MOCK_RECORDS[memIdx] = { ...MOCK_RECORDS[memIdx], ...result };
+            }
             syncCacheOnUpdate(result);
             purgeRecordFromOtherTables(result.id, result.code, finalTable);
+
+            console.log(`[MUTATION] React State: UPDATED`);
             return { ...result, _isOfflineSaved: false };
         }
-        return { ...record, _isOfflineSaved: false };
+        throw new Error("Không thể map dữ liệu phản hồi từ Supabase.");
     } catch (error: any) {
+        console.error(`[MUTATION] Supabase UPDATE: ERROR`, error);
+        console.warn(`[MUTATION] React State: NOT COMMITTED`);
         logError("updateRecordApi", error, true);
         await addPendingRecord(record, 'UPDATE');
-        syncCacheOnUpdate({ ...record, _isOfflineSaved: true });
-        return { ...record, _isOfflineSaved: true };
+        throw error;
     }
 };
 
 export const saveRecord = updateRecordApi;
 
 export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
+    console.log(`[MUTATION] Start updateRecordFieldsApi for record ID: ${id}`);
+    console.log(`[MUTATION] Supabase UPDATE: START`);
+
     // 0. Khóa bảo vệ thời gian thực chống giật lùi trạng thái
     markRecordsRecentlyUpdated([{ id, ...fields }]);
 
     if (!isConfigured) {
+        console.log(`[MUTATION] Supabase offline mode (isConfigured=false). Saved offline.`);
         const fallbackRecord = { id, ...fields, _isOfflineSaved: true } as RecordFile;
         await addPendingRecord(fallbackRecord, 'UPDATE');
         syncCacheOnUpdate(fallbackRecord);
@@ -1176,23 +1208,35 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
         }
 
         if (!updatedData || updatedData.length === 0) {
-            if (lastError) throw lastError;
+            throw (lastError || new Error("Supabase UPDATE returned 0 rows"));
         }
+
+        console.log(`[MUTATION] Supabase UPDATE: SUCCESS`);
 
         const result = mapRecordFromDb({ id, ...fields, ...(updatedData?.[0] || {}), sourceTable: finalTable }) as RecordFile;
         if (result) {
+            console.log(`[MUTATION] VERIFY: SUCCESS (ID: ${result.id})`);
             await removePendingRecord(result.id);
+            markRecordsRecentlyUpdated([result]);
+
+            const memIdx = MOCK_RECORDS.findIndex(r => r.id === result.id);
+            if (memIdx !== -1) {
+                MOCK_RECORDS[memIdx] = { ...MOCK_RECORDS[memIdx], ...result };
+            }
             syncCacheOnUpdate(result);
             purgeRecordFromOtherTables(result.id, result.code, finalTable);
+
+            console.log(`[MUTATION] React State: UPDATED`);
             return { ...result, _isOfflineSaved: false };
         }
-        return { id, ...fields } as RecordFile;
+        throw new Error("Không thể map kết quả cập nhật từ Supabase.");
     } catch (error: any) {
+        console.error(`[MUTATION] Supabase UPDATE: ERROR`, error);
+        console.warn(`[MUTATION] React State: NOT COMMITTED`);
         logError("updateRecordFieldsApi", error, true);
         const fallbackRecord = { id, ...fields, _isOfflineSaved: true } as RecordFile;
         await addPendingRecord(fallbackRecord, 'UPDATE');
-        syncCacheOnUpdate(fallbackRecord);
-        return fallbackRecord;
+        throw error;
     }
 };
 
@@ -1635,23 +1679,24 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
 };
 
 // Cập nhật hàng loạt hồ sơ an toàn bằng ID (Phòng tránh trùng mã hồ sơ)
-export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onProgress?: (processed: number, total: number) => void): Promise<{ success: boolean; count: number }> => {
+export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onProgress?: (processed: number, total: number) => void): Promise<{ success: boolean; count: number; error?: any }> => {
     if (!updates || updates.length === 0) return { success: true, count: 0 };
+
+    console.log(`[MUTATION] Start updateRecordsBatchById for ${updates.length} records`);
+    console.log(`[MUTATION] Supabase UPDATE: START`);
 
     // 0. Khóa bảo vệ thời gian thực cho toàn bộ hồ sơ vừa chuyển trạng thái (ngăn chặn polling nền đè lùi trạng thái)
     markRecordsRecentlyUpdated(updates);
 
-    // 1. ĐỒNG BỘ NGAY VÀO RAM VÀ BỘ NHỚ ĐỆM (INSTANT CACHE & MEMORY SYNC)
-    // Đảm bảo giao diện và bộ nhớ cache lập tức khóa trạng thái mới, không bị giật lùi kể cả khi mạng chậm
-    updates.forEach(up => {
-        const idx = MOCK_RECORDS.findIndex(r => r.id === up.id);
-        if (idx !== -1) {
-            MOCK_RECORDS[idx] = { ...MOCK_RECORDS[idx], ...up } as RecordFile;
-        }
-    });
-    syncCacheOnBatchUpdate(updates);
-
     if (!isConfigured) {
+        console.log(`[MUTATION] Supabase offline mode (isConfigured=false). Saved offline.`);
+        updates.forEach(up => {
+            const idx = MOCK_RECORDS.findIndex(r => r.id === up.id);
+            if (idx !== -1) {
+                MOCK_RECORDS[idx] = { ...MOCK_RECORDS[idx], ...up } as RecordFile;
+            }
+        });
+        syncCacheOnBatchUpdate(updates);
         saveToCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
         if (onProgress) onProgress(updates.length, updates.length);
         return { success: true, count: updates.length };
@@ -1738,15 +1783,30 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
             upsertIntoTable('luutru_records', luutruRows)
         ]);
 
-        // Nếu bảng nào gặp lỗi mạng hoặc lỗi Supabase, tự động đẩy hồ sơ vào hàng đợi Offline Sync để tự động thử lại
-        results.forEach((res, index) => {
-            if (res.status === 'rejected') {
-                const table = index === 0 ? 'land_records' : index === 1 ? 'dangky_records' : 'luutru_records';
-                const rows = index === 0 ? landRows : index === 1 ? dangkyRows : luutruRows;
-                console.warn(`⚠️ Cập nhật bảng ${table} thất bại, đang xếp ${rows.length} hồ sơ vào hàng đợi tự động đồng bộ:`, res.reason);
-                rows.forEach(r => {
-                    addPendingRecord(r as RecordFile, 'UPDATE', table).catch(e => console.error("Error adding to sync queue:", e));
-                });
+        const hasRejections = results.some(res => res.status === 'rejected');
+        if (hasRejections) {
+            console.error(`[MUTATION] Supabase UPDATE: ERROR inside updateRecordsBatchById`);
+            console.warn(`[MUTATION] React State: NOT COMMITTED`);
+            results.forEach((res, index) => {
+                if (res.status === 'rejected') {
+                    const table = index === 0 ? 'land_records' : index === 1 ? 'dangky_records' : 'luutru_records';
+                    const rows = index === 0 ? landRows : index === 1 ? dangkyRows : luutruRows;
+                    rows.forEach(r => {
+                        addPendingRecord(r as RecordFile, 'UPDATE', table).catch(e => console.error(e));
+                    });
+                }
+            });
+            return { success: false, count: 0, error: 'Lỗi đồng bộ dữ liệu tới Supabase' };
+        }
+
+        console.log(`[MUTATION] Supabase UPDATE: SUCCESS for ${updates.length} records`);
+        console.log(`[MUTATION] VERIFY: SUCCESS`);
+
+        // Synchronize RAM and local cache ONLY after Supabase confirmation
+        fullMergedUpdates.forEach(up => {
+            const idx = MOCK_RECORDS.findIndex(r => r.id === up.id);
+            if (idx !== -1) {
+                MOCK_RECORDS[idx] = { ...MOCK_RECORDS[idx], ...up } as RecordFile;
             }
         });
 
@@ -1762,15 +1822,17 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         }
         
         await syncCacheOnBatchUpdate(fullMergedUpdates);
+        console.log(`[MUTATION] React State: UPDATED`);
         if (onProgress) onProgress(updates.length, updates.length);
         return { success: true, count: updates.length };
-    } catch (error) {
+    } catch (error: any) {
+        console.error(`[MUTATION] Supabase UPDATE: ERROR`, error);
+        console.warn(`[MUTATION] React State: NOT COMMITTED`);
         logError("updateRecordsBatchById", error);
-        // Ngay cả khi có ngoại lệ chung, vẫn xếp toàn bộ updates vào Sync Queue để không mất dữ liệu
         updates.forEach(u => {
             addPendingRecord(u as RecordFile, 'UPDATE').catch(e => console.error(e));
         });
-        return { success: false, count: 0 };
+        return { success: false, count: 0, error };
     }
 };
 

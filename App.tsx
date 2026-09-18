@@ -958,19 +958,22 @@ function App() {
           return { ...r, ...recordUpdates };
       });
 
-      // Cập nhật giao diện tức thì 0 giây với O(1) Map
-      const updateMap = new Map<string, RecordFile>();
-      updatedTargets.forEach(u => updateMap.set(u.id, u));
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      // Đẩy lên Supabase trước, xác nhận thành công mới cập nhật React State
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) throw new Error(res.error || "Không thể lưu dữ liệu vào Supabase");
 
-      setToast({ type: 'success', message: `Đã cập nhật ${updatedTargets.length} hồ sơ thành công!` });
-      setIsBulkUpdateModalOpen(false);
-      setSelectedRecordIds(new Set()); 
+          const updateMap = new Map<string, RecordFile>();
+          updatedTargets.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
-      // Đẩy ngầm lên Supabase, không block UI
-      updateRecordsBatchById(updatedTargets).catch(err => {
-          console.error("Batch update background error:", err);
-      });
+          setToast({ type: 'success', message: `Đã cập nhật ${updatedTargets.length} hồ sơ thành công!` });
+          setIsBulkUpdateModalOpen(false);
+          setSelectedRecordIds(new Set()); 
+      } catch (err: any) {
+          console.error("Batch update error:", err);
+          setToast({ type: 'error', message: `Cập nhật thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+      }
   };
 
   const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string, extraUpdates?: any) => {
@@ -1016,11 +1019,15 @@ function App() {
           }
       }
 
-      setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
       try { 
-          await updateRecordApi({ ...record, ...updates }); 
-      } catch (e) { 
+          const updated = await updateRecordApi({ ...record, ...updates }); 
+          if (updated) {
+              setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
+              setToast({ type: 'success', message: 'Đã cập nhật dữ liệu thành công!' });
+          }
+      } catch (e: any) { 
           console.error("Quick update failed", e); 
+          setToast({ type: 'error', message: `Lỗi cập nhật: ${e?.message || 'Không thể lưu vào CSDL'}` });
       }
   }, [records, createStatusLog]);
 
@@ -1056,10 +1063,19 @@ function App() {
               : returnRecord.privateNotes,
           statusLogs
       }; 
-      setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
-      await updateRecordApi({ ...returnRecord, ...updates });
-      setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
-      setReturnRecord(null);
+
+      try {
+          const updated = await updateRecordApi({ ...returnRecord, ...updates });
+          if (updated) {
+              setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updated } : r));
+              setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
+              setReturnRecord(null);
+              setIsReturnModalOpen(false);
+          }
+      } catch (e: any) {
+          console.error("Return result failed", e);
+          setToast({ type: 'error', message: `Lỗi ghi nhận trả kết quả: ${e?.message || 'Không thể lưu vào CSDL'}` });
+      }
   }, [returnRecord, currentUser, employees, createStatusLog]);
 
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
@@ -1070,14 +1086,20 @@ function App() {
       }
       const newValue = !record.needsMapCorrection;
       const updatedRecord = { ...record, needsMapCorrection: newValue };
-      setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
-      await updateRecordApi(updatedRecord);
-      if (newValue) {
-          setRecordForMapCorrection(updatedRecord);
-          setCurrentView('utilities');
-          setToast({ type: 'success', message: `Đã chuyển hồ sơ ${record.code} sang tiện ích chỉnh lý bản đồ.` });
-      } else {
-          setToast({ type: 'success', message: `Đã HỦY yêu cầu chỉnh lý cho hồ sơ ${record.code}.` });
+      try {
+          const updated = await updateRecordApi(updatedRecord);
+          if (updated) {
+              setRecords(prev => prev.map(r => r.id === record.id ? updated : r));
+              if (newValue) {
+                  setRecordForMapCorrection(updated);
+                  setCurrentView('utilities');
+                  setToast({ type: 'success', message: `Đã chuyển hồ sơ ${record.code} sang tiện ích chỉnh lý bản đồ.` });
+              } else {
+                  setToast({ type: 'success', message: `Đã HỦY yêu cầu chỉnh lý cho hồ sơ ${record.code}.` });
+              }
+          }
+      } catch (e: any) {
+          setToast({ type: 'error', message: 'Lỗi cập nhật yêu cầu chỉnh lý vào CSDL.' });
       }
   }, []);
 
@@ -1161,11 +1183,16 @@ function App() {
                   notes: 'Hoàn thành bổ sung, chuyển tiếp hồ sơ'
               });
               const updatedRecord = { ...record, ...updates, ...synced };
-              setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
-              setToast({ type: 'success', message: `Hồ sơ đã được khôi phục về bước: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
-              updateRecordApi(updatedRecord).catch(err => {
+              try {
+                  const res = await updateRecordApi(updatedRecord);
+                  if (res) {
+                      setRecords(prev => prev.map(r => r.id === record.id ? res : r));
+                      setToast({ type: 'success', message: `Hồ sơ đã được khôi phục về bước: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
+                  }
+              } catch (err: any) {
                   console.error("advanceStatus supplement resume error:", err);
-              });
+                  setToast({ type: 'error', message: `Lỗi chuyển bước: ${err?.message || 'Không thể lưu vào CSDL'}` });
+              }
               return;
           }
           if (record.status === RecordStatus.PENDING_CHECK) {
@@ -1196,11 +1223,16 @@ function App() {
                   userId: currentUser?.id
               });
               const updatedRecord = { ...record, ...updates };
-              setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
-              setToast({ type: 'success', message: `Đã chuyển hồ sơ sang: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
-              updateRecordApi(updatedRecord).catch(err => {
+              try {
+                  const res = await updateRecordApi(updatedRecord);
+                  if (res) {
+                      setRecords(prev => prev.map(r => r.id === record.id ? res : r));
+                      setToast({ type: 'success', message: `Đã chuyển hồ sơ sang: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
+                  }
+              } catch (err: any) {
                   console.error("advanceStatus background error:", err);
-              });
+                  setToast({ type: 'error', message: `Lỗi chuyển bước: ${err?.message || 'Không thể lưu vào CSDL'}` });
+              }
           }
           return;
       }
@@ -1255,10 +1287,16 @@ function App() {
               userId: currentUser?.id
           });
           const updatedRecord = { ...record, ...updates };
-          setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
-          updateRecordApi(updatedRecord).catch(err => {
+          try {
+              const res = await updateRecordApi(updatedRecord);
+              if (res) {
+                  setRecords(prev => prev.map(r => r.id === record.id ? res : r));
+                  setToast({ type: 'success', message: `Đã chuyển hồ sơ sang: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
+              }
+          } catch (err: any) {
               console.error("advanceStatus background error:", err);
-          });
+              setToast({ type: 'error', message: `Lỗi chuyển bước: ${err?.message || 'Không thể lưu vào CSDL'}` });
+          }
       }
   }, [currentUser]);
 
@@ -1288,18 +1326,22 @@ function App() {
           return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, updated_at: nowStr, statusLogs };
       });
 
-      const updateMap = new Map<string, RecordFile>();
-      updatesToApply.forEach(u => updateMap.set(u.id, u));
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      try {
+          const res = await updateRecordsBatchById(updatesToApply);
+          if (!res.success) throw new Error(res.error || "Không thể lưu chốt đợt vào CSDL");
 
-      updateRecordsBatchById(updatesToApply).catch(err => {
+          const updateMap = new Map<string, RecordFile>();
+          updatesToApply.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+          setSelectedRecordIds(new Set()); 
+          setToast({ type: 'success', message: `[Đo đạc] Đã chốt danh sách ${batchNumber} (${updatesToApply.length} hồ sơ) thành công.` });
+          setExportModalType("handover");
+          setIsExportModalOpen(true);
+      } catch (err: any) {
           console.error("Lỗi khi chốt đợt xuất giao 1 cửa Đo đạc:", err);
-      });
-
-      setSelectedRecordIds(new Set()); 
-      setToast({ type: 'success', message: `[Đo đạc] Đã chốt danh sách ${batchNumber} (${updatesToApply.length} hồ sơ) thành công.` });
-      setExportModalType("handover");
-      setIsExportModalOpen(true);
+          setToast({ type: 'error', message: `Chốt đợt thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+      }
   };
 
   const exportCertificateBatch = async (batchNumber: number | string, batchDate: string, handoverWard?: string) => {
@@ -1328,18 +1370,22 @@ function App() {
           return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, updated_at: nowStr, statusLogs };
       });
 
-      const updateMap = new Map<string, RecordFile>();
-      updatesToApply.forEach(u => updateMap.set(u.id, u));
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      try {
+          const res = await updateRecordsBatchById(updatesToApply);
+          if (!res.success) throw new Error(res.error || "Không thể lưu chốt đợt vào CSDL");
 
-      updateRecordsBatchById(updatesToApply).catch(err => {
+          const updateMap = new Map<string, RecordFile>();
+          updatesToApply.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+          setSelectedRecordIds(new Set()); 
+          setToast({ type: 'success', message: `[Cấp giấy] Đã chốt danh sách ${batchNumber} (${updatesToApply.length} hồ sơ) thành công.` });
+          setExportModalType("handover");
+          setIsExportModalOpen(true);
+      } catch (err: any) {
           console.error("Lỗi khi chốt đợt xuất giao 1 cửa Cấp giấy:", err);
-      });
-
-      setSelectedRecordIds(new Set()); 
-      setToast({ type: 'success', message: `[Cấp giấy] Đã chốt danh sách ${batchNumber} (${updatesToApply.length} hồ sơ) thành công.` });
-      setExportModalType("handover");
-      setIsExportModalOpen(true);
+          setToast({ type: 'error', message: `Chốt đợt thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+      }
   };
 
   const exportArchiveBatch = async (batchName: string, batchDate: string) => {
@@ -1398,23 +1444,28 @@ function App() {
           return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, updated_at: nowStr, statusLogs };
       });
 
-      const updateMap = new Map<string, RecordFile>();
-      updatesToApply.forEach(u => updateMap.set(u.id, u));
-      markRecordsRecentlyUpdated(updatesToApply);
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      try {
+          const recordIds = updatesToApply.map(u => u.id);
+          const [batchRes] = await Promise.all([
+              updateRecordsBatchById(updatesToApply),
+              createArchiveBatch(pureBatch, recordIds, 'global', batchDate)
+          ]);
 
-      const recordIds = updatesToApply.map(u => u.id);
-      
-      // Chạy đồng thời cập nhật DB chính và lưu đợt xuất
-      await Promise.allSettled([
-          updateRecordsBatchById(updatesToApply),
-          createArchiveBatch(pureBatch, recordIds, 'global', batchDate)
-      ]);
+          if (!batchRes.success) throw new Error("Lỗi lưu chốt đợt vào Supabase");
 
-      setSelectedRecordIds(new Set()); 
-      setToast({ type: 'success', message: `Đã chốt danh sách giao 1 cửa chung "${pureBatch}" (${updatesToApply.length} hồ sơ) thành công.` });
-      setExportModalType("handover");
-      setIsExportModalOpen(true);
+          const updateMap = new Map<string, RecordFile>();
+          updatesToApply.forEach(u => updateMap.set(u.id, u));
+          markRecordsRecentlyUpdated(updatesToApply);
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+          setSelectedRecordIds(new Set()); 
+          setToast({ type: 'success', message: `Đã chốt danh sách giao 1 cửa chung "${pureBatch}" (${updatesToApply.length} hồ sơ) thành công.` });
+          setExportModalType("handover");
+          setIsExportModalOpen(true);
+      } catch (err: any) {
+          console.error("Execute batch export error:", err);
+          setToast({ type: 'error', message: `Lỗi chốt đợt xuất giao 1 cửa: ${err?.message || 'Không thể lưu vào CSDL'}` });
+      }
   };
 
   const executeReturnBatchHandover = async (batchNumber: number, batchDate: string, deptName: string) => {
@@ -1435,18 +1486,20 @@ function App() {
           };
       });
 
-      // Cập nhật giao diện tức thời với O(1) Map
-      const updateMap = new Map<string, RecordFile>();
-      updatesToApply.forEach(u => updateMap.set(u.id, u));
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      try {
+          const res = await updateRecordsBatchById(updatesToApply);
+          if (!res.success) throw new Error("Lỗi lưu vào CSDL");
 
-      // Đẩy hàng loạt qua updateRecordsBatchById
-      updateRecordsBatchById(updatesToApply).catch(err => {
+          const updateMap = new Map<string, RecordFile>();
+          updatesToApply.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã chốt danh sách bàn giao ĐỢT ${batchNumber} (${updatesToApply.length} hồ sơ) về ${deptName} thành công.` });
+      } catch (err: any) {
           console.error("Lỗi khi chốt đợt trả kết quả:", err);
-      });
-
-      setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã chốt danh sách bàn giao ĐỢT ${batchNumber} (${updatesToApply.length} hồ sơ) về ${deptName} thành công.` });
+          setToast({ type: 'error', message: `Chốt đợt bàn giao thất bại: ${err?.message || 'Lỗi Supabase'}` });
+      }
   };
 
   const handleConfirmSignBatch = async () => {
@@ -1476,21 +1529,23 @@ function App() {
           };
       });
 
-      // Cập nhật giao diện tức thì 0 giây với O(1) Map
-      const updateMap = new Map<string, RecordFile>();
-      updatedTargets.forEach(u => updateMap.set(u.id, u));
-      markRecordsRecentlyUpdated(updatedTargets);
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) throw new Error("Lỗi lưu ký duyệt vào CSDL");
 
-      setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã ký duyệt ${targetRecords.length} hồ sơ thành công!` });
-      setIsSignApprovalModalOpen(false);
-      setSignApprovalTargetRecords([]);
+          const updateMap = new Map<string, RecordFile>();
+          updatedTargets.forEach(u => updateMap.set(u.id, u));
+          markRecordsRecentlyUpdated(updatedTargets);
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
-      // Đẩy ngầm lên Supabase, không block UI
-      updateRecordsBatchById(updatedTargets).catch(err => {
-          console.error("Batch sign background error:", err);
-      });
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã ký duyệt ${targetRecords.length} hồ sơ thành công!` });
+          setIsSignApprovalModalOpen(false);
+          setSignApprovalTargetRecords([]);
+      } catch (err: any) {
+          console.error("Batch sign error:", err);
+          setToast({ type: 'error', message: `Ký duyệt thất bại: ${err?.message || 'Lỗi Supabase'}` });
+      }
   };
 
   const handleExecuteSignBatch = async () => {
@@ -1503,19 +1558,21 @@ function App() {
           statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
       }));
 
-      // Cập nhật giao diện tức thì 0 giây với O(1) Map
-      const updateMap = new Map<string, RecordFile>();
-      updatedTargets.forEach(u => updateMap.set(u.id, u));
-      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) throw new Error("Lỗi lưu ký duyệt vào CSDL");
 
-      setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã chuyển ${bulkSignPendingRecords.length} hồ sơ sang "Đã ký".` });
-      setIsBulkSignModalOpen(false);
+          const updateMap = new Map<string, RecordFile>();
+          updatedTargets.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
-      // Đẩy ngầm lên Supabase, không block UI
-      updateRecordsBatchById(updatedTargets).catch(err => {
-          console.error("Batch sign background error:", err);
-      });
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã chuyển ${bulkSignPendingRecords.length} hồ sơ sang "Đã ký".` });
+          setIsBulkSignModalOpen(false);
+      } catch (err: any) {
+          console.error("Batch sign batch error:", err);
+          setToast({ type: 'error', message: `Ký duyệt đợt thất bại: ${err?.message || 'Lỗi Supabase'}` });
+      }
   };
 
   const handleExportReturnedList = () => {
@@ -1545,27 +1602,35 @@ function App() {
              return { ...r, ...updates };
           });
           
-          // Cập nhật giao diện tức thì 0 giây với O(1) Map
-          const updateMap = new Map<string, RecordFile>();
-          updatesToApply.forEach(u => updateMap.set(u.id, u));
-          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+          try {
+              const res = await updateRecordsBatchById(updatesToApply);
+              if (!res.success) throw new Error("Lỗi lưu vào CSDL");
 
-          setSelectedRecordIds(new Set());
-          setToast({ type: 'success', message: `Đã đánh dấu ${targets.length} hồ sơ thành "Hồ sơ trả".` });
+              const updateMap = new Map<string, RecordFile>();
+              updatesToApply.forEach(u => updateMap.set(u.id, u));
+              setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
-          // Đẩy ngầm lên Supabase, không block UI
-          updateRecordsBatchById(updatesToApply).catch(err => {
-              console.error("Batch reject background error:", err);
-          });
+              setSelectedRecordIds(new Set());
+              setToast({ type: 'success', message: `Đã đánh dấu ${targets.length} hồ sơ thành "Hồ sơ trả".` });
+          } catch (err: any) {
+              console.error("Batch reject error:", err);
+              setToast({ type: 'error', message: `Đánh dấu hồ sơ trả thất bại: ${err?.message || 'Lỗi Supabase'}` });
+          }
       }
   };
 
   const handleHandOverRecords = useCallback(async (recordIds: string[]) => {
       if (recordIds.length === 0) return;
       const updates = recordIds.map(id => ({ id, isHandedOver: true }));
-      setRecords(prev => prev.map(r => recordIds.includes(r.id) ? { ...r, isHandedOver: true } : r));
-      await updateRecordsBatchById(updates);
-      setToast({ type: 'success', message: `Đã tự động bàn giao ${recordIds.length} hồ sơ và đồng bộ dữ liệu!` });
+      try {
+          const res = await updateRecordsBatchById(updates);
+          if (res.success) {
+              setRecords(prev => prev.map(r => recordIds.includes(r.id) ? { ...r, isHandedOver: true } : r));
+              setToast({ type: 'success', message: `Đã tự động bàn giao ${recordIds.length} hồ sơ và đồng bộ dữ liệu!` });
+          }
+      } catch (err: any) {
+          console.error("Auto handover error:", err);
+      }
   }, [setRecords]);
 
   const handleOpenRejectReturnModal = useCallback((targets: RecordFile[]) => {
@@ -1617,16 +1682,23 @@ function App() {
           };
       });
 
-      setRecords(prev => prev.map(r => {
-          const found = updatedTargets.find(u => u.id === r.id);
-          return found ? found : r;
-      }));
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) throw new Error("Lỗi gia hạn CSDL");
 
-      await Promise.all(updatedTargets.map(u => updateRecordApi(u)));
-      setIsExtendModalOpen(false);
-      setExtendTargetRecords([]);
-      setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã gia hạn ngày hẹn cho ${updatedTargets.length} hồ sơ thành công!` });
+          setRecords(prev => prev.map(r => {
+              const found = updatedTargets.find(u => u.id === r.id);
+              return found ? found : r;
+          }));
+
+          setIsExtendModalOpen(false);
+          setExtendTargetRecords([]);
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã gia hạn ngày hẹn cho ${updatedTargets.length} hồ sơ thành công!` });
+      } catch (err: any) {
+          console.error("Extend deadline error:", err);
+          setToast({ type: 'error', message: `Gia hạn ngày hẹn thất bại: ${err?.message || 'Lỗi Supabase'}` });
+      }
   }, [extendTargetRecords, currentUser]);
 
   const handleConfirmRejectReturnStep = useCallback(async (optionType: ReturnOptionType, reason: string, returnDateStr: string) => {
@@ -1700,16 +1772,23 @@ function App() {
           };
       });
 
-      setRecords(prev => prev.map(r => {
-          const found = updatedTargets.find(u => u.id === r.id);
-          return found ? found : r;
-      }));
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) throw new Error("Lỗi trả hồ sơ CSDL");
 
-      await Promise.all(updatedTargets.map(u => updateRecordApi(u)));
-      setIsRejectReturnStepModalOpen(false);
-      setRejectReturnTargetRecords([]);
-      setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã thực hiện trả ${updatedTargets.length} hồ sơ thành công!` });
+          setRecords(prev => prev.map(r => {
+              const found = updatedTargets.find(u => u.id === r.id);
+              return found ? found : r;
+          }));
+
+          setIsRejectReturnStepModalOpen(false);
+          setRejectReturnTargetRecords([]);
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã thực hiện trả ${updatedTargets.length} hồ sơ thành công!` });
+      } catch (err: any) {
+          console.error("Reject return step error:", err);
+          setToast({ type: 'error', message: `Trả hồ sơ thất bại: ${err?.message || 'Lỗi Supabase'}` });
+      }
   }, [rejectReturnTargetRecords, currentUser]);
 
   if (!currentUser) return (
