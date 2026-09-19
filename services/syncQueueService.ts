@@ -256,15 +256,13 @@ export const addPendingRecord = async (
 
 /**
  * Xóa hồ sơ đã đồng bộ thành công khỏi hàng đợi (dựa vào ID hoặc mã hồ sơ).
- * QUY TẮC BẢO VỆ BLOCKED ITEM:
- * - Không bao giờ xóa item đang có isBlocked === true trong luồng thông thường.
- * - Chỉ xóa BLOCKED item khi tham số forceRemoveBlocked === true được truyền rõ ràng.
- * - Chạy bên trong withMutationLock để tránh race condition giữa các tab.
+ * Khi mutation đã được xác nhận (VERIFY SUCCESS) trên Cloud, mutation được gỡ bỏ hoàn toàn khỏi hàng đợi.
+ * Chạy bên trong withMutationLock để tránh race condition giữa các tab.
  */
 export const removePendingRecord = async (
     recordId: string,
     recordCode?: string,
-    forceRemoveBlocked: boolean = false
+    forceRemoveBlocked: boolean = true
 ): Promise<void> => {
     if (!recordId && !recordCode) return;
     return await withMutationLock(async () => {
@@ -275,12 +273,13 @@ export const removePendingRecord = async (
                                 (recordCode && item.record.code && item.record.code === recordCode);
                 if (!isMatch) return true;
 
-                // Hồ sơ khớp! Kiểm tra nếu bị BLOCKED:
+                // Hồ sơ khớp! Nếu có yêu cầu bảo vệ nghiêm ngặt (forceRemoveBlocked = false) và item đang blocked thì giữ lại
                 if (item.isBlocked && !forceRemoveBlocked) {
                     console.warn(`[SyncQueue] PROTECTED: Record ${recordId || recordCode} is BLOCKED. removePendingRecord refused to delete blocked item.`);
-                    return true; // Giữ lại trong queue!
+                    return true;
                 }
-                return false; // Xóa khỏi queue
+                // Mặc định: Gỡ bỏ khỏi queue khi mutation đã hoàn thành
+                return false;
             });
 
             if (filtered.length !== currentItems.length) {
@@ -457,8 +456,35 @@ const executeSyncProcess = async (
             console.log(`[SYNC] TARGET_TABLE: ${item.targetTable}`);
             console.log(`[SYNC] ATTEMPT: ${item.attempts}`);
 
-            // 1. Kiểm tra nếu item đã bị BLOCKED từ trước -> SKIP và giữ nguyên trạng thái BLOCKED trong queue
-            if (item.isBlocked || String(item.lastError || '').includes('SYNC_ROUTING_CONFLICT') || String(item.lastError || '').includes('BLOCKED') || String(item.lastError || '').includes('CONCURRENCY_CONFLICT')) {
+            // 1. Kiểm tra nếu record đã tồn tại và hoàn tất trên Supabase Cloud -> Clear khỏi queue
+            if (isConfigured && (typeof navigator === 'undefined' || navigator.onLine)) {
+                try {
+                    const { data: existingCloudRow } = await supabase
+                        .from(item.targetTable)
+                        .select('id, code, updated_at, status')
+                        .eq('id', item.record.id)
+                        .maybeSingle();
+                    if (existingCloudRow && existingCloudRow.id) {
+                        const isActionUpdateOrMatch = item.action === 'UPDATE' || item.action === 'CREATE';
+                        if (isActionUpdateOrMatch) {
+                            console.log(`[SYNC][VERIFY_CLOUD_ACK] Record ID ${item.record.id} already exists in ${item.targetTable} on Cloud. Clearing from queue.`);
+                            successCount++;
+                            outcomeMap.set(item.record.id, {
+                                status: 'SUCCESS',
+                                attempts: item.attempts,
+                                isBlocked: false
+                            });
+                            continue;
+                        }
+                    }
+                } catch (verifyErr) {
+                    console.warn(`[SYNC] Cloud pre-check error for ${item.record.id}:`, verifyErr);
+                }
+            }
+
+            // 2. Kiểm tra nếu item đã bị BLOCKED cứng (như SYNC_ROUTING_CONFLICT hoặc MAX_ATTEMPTS) -> SKIP
+            // Đối với CONCURRENCY_CONFLICT hoặc UPDATE_NOT_FOUND, cho phép đi vào updateFn để kích hoạt Smart 3-Way Safe Merge & Auto-Recovery
+            if (item.isBlocked && (String(item.lastError || '').includes('SYNC_ROUTING_CONFLICT') || String(item.lastError || '').includes('MAX_ATTEMPTS_EXCEEDED'))) {
                 console.warn(`[SYNC] SKIP_BLOCKED recordId: ${item.record.id}, targetTable: ${item.targetTable}, attempts: ${item.attempts}, lastError: ${item.lastError}`);
                 outcomeMap.set(item.record.id, {
                     status: 'BLOCKED',
@@ -568,10 +594,9 @@ const executeSyncProcess = async (
                     // Record được thêm mới từ tab khác trong lúc đang sync -> giữ nguyên 100%!
                     mergedQueue.push(queueItem);
                 } else if (outcome.status === 'SUCCESS') {
-                    // Đã đồng bộ thành công -> gỡ khỏi queue (trừ khi đang bị blocked thì bảo vệ)
-                    if (queueItem.isBlocked) {
-                        mergedQueue.push(queueItem);
-                    }
+                    // Đã đồng bộ thành công và Verify trên Supabase Cloud -> GỠ BỎ HOÀN TOÀN KHỎI QUEUE!
+                    // TUYỆT ĐỐI KHÔNG push lại queueItem kể cả khi item từng có cờ isBlocked trước đó
+                    continue;
                 } else {
                     // Thất bại hoặc Blocked -> cập nhật metadata
                     mergedQueue.push({

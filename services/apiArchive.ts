@@ -660,23 +660,6 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 .maybeSingle();
             existingRows = res.data;
 
-            // Auto-Discovery & Cross-Table Migration if not in luutru_records
-            if (!existingRows) {
-                const landRes = await supabase.from('land_records').select('*').eq('id', record.id).maybeSingle();
-                if (landRes.data) {
-                    console.log(`[Archive Auto-Migrate] Record ID ${record.id} found in land_records. Migrating to luutru_records...`);
-                    existingRows = landRes.data;
-                    await supabase.from('land_records').delete().eq('id', record.id);
-                } else {
-                    const dangkyRes = await supabase.from('dangky_records').select('*').eq('id', record.id).maybeSingle();
-                    if (dangkyRes.data) {
-                        console.log(`[Archive Auto-Migrate] Record ID ${record.id} found in dangky_records. Migrating to luutru_records...`);
-                        existingRows = dangkyRes.data;
-                        await supabase.from('dangky_records').delete().eq('id', record.id);
-                    }
-                }
-            }
-
             if (existingRows) {
                 const currentArch = mapLuutruDbToArchiveRecord(existingRows);
                 fullRecord = {
@@ -969,67 +952,19 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
             
         if (fetchError) throw fetchError;
 
-        // Auto-Discovery & Cross-Table Migration if any requested IDs are missing from luutru_records
+        // Phục hồi từ bộ nhớ cache lưu trữ hoặc pending queue nếu thiếu
         const missingIds = ids.filter(id => !currentRecords?.some(r => r.id === id));
         if (missingIds.length > 0) {
-            console.log(`[updateArchiveRecordsBatch] ${missingIds.length} IDs not found in luutru_records. Checking other tables & caches...`, missingIds);
-            
-            // 1. Kiểm tra land_records
+            console.log(`[updateArchiveRecordsBatch] Resolving ${missingIds.length} missing IDs from local caches/queue:`, missingIds);
+            const localCachedArchive = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            const localCachedRecords = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+            let pending: any[] = [];
             try {
-                const { data: landRecords } = await supabase
-                    .from('land_records')
-                    .select('*')
-                    .in('id', missingIds);
-                if (landRecords && landRecords.length > 0) {
-                    console.log(`[Archive Auto-Migrate] Found ${landRecords.length} records in land_records to migrate into luutru_records:`, landRecords.map(r => r.id));
-                    const migratedPayloads = landRecords.map(lr => {
-                        const arch = mapLuutruDbToArchiveRecord(lr);
-                        return mapArchiveRecordToLuutruDb(arch);
-                    });
-                    await supabase.from('luutru_records').upsert(migratedPayloads);
-                    await supabase.from('land_records').delete().in('id', landRecords.map(r => r.id));
-                    currentRecords = [...(currentRecords || []), ...landRecords];
-                }
-            } catch (mErr) {
-                console.warn('[Archive Auto-Migrate] Warning searching land_records:', mErr);
-            }
+                pending = await getPendingRecords();
+            } catch {}
 
-            // 2. Kiểm tra dangky_records
-            const stillMissingIds = ids.filter(id => !currentRecords?.some(r => r.id === id));
-            if (stillMissingIds.length > 0) {
-                try {
-                    const { data: dangkyRecords } = await supabase
-                        .from('dangky_records')
-                        .select('*')
-                        .in('id', stillMissingIds);
-                    if (dangkyRecords && dangkyRecords.length > 0) {
-                        console.log(`[Archive Auto-Migrate] Found ${dangkyRecords.length} records in dangky_records to migrate into luutru_records:`, dangkyRecords.map(r => r.id));
-                        const migratedPayloads = dangkyRecords.map(dr => {
-                            const arch = mapLuutruDbToArchiveRecord(dr);
-                            return mapArchiveRecordToLuutruDb(arch);
-                        });
-                        await supabase.from('luutru_records').upsert(migratedPayloads);
-                        await supabase.from('dangky_records').delete().in('id', dangkyRecords.map(r => r.id));
-                        currentRecords = [...(currentRecords || []), ...dangkyRecords];
-                    }
-                } catch (mErr) {
-                    console.warn('[Archive Auto-Migrate] Warning searching dangky_records:', mErr);
-                }
-            }
-
-            // 3. Khôi phục từ bộ nhớ cache hoặc pending sync queue
-            const remainingMissingIds = ids.filter(id => !currentRecords?.some(r => r.id === id));
-            if (remainingMissingIds.length > 0) {
-                console.log(`[Archive Auto-Recovery] Resolving ${remainingMissingIds.length} missing IDs from local caches/queue:`, remainingMissingIds);
-                const localCachedArchive = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-                const localCachedRecords = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
-                let pending: any[] = [];
-                try {
-                    pending = await getPendingRecords();
-                } catch {}
-
-                for (const missingId of remainingMissingIds) {
-                    const foundCached = localCachedArchive.find(r => r.id === missingId)
+            for (const missingId of missingIds) {
+                const foundCached = localCachedArchive.find(r => r.id === missingId)
                         || memoryArchiveRecordsCache?.find(r => r.id === missingId)
                         || MOCK_ARCHIVE.find(r => r.id === missingId)
                         || localCachedRecords.find(r => r.id === missingId)
@@ -1072,7 +1007,6 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
                     }
                 }
             }
-        }
 
         if (!currentRecords || currentRecords.length === 0) {
             console.warn(`[MUTATION][UPDATE_NOT_FOUND] Records with IDs ${ids.join(', ')} not found in any table or cache. Enqueueing to offline pending queue.`);

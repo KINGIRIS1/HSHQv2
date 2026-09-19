@@ -393,6 +393,104 @@ export const isConcurrencyConflict = (dbUpdatedAt?: string | null, clientUpdated
     return (dbTime - clientTime) > 2000;
 };
 
+export interface MergeResult {
+    hasConflict: boolean;
+    conflictFields: string[];
+    mergedRecord: RecordFile | null;
+}
+
+/**
+ * 3-Way Non-Conflicting Auto-Merge Strategy.
+ * Khi server có phiên bản mới hơn client:
+ * - Giữ nguyên các trường mới nhất của server.
+ * - Áp dụng các thay đổi nghiệp vụ của local nếu không xung đột đối kháng trên cùng 1 trường.
+ * - Nếu phát hiện cùng sửa đổi một trường trọng yếu (status, assignedTo...) với giá trị khác nhau -> TRUE CONFLICT.
+ */
+export const mergeRecordSafely = (
+    serverRecord: RecordFile,
+    localMutation: RecordFile,
+    baseSnapshot?: Partial<RecordFile>
+): MergeResult => {
+    if (!serverRecord || !localMutation) {
+        return { hasConflict: false, conflictFields: [], mergedRecord: localMutation || serverRecord };
+    }
+
+    const systemFields = new Set([
+        'id', 'code', 'sourceTable', '_isOfflineSaved', '_baseUpdatedAt', '_baseSnapshot',
+        'created_at', 'createdAt', 'updated_at', 'updatedAt', 'created_by'
+    ]);
+
+    const conflictFields: string[] = [];
+    const merged: any = { ...serverRecord };
+
+    const allKeys = new Set([
+        ...Object.keys(serverRecord),
+        ...Object.keys(localMutation)
+    ]);
+
+    for (const key of allKeys) {
+        if (systemFields.has(key)) continue;
+
+        const serverVal = (serverRecord as any)[key];
+        const localVal = (localMutation as any)[key];
+        const baseVal = baseSnapshot ? (baseSnapshot as any)[key] : undefined;
+
+        if (localVal === undefined) {
+            continue;
+        }
+
+        if (baseSnapshot && baseVal !== undefined) {
+            const isLocalChanged = JSON.stringify(localVal) !== JSON.stringify(baseVal);
+            const isServerChanged = JSON.stringify(serverVal) !== JSON.stringify(baseVal);
+
+            if (isLocalChanged && isServerChanged) {
+                if (JSON.stringify(localVal) !== JSON.stringify(serverVal)) {
+                    conflictFields.push(key);
+                } else {
+                    merged[key] = localVal;
+                }
+            } else if (isLocalChanged) {
+                merged[key] = localVal;
+            } else {
+                merged[key] = serverVal;
+            }
+        } else {
+            if (JSON.stringify(localVal) === JSON.stringify(serverVal)) {
+                merged[key] = serverVal;
+            } else if (serverVal === null || serverVal === undefined || serverVal === '' || (Array.isArray(serverVal) && serverVal.length === 0)) {
+                merged[key] = localVal;
+            } else if (localVal === null || localVal === undefined || localVal === '' || (Array.isArray(localVal) && localVal.length === 0)) {
+                merged[key] = serverVal;
+            } else {
+                const criticalFields = ['status', 'assignedTo', 'deadline', 'exportBatch', 'isHandedOver', 'hasDefect'];
+                if (criticalFields.includes(key)) {
+                    conflictFields.push(key);
+                } else {
+                    merged[key] = localVal;
+                }
+            }
+        }
+    }
+
+    if (conflictFields.length > 0) {
+        return {
+            hasConflict: true,
+            conflictFields,
+            mergedRecord: null
+        };
+    }
+
+    merged.updated_at = new Date().toISOString();
+    merged.updatedAt = merged.updated_at;
+    merged._isOfflineSaved = false;
+
+    return {
+        hasConflict: false,
+        conflictFields: [],
+        mergedRecord: merged as RecordFile
+    };
+};
+
 export interface RoutingValidationResult {
     valid: boolean;
     targetTable: 'dangky_records' | 'land_records' | 'luutru_records';
@@ -630,15 +728,27 @@ const fetchPageDirectWithRetry = async (
 export type TierProgressCallback = (tier: 1 | 2 | 3, recordsSoFar: RecordFile[], isComplete: boolean) => void;
 
 let inFlightFetchRecordsPromise: Promise<RecordFile[]> | null = null;
+let lastFetchTime = 0;
+let lastFetchedRecords: RecordFile[] | null = null;
 const fetchRecordsCallbacks = new Set<TierProgressCallback>();
 
-export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<RecordFile[]> => {
+export const fetchRecords = async (onProgress?: TierProgressCallback, forceRefresh = false): Promise<RecordFile[]> => {
   if (onProgress) {
       fetchRecordsCallbacks.add(onProgress);
   }
 
+  // Trả về ngay Promise đang chạy nếu có (Shared In-Flight Promise)
   if (inFlightFetchRecordsPromise) {
       return inFlightFetchRecordsPromise;
+  }
+
+  // Deduplication window: nếu vừa fetch trong vòng 3000ms và không force refresh -> trả về cache ngay
+  const now = Date.now();
+  if (!forceRefresh && lastFetchedRecords && (now - lastFetchTime < 3000)) {
+      if (onProgress) {
+          try { onProgress(3, lastFetchedRecords, true); } catch {}
+      }
+      return lastFetchedRecords;
   }
 
   inFlightFetchRecordsPromise = (async () => {
@@ -688,12 +798,12 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
         }
         
         const rawList = [...dangky, ...land, ...luutru];
-        const now = Date.now();
+        const currentTime = Date.now();
         rawList.forEach(item => {
             const mapped = mapRecordFromDb(item);
             if (mapped && mapped.id && !allBlankIds.has(mapped.id)) {
                 const recent = RECENTLY_UPDATED_RECORDS.get(mapped.id);
-                if (recent && (now - recent.updatedAt < 60000)) {
+                if (recent && (currentTime - recent.updatedAt < 60000)) {
                     console.log(`[SYNC] Record: ${mapped.code || mapped.id}`);
                     console.log(`[SYNC] Server status: ${mapped.status}`);
                     console.log(`[SYNC] Protection active (Client recent status: ${recent.record.status}). Keeping recent status.`);
@@ -731,6 +841,9 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
         if (finalRecords.length > 0) {
             saveToCache(CACHE_KEYS.RECORDS, finalRecords);
         }
+
+        lastFetchTime = Date.now();
+        lastFetchedRecords = finalRecords;
 
         fetchRecordsCallbacks.forEach(cb => {
             try { cb(3, finalRecords, true); } catch {}
@@ -1322,12 +1435,22 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
         try {
             const { data: curData } = await supabase
                 .from(targetTable)
-                .select('updated_at')
+                .select('*')
                 .eq('id', record.id)
                 .maybeSingle();
             if (curData && curData.updated_at && isConcurrencyConflict(curData.updated_at, previousUpdatedAt)) {
-                console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${record.id} in ${targetTable} was updated by another session. DB: ${curData.updated_at}, Expected: ${previousUpdatedAt}`);
-                throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${record.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
+                // Thử 3-way non-conflicting auto-merge
+                const serverRecord = mapRecordFromDb(curData) as RecordFile;
+                const mergeRes = mergeRecordSafely(serverRecord, record, (record as any)._baseSnapshot);
+                if (!mergeRes.hasConflict && mergeRes.mergedRecord) {
+                    console.log(`[MUTATION][SAFE_MERGE] Auto-merged non-conflicting mutation for record ID ${record.id}`);
+                    record = mergeRes.mergedRecord;
+                    previousUpdatedAt = curData.updated_at;
+                } else {
+                    const conflictFields = mergeRes.conflictFields.join(', ');
+                    console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${record.id} in ${targetTable} has conflicting fields: [${conflictFields}]. DB: ${curData.updated_at}, Expected: ${previousUpdatedAt}`);
+                    throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${record.id} in table ${targetTable} has true conflict on fields [${conflictFields}]. Please refresh.`);
+                }
             }
         } catch (fetchError: any) {
             if (String(fetchError?.message || '').includes('CONCURRENCY_CONFLICT')) {
@@ -1381,46 +1504,62 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
         }
 
         if (!data || data.length === 0) {
-            const { data: checkData } = await supabase.from(targetTable).select('id, updated_at').eq('id', record.id);
+            const { data: checkData } = await supabase.from(targetTable).select('*').eq('id', record.id);
             if (checkData && checkData.length > 0) {
                 const currentDbUpdatedAt = checkData[0].updated_at;
                 if (isConcurrencyConflict(currentDbUpdatedAt, previousUpdatedAt)) {
-                    console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${record.id} in ${targetTable} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
-                    throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${record.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
+                    const serverRecord = mapRecordFromDb(checkData[0]) as RecordFile;
+                    const mergeRes = mergeRecordSafely(serverRecord, record, (record as any)._baseSnapshot);
+                    if (!mergeRes.hasConflict && mergeRes.mergedRecord) {
+                        console.log(`[MUTATION][SAFE_MERGE_RETRY] Auto-merged on 0-row check for ID: ${record.id}`);
+                        const mergedPayload = sanitizeRecordPayloadForTable(mergeRes.mergedRecord, targetTable);
+                        const retryRes = await supabase.from(targetTable).update(mergedPayload).eq('id', record.id).select();
+                        if (retryRes.data && retryRes.data.length > 0) {
+                            data = retryRes.data;
+                        }
+                    } else {
+                        const conflictFields = mergeRes.conflictFields.join(', ');
+                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${record.id} in ${targetTable} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                        throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${record.id} in table ${targetTable} has conflict on fields [${conflictFields}]. Please refresh.`);
+                    }
                 }
             }
 
-            // Cross-Table Auto-Migration: Kiểm tra các bảng khác trước khi báo lỗi
-            const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
-            for (const ot of otherTables) {
-                try {
-                    const { data: otData } = await supabase.from(ot).select('*').eq('id', record.id);
-                    if (otData && otData.length > 0) {
-                        console.log(`[Cross-Table Auto-Migrate] Record ID ${record.id} found in ${ot}, migrating to ${targetTable}...`);
-                        await supabase.from(ot).delete().eq('id', record.id);
-                        break;
+            if (!data || data.length === 0) {
+                // Kiểm tra xem bản ghi có tồn tại trong targetTable không (trường hợp idempotency update 0 rows)
+                const { data: existInTarget } = await supabase.from(targetTable).select('*').eq('id', record.id);
+                if (existInTarget && existInTarget.length > 0) {
+                    console.log(`[MUTATION][IDEMPOTENT] Record ID ${record.id} already matched in ${targetTable}.`);
+                    data = existInTarget;
+                } else {
+                    // Kiểm tra nếu tồn tại ở bảng khác -> Báo lỗi ROUTING_DATA_INTEGRITY_ERROR, TUYỆT ĐỐI KHÔNG AUTO-MIGRATE
+                    const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
+                    let foundOther: string | null = null;
+                    for (const ot of otherTables) {
+                        try {
+                            const { data: otCheck } = await supabase.from(ot).select('id').eq('id', record.id).maybeSingle();
+                            if (otCheck && otCheck.id) {
+                                foundOther = ot;
+                                break;
+                            }
+                        } catch (e) {}
                     }
-                } catch (e) {}
-            }
 
-            console.warn(`[MUTATION][RECOVERY] UPDATE returned 0 rows on ${targetTable} for ID: ${record.id}. Executing upsert recovery...`);
-            let upsertRes = await supabase.from(targetTable).upsert(payload).select();
-            if (upsertRes.error && (upsertRes.error.code === 'PGRST204' || String(upsertRes.error.code) === '42703')) {
-                const { recoveredPayload } = recoverPayloadFromSchemaError(payload, targetTable, upsertRes.error);
-                upsertRes = await supabase.from(targetTable).upsert(recoveredPayload).select();
-            }
-            if (upsertRes.data && upsertRes.data.length > 0) {
-                data = upsertRes.data;
-            } else {
-                console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${record.id}`);
-                throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${record.id} was not found in table ${targetTable}.`);
+                    if (foundOther) {
+                        console.error(`[ROUTING_DATA_INTEGRITY_ERROR] Record ID ${record.id} exists in ${foundOther}, but update requested for ${targetTable}. Auto-migration is forbidden.`);
+                        throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${record.id} exists in ${foundOther}. Auto-migration to ${targetTable} is strictly forbidden.`);
+                    }
+
+                    console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${record.id} was not found in table ${targetTable}.`);
+                    throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${record.id} was not found in table ${targetTable}.`);
+                }
             }
         }
 
         const result = mapRecordFromDb({ ...record, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
             console.log(`[MUTATION][VERIFY] SUCCESS - Record verified in DB (ID: ${result.id}, Table: ${targetTable}, Status: ${result.status})`);
-            await removePendingRecord(result.id);
+            await removePendingRecord(result.id, result.code, true);
             markRecordsRecentlyUpdated([result]);
             
             const memIdx = MOCK_RECORDS.findIndex(r => r.id === result.id);
@@ -1548,46 +1687,41 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
                 }
             }
 
-            // Cross-Table Auto-Migration: Kiểm tra các bảng khác trước khi báo lỗi
-            const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
-            let foundInOtherTable: any = null;
-            for (const ot of otherTables) {
-                try {
-                    const { data: otData } = await supabase.from(ot).select('*').eq('id', id);
-                    if (otData && otData.length > 0) {
-                        foundInOtherTable = otData[0];
-                        console.log(`[Cross-Table Auto-Migrate] Record ID ${id} found in ${ot}, migrating to ${targetTable}...`);
-                        await supabase.from(ot).delete().eq('id', id);
-                        break;
+            if (!data || data.length === 0) {
+                // Kiểm tra xem bản ghi có tồn tại trong targetTable không (trường hợp idempotency update 0 rows)
+                const { data: existInTarget } = await supabase.from(targetTable).select('*').eq('id', id);
+                if (existInTarget && existInTarget.length > 0) {
+                    console.log(`[MUTATION][IDEMPOTENT] Record ID ${id} fields already matched in ${targetTable}.`);
+                    data = existInTarget;
+                } else {
+                    // Kiểm tra nếu tồn tại ở bảng khác -> Báo lỗi ROUTING_DATA_INTEGRITY_ERROR, TUYỆT ĐỐI KHÔNG AUTO-MIGRATE
+                    const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
+                    let foundOther: string | null = null;
+                    for (const ot of otherTables) {
+                        try {
+                            const { data: otCheck } = await supabase.from(ot).select('id').eq('id', id).maybeSingle();
+                            if (otCheck && otCheck.id) {
+                                foundOther = ot;
+                                break;
+                            }
+                        } catch (e) {}
                     }
-                } catch (e) {}
-            }
 
-            console.warn(`[MUTATION][RECOVERY] UPDATE fields returned 0 rows on ${targetTable} for ID: ${id}. Executing upsert recovery...`);
-            const recoveryPayload = sanitizeRecordPayloadForTable({
-                ...(foundInOtherTable || {}),
-                id,
-                ...fields,
-                updated_at: new Date().toISOString()
-            }, targetTable);
+                    if (foundOther) {
+                        console.error(`[ROUTING_DATA_INTEGRITY_ERROR] Record ID ${id} exists in ${foundOther}, but update requested for ${targetTable}. Auto-migration is forbidden.`);
+                        throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${id} exists in ${foundOther}. Auto-migration to ${targetTable} is strictly forbidden.`);
+                    }
 
-            let upsertRes = await supabase.from(targetTable).upsert(recoveryPayload).select();
-            if (upsertRes.error && (upsertRes.error.code === 'PGRST204' || String(upsertRes.error.code) === '42703')) {
-                const { recoveredPayload } = recoverPayloadFromSchemaError(recoveryPayload, targetTable, upsertRes.error);
-                upsertRes = await supabase.from(targetTable).upsert(recoveredPayload).select();
-            }
-            if (upsertRes.data && upsertRes.data.length > 0) {
-                data = upsertRes.data;
-            } else {
-                console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE fields returned 0 modified rows on ${targetTable} for ID: ${id}`);
-                throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${id} was not found in table ${targetTable}.`);
+                    console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${id} was not found in table ${targetTable}.`);
+                    throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${id} was not found in table ${targetTable}.`);
+                }
             }
         }
 
         const result = mapRecordFromDb({ id, ...fields, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
             console.log(`[MUTATION][VERIFY] SUCCESS - Verified fields update in DB (ID: ${result.id}, Table: ${targetTable})`);
-            await removePendingRecord(result.id);
+            await removePendingRecord(result.id, result.code, true);
             markRecordsRecentlyUpdated([result]);
 
             const memIdx = MOCK_RECORDS.findIndex(r => r.id === result.id);
