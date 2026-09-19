@@ -264,6 +264,20 @@ export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
 
 // --- USERS ENRICHMENT HELPERS ---
 
+const isEnrichmentDebugEnabled = (): boolean => {
+    return typeof window !== 'undefined' && Boolean((window as any).__DEBUG_USER_ENRICHMENT__);
+};
+
+// Bộ nhớ đệm tạm thời cho kết quả enrichUserWithEmployees để tránh gọi lại lặp đi lặp lại khi không có thay đổi
+const userEnrichCache = new Map<string, { key: string; result: User }>();
+
+// Helper redact thông tin nhạy cảm (như mật khẩu) khi cần log
+export const redactSensitiveUserInfo = (u: any) => {
+    if (!u) return u;
+    const { password, ...safe } = u;
+    return safe;
+};
+
 /**
  * Tự động đồng bộ và bổ sung Họ tên nhân viên chính xác cho User từ bảng employees
  * Quy tắc:
@@ -278,17 +292,17 @@ export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
 export const enrichUserWithEmployees = async (user: User, existingEmployees?: Employee[]): Promise<User> => {
     if (!user) return user;
 
-    console.group(`[AUTH HYDRATION] Hydrating profile for user: "${user.username}" (${user.name})`);
-    console.log(`Step 1: Raw User Record from DB/Session:`, {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        employeeId: user.employeeId,
-        department: user.department,
-        position: user.position,
-        managedWards: user.managedWards
-    });
+    const debug = isEnrichmentDebugEnabled();
+    const cacheKey = `${user.username || ''}|${user.employeeId || ''}|${user.name || ''}|${user.role || ''}|${user.department || ''}|${user.position || ''}|${JSON.stringify(user.managedWards || [])}|${existingEmployees?.length || 0}`;
+    const cached = userEnrichCache.get(user.username || '');
+    if (cached && cached.key === cacheKey) {
+        return cached.result;
+    }
+
+    if (debug) {
+        console.group(`[AUTH HYDRATION] Hydrating profile for user: "${user.username}" (${user.name})`);
+        console.log(`Debug User Record:`, redactSensitiveUserInfo(user));
+    }
 
     let employeesList = existingEmployees;
     if (!employeesList || employeesList.length === 0) {
@@ -332,17 +346,15 @@ export const enrichUserWithEmployees = async (user: User, existingEmployees?: Em
                     .or(`id.ilike.${key},name.ilike.${key}`);
                 if (!error && Array.isArray(data) && data.length > 0) {
                     matchedEmp = mapEmployeeFromDb(data[0]);
-                    console.log(`Step 2: Queried Employee directly from Supabase Cloud:`, matchedEmp);
+                    if (debug) console.log(`Step 2: Queried Employee directly from Supabase Cloud:`, matchedEmp);
                     break;
                 }
             } catch (e) {
                 console.warn("Lỗi truy vấn nhân viên trực tiếp từ CSDL Cloud:", e);
             }
         }
-    } else if (matchedEmp) {
+    } else if (matchedEmp && debug) {
         console.log(`Step 2: Matched Employee from memory/cache:`, matchedEmp);
-    } else {
-        console.warn(`Step 2: No linked Employee record found for user "${user.username}". Using fallback profile info if present.`);
     }
 
     // Step 3: Resolve Position, Department, Managed Wards
@@ -379,11 +391,14 @@ export const enrichUserWithEmployees = async (user: User, existingEmployees?: Em
         managedWards: resolvedWards
     };
 
-    console.log(`Step 3: Position resolved: "${finalUser.position || 'N/A'}"`);
-    console.log(`Step 4: Department resolved: "${finalUser.department || 'N/A'}"`);
-    console.log(`Step 5: Managed Wards / Assigned Areas resolved:`, finalUser.managedWards || []);
-    console.log(`Step 6: Final Complete User Object constructed:`, finalUser);
-    console.groupEnd();
+    if (debug) {
+        console.log(`Enriched User Object:`, redactSensitiveUserInfo(finalUser));
+        console.groupEnd();
+    }
+
+    if (user.username) {
+        userEnrichCache.set(user.username, { key: cacheKey, result: finalUser });
+    }
 
     return finalUser;
 };

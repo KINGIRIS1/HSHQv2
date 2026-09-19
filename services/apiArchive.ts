@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabaseClient';
-import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, CACHE_KEYS } from './apiCore';
+import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, CACHE_KEYS, isTransientError } from './apiCore';
 import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated } from './apiRecords';
 import { addPendingRecord, getPendingRecords } from './syncQueueService';
 import { RecordFile, RecordStatus } from '../types';
@@ -401,30 +401,14 @@ export const getCachedArchiveRecords = async (): Promise<RecordFile[]> => {
     return [];
 };
 
-export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[]> => {
-    if (!hasMigratedArchiveOnce) {
-        hasMigratedArchiveOnce = true;
-        migrateArchiveRecordsFromLandRecords().catch(e => console.warn('Background migration warning:', e));
-    }
+// Biến giữ promise đang chạy để tránh tạo nhiều request đồng thời khi khởi động
+let inFlightAllArchivePromise: Promise<RecordFile[]> | null = null;
+const inFlightTypePromises = new Map<string, Promise<ArchiveRecord[]>>();
 
-    if (!isConfigured) {
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-        if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
-        const res = MOCK_ARCHIVE.map(r => {
-            const row = mapArchiveRecordToLuutruDb(r);
-            return mapArchiveDbToRecordFile(row);
-        });
-        memoryArchiveRecordsCache = res;
-        return res;
-    }
-
-    try {
-        let allRecords: RecordFile[] = [];
-        let page = 0;
-        const pageSize = 1000;
-        let hasMore = true;
-
-        while (hasMore) {
+const fetchLuutruBatchWithRetry = async (page: number, pageSize: number, maxRetries = 3): Promise<{ data: any[] | null; error: any }> => {
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
             let query = supabase
                 .from('luutru_records')
                 .select('*')
@@ -436,118 +420,196 @@ export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[
                 // ignore sort error
             }
 
-            const { data, error } = await query;
+            const res = await query;
+            if (!res.error) {
+                return { data: res.data || [], error: null };
+            }
 
-            if (error) {
-                console.warn('Lỗi khi fetch all luutru_records:', error);
-                const fallbackRes = await supabase.from('luutru_records').select('*').limit(1000);
-                if (fallbackRes.data && fallbackRes.data.length > 0) {
-                    allRecords = fallbackRes.data.map(item => mapArchiveDbToRecordFile(item));
-                }
+            lastError = res.error;
+            // Nếu không phải lỗi tạm thời (ví dụ bảng không tồn tại, lỗi cú pháp), không retry vô ích
+            if (!isTransientError(res.error)) {
                 break;
             }
 
-            if (data && data.length > 0) {
-                const mapped = data.map(item => mapArchiveDbToRecordFile(item));
-                allRecords = [...allRecords, ...mapped];
-                if (data.length < pageSize) hasMore = false;
-                else page++;
-            } else {
-                hasMore = false;
+            if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt - 1)));
+            }
+        } catch (err: any) {
+            lastError = err;
+            if (!isTransientError(err)) {
+                break;
+            }
+            if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt - 1)));
             }
         }
-
-        // Khử trùng lặp 100% bằng Map theo id
-        const uniqueMap = new Map<string, RecordFile>();
-        allRecords.forEach(r => {
-            if (r && r.id) {
-                uniqueMap.set(r.id, r);
-            }
-        });
-
-        const result = Array.from(uniqueMap.values());
-        
-        // Cập nhật bộ nhớ đệm RAM & IndexedDB
-        if (result.length > 0) {
-            memoryArchiveRecordsCache = result;
-            setIndexedDBItem(CACHE_KEY_LUUTRU_RECORDS, result).catch(() => {});
-        }
-
-        return result;
-    } catch (error: any) {
-        logError('fetchAllArchiveRecordsAsRecordFiles', error, true);
-        return memoryArchiveRecordsCache || [];
     }
+    return { data: null, error: lastError };
+};
+
+export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[]> => {
+    if (inFlightAllArchivePromise) {
+        return inFlightAllArchivePromise;
+    }
+
+    inFlightAllArchivePromise = (async () => {
+        if (!hasMigratedArchiveOnce) {
+            hasMigratedArchiveOnce = true;
+            migrateArchiveRecordsFromLandRecords().catch(e => console.warn('Background migration warning:', e));
+        }
+
+        if (!isConfigured) {
+            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+            const res = MOCK_ARCHIVE.map(r => {
+                const row = mapArchiveRecordToLuutruDb(r);
+                return mapArchiveDbToRecordFile(row);
+            });
+            memoryArchiveRecordsCache = res;
+            return res;
+        }
+
+        try {
+            let allRecords: RecordFile[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data, error } = await fetchLuutruBatchWithRetry(page, pageSize, 3);
+
+                if (error) {
+                    console.warn('Lỗi khi fetch all luutru_records sau khi thử lại:', error);
+                    break;
+                }
+
+                if (data && data.length > 0) {
+                    const mapped = data.map(item => mapArchiveDbToRecordFile(item));
+                    allRecords = [...allRecords, ...mapped];
+                    if (data.length < pageSize) hasMore = false;
+                    else page++;
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            // Nếu lấy được dữ liệu mới từ Cloud
+            if (allRecords.length > 0) {
+                // Khử trùng lặp 100% bằng Map theo id
+                const uniqueMap = new Map<string, RecordFile>();
+                allRecords.forEach(r => {
+                    if (r && r.id) {
+                        uniqueMap.set(r.id, r);
+                    }
+                });
+
+                const result = Array.from(uniqueMap.values());
+                memoryArchiveRecordsCache = result;
+                setIndexedDBItem(CACHE_KEY_LUUTRU_RECORDS, result).catch(() => {});
+                return result;
+            }
+
+            // Nếu kết nối lỗi hoặc không tải được dữ liệu, an toàn fallback về bộ nhớ đệm / IndexedDB (KHÔNG ghi đè rỗng)
+            if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
+                return memoryArchiveRecordsCache;
+            }
+
+            const idbFallback = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
+            if (Array.isArray(idbFallback) && idbFallback.length > 0) {
+                memoryArchiveRecordsCache = idbFallback;
+                return idbFallback;
+            }
+
+            return [];
+        } catch (error: any) {
+            logError('fetchAllArchiveRecordsAsRecordFiles', error, true);
+            if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
+                return memoryArchiveRecordsCache;
+            }
+            try {
+                const idbFallback = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
+                if (Array.isArray(idbFallback) && idbFallback.length > 0) {
+                    memoryArchiveRecordsCache = idbFallback;
+                    return idbFallback;
+                }
+            } catch {}
+            return [];
+        } finally {
+            inFlightAllArchivePromise = null;
+        }
+    })();
+
+    return inFlightAllArchivePromise;
 };
 
 export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'): Promise<ArchiveRecord[]> => {
-    if (!isConfigured) {
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-        if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
-        return MOCK_ARCHIVE.filter(r => r.type === type);
+    const inFlight = inFlightTypePromises.get(type);
+    if (inFlight) {
+        return inFlight;
     }
-    try {
-        let allData: ArchiveRecord[] = [];
-        let page = 0;
-        const pageSize = 1000;
-        let hasMore = true;
 
-        while (hasMore) {
-            let query = supabase
-                .from('luutru_records')
-                .select('*')
-                .range(page * pageSize, (page + 1) * pageSize - 1);
+    const promise = (async () => {
+        if (!isConfigured) {
+            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+            return MOCK_ARCHIVE.filter(r => r.type === type);
+        }
+        try {
+            let allData: ArchiveRecord[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
 
-            // Sắp xếp an toàn theo receivedDate giảm dần (nếu có lỗi cột sẽ bỏ qua)
-            try {
-                query = query.order('receivedDate', { ascending: false, nullsFirst: false });
-            } catch {
-                // ignore
-            }
+            while (hasMore) {
+                const { data, error } = await fetchLuutruBatchWithRetry(page, pageSize, 3);
 
-            const { data, error } = await query;
-
-            if (error) {
-                console.warn('Lỗi khi fetch luutru_records:', error);
-                // Thử fallback query đơn giản nếu có lỗi sắp xếp
-                const fallbackRes = await supabase.from('luutru_records').select('*').limit(1000);
-                if (fallbackRes.data && fallbackRes.data.length > 0) {
-                    const mapped = fallbackRes.data.map(item => mapLuutruDbToArchiveRecord(item));
+                if (error) {
+                    console.warn(`Lỗi khi fetch luutru_records (${type}) sau khi thử lại:`, error);
+                    break;
+                }
+                
+                if (data && data.length > 0) {
+                    const mapped = data.map(item => mapLuutruDbToArchiveRecord(item));
                     const filtered = mapped.filter(r => r.type === type);
                     allData = [...allData, ...filtered];
+                    if (data.length < pageSize) hasMore = false;
+                    else page++;
+                } else {
+                    hasMore = false;
                 }
-                break;
             }
-            
-            if (data && data.length > 0) {
-                const mapped = data.map(item => mapLuutruDbToArchiveRecord(item));
-                const filtered = mapped.filter(r => r.type === type);
-                allData = [...allData, ...filtered];
-                if (data.length < pageSize) hasMore = false;
-                else page++;
-            } else {
-                hasMore = false;
+
+            if (allData.length > 0) {
+                // Khử trùng lặp 100% bằng Map theo id hoặc số hiệu tránh trùng
+                const uniqueMap = new Map<string, ArchiveRecord>();
+                allData.forEach(r => {
+                    if (r && (r.id || r.so_hieu)) {
+                        const key = r.id || r.so_hieu;
+                        uniqueMap.set(key, r);
+                    }
+                });
+                const result = Array.from(uniqueMap.values());
+
+                saveToCache(CACHE_KEY_ARCHIVE, result);
+                return result;
             }
+
+            // Fallback an toàn về cache cũ (không ghi đè rỗng)
+            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+            return (cached.length > 0 ? cached : MOCK_ARCHIVE).filter(r => r.type === type);
+        } catch (error: any) {
+            logError(`fetchArchiveRecords-${type}`, error, true);
+            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+            return (cached.length > 0 ? cached : MOCK_ARCHIVE).filter(r => r.type === type);
+        } finally {
+            inFlightTypePromises.delete(type);
         }
+    })();
 
-        // Khử trùng lặp 100% bằng Map theo id hoặc số hiệu tránh trùng
-        const uniqueMap = new Map<string, ArchiveRecord>();
-        allData.forEach(r => {
-            if (r && (r.id || r.so_hieu)) {
-                const key = r.id || r.so_hieu;
-                uniqueMap.set(key, r);
-            }
-        });
-        const result = Array.from(uniqueMap.values());
-
-        saveToCache(CACHE_KEY_ARCHIVE, result);
-        return result;
-    } catch (error: any) {
-        logError(`fetchArchiveRecords-${type}`, error, true);
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-        if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
-        return MOCK_ARCHIVE.filter(r => r.type === type);
-    }
+    inFlightTypePromises.set(type, promise);
+    return promise;
 };
 
 export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise<SaveArchiveResult> => {

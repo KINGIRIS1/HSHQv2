@@ -649,7 +649,8 @@ export const useAppData = (currentUser: User | null) => {
             return result;
         } catch (e) {
             console.error("Lỗi khi đồng bộ hàng đợi:", e);
-            return { successCount: 0, failCount: 0 };
+            const currentCount = await getPendingSyncCount();
+            return { successCount: 0, failCount: 0, blockedCount: 0, pendingCount: currentCount };
         }
     };
 

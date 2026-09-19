@@ -629,116 +629,141 @@ const fetchPageDirectWithRetry = async (
 
 export type TierProgressCallback = (tier: 1 | 2 | 3, recordsSoFar: RecordFile[], isComplete: boolean) => void;
 
-export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<RecordFile[]> => {
-  console.log(`[SYNC] Start fetchRecords`);
-  console.log(`[SYNC] Fetch from Supabase`);
+let inFlightFetchRecordsPromise: Promise<RecordFile[]> | null = null;
+const fetchRecordsCallbacks = new Set<TierProgressCallback>();
 
-  if (!isConfigured) {
-      console.warn("Supabase chưa được cấu hình.");
-      const pending = await getPendingRecords();
-      return pending;
+export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<RecordFile[]> => {
+  if (onProgress) {
+      fetchRecordsCallbacks.add(onProgress);
   }
 
-  try {
-    const uniqueMap = new Map<string, RecordFile>();
+  if (inFlightFetchRecordsPromise) {
+      return inFlightFetchRecordsPromise;
+  }
 
-    // 1. Tải toàn bộ 100% hồ sơ từ cả 3 bảng phân loại song song
-    const [dangky, land, luutru] = await Promise.all([
-        fetchTableRecords('dangky_records'),
-        fetchTableRecords('land_records'),
-        fetchTableRecords('luutru_records')
-    ]);
+  inFlightFetchRecordsPromise = (async () => {
+      console.log(`[SYNC] Start fetchRecords`);
+      console.log(`[SYNC] Fetch from Supabase`);
 
-    // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào dangky_records (ví dụ hồ sơ Đo đạc 2.x)
-    const misplacedInDangky = dangky
-        .map(mapRecordFromDb)
-        .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'dangky_records');
+      if (!isConfigured) {
+          console.warn("Supabase chưa được cấu hình.");
+          const pending = await getPendingRecords();
+          return pending;
+      }
 
-    // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào land_records (ví dụ hồ sơ Lưu trữ 1.x / mã LT-)
-    const misplacedInLand = land
-        .map(mapRecordFromDb)
-        .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'land_records');
+      try {
+        const uniqueMap = new Map<string, RecordFile>();
 
-    // Tự động phát hiện các dòng hoàn toàn trống rác trong land_records, dangky_records, luutru_records
-    const blankInLandIds = new Set(
-        land.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
-    );
-    const blankInDangkyIds = new Set(
-        dangky.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
-    );
-    const blankInLuutruIds = new Set(
-        luutru.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
-    );
-    const allBlankIds = new Set([...blankInLandIds, ...blankInDangkyIds, ...blankInLuutruIds]);
+        // 1. Tải toàn bộ 100% hồ sơ từ cả 3 bảng phân loại song song
+        const [dangky, land, luutru] = await Promise.all([
+            fetchTableRecords('dangky_records'),
+            fetchTableRecords('land_records'),
+            fetchTableRecords('luutru_records')
+        ]);
 
-    if (misplacedInDangky.length > 0 || misplacedInLand.length > 0) {
-        console.warn(`⚠️ [Fetch Warning] Phát hiện ${misplacedInDangky.length} hồ sơ có thể sai bảng ở dangky_records, ${misplacedInLand.length} ở land_records. Giữ nguyên dữ liệu, không tự động di chuyển hoặc xóa.`);
-    }
-    
-    const rawList = [...dangky, ...land, ...luutru];
-    const now = Date.now();
-    rawList.forEach(item => {
-        const mapped = mapRecordFromDb(item);
-        if (mapped && mapped.id && !allBlankIds.has(mapped.id)) {
-            const recent = RECENTLY_UPDATED_RECORDS.get(mapped.id);
-            if (recent && (now - recent.updatedAt < 60000)) {
-                console.log(`[SYNC] Record: ${mapped.code || mapped.id}`);
-                console.log(`[SYNC] Server status: ${mapped.status}`);
-                console.log(`[SYNC] Protection active (Client recent status: ${recent.record.status}). Keeping recent status.`);
-                uniqueMap.set(mapped.id, { ...mapped, ...recent.record });
+        // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào dangky_records (ví dụ hồ sơ Đo đạc 2.x)
+        const misplacedInDangky = dangky
+            .map(mapRecordFromDb)
+            .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'dangky_records');
+
+        // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào land_records (ví dụ hồ sơ Lưu trữ 1.x / mã LT-)
+        const misplacedInLand = land
+            .map(mapRecordFromDb)
+            .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'land_records');
+
+        // Tự động phát hiện các dòng hoàn toàn trống rác trong land_records, dangky_records, luutru_records
+        const blankInLandIds = new Set(
+            land.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
+        );
+        const blankInDangkyIds = new Set(
+            dangky.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
+        );
+        const blankInLuutruIds = new Set(
+            luutru.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
+        );
+        const allBlankIds = new Set([...blankInLandIds, ...blankInDangkyIds, ...blankInLuutruIds]);
+
+        if (misplacedInDangky.length > 0 || misplacedInLand.length > 0) {
+            console.warn(`⚠️ [Fetch Warning] Phát hiện ${misplacedInDangky.length} hồ sơ có thể sai bảng ở dangky_records, ${misplacedInLand.length} ở land_records. Giữ nguyên dữ liệu, không tự động di chuyển hoặc xóa.`);
+        }
+        
+        const rawList = [...dangky, ...land, ...luutru];
+        const now = Date.now();
+        rawList.forEach(item => {
+            const mapped = mapRecordFromDb(item);
+            if (mapped && mapped.id && !allBlankIds.has(mapped.id)) {
+                const recent = RECENTLY_UPDATED_RECORDS.get(mapped.id);
+                if (recent && (now - recent.updatedAt < 60000)) {
+                    console.log(`[SYNC] Record: ${mapped.code || mapped.id}`);
+                    console.log(`[SYNC] Server status: ${mapped.status}`);
+                    console.log(`[SYNC] Protection active (Client recent status: ${recent.record.status}). Keeping recent status.`);
+                    uniqueMap.set(mapped.id, { ...mapped, ...recent.record });
+                } else {
+                    uniqueMap.set(mapped.id, mapped);
+                }
+            }
+        });
+
+        // 2. [QUAN TRỌNG NHẤT] Hợp nhất các hồ sơ đang chờ đồng bộ (Sync Queue)
+        // fetchRecords TUYỆT ĐỐI KHÔNG tự ý xóa items trong Sync Queue
+        const pendingItems = await getPendingSyncItems();
+        for (const item of pendingItems) {
+            const pending = item.record;
+            if (!pending || !pending.id) continue;
+
+            if (item.action === 'DELETE') {
+                // Bản ghi đã bị xóa offline, loại bỏ khỏi danh sách hiển thị
+                uniqueMap.delete(pending.id);
+                continue;
+            }
+
+            const cloudRecord = uniqueMap.get(pending.id);
+            if (cloudRecord) {
+                uniqueMap.set(pending.id, { ...cloudRecord, ...pending, _isOfflineSaved: true });
             } else {
-                uniqueMap.set(mapped.id, mapped);
+                uniqueMap.set(pending.id, { ...pending, _isOfflineSaved: true });
             }
         }
-    });
 
-    // 2. [QUAN TRỌNG NHẤT] Hợp nhất các hồ sơ đang chờ đồng bộ (Sync Queue)
-    // fetchRecords TUYỆT ĐỐI KHÔNG tự ý xóa items trong Sync Queue
-    const pendingItems = await getPendingSyncItems();
-    for (const item of pendingItems) {
-        const pending = item.record;
-        if (!pending || !pending.id) continue;
+        const finalRecords = Array.from(uniqueMap.values());
+        console.log(`[SYNC] Apply state (${finalRecords.length} records ready)`);
 
-        if (item.action === 'DELETE') {
-            // Bản ghi đã bị xóa offline, loại bỏ khỏi danh sách hiển thị
-            uniqueMap.delete(pending.id);
-            continue;
+        if (finalRecords.length > 0) {
+            saveToCache(CACHE_KEYS.RECORDS, finalRecords);
         }
 
-        const cloudRecord = uniqueMap.get(pending.id);
-        if (cloudRecord) {
-            uniqueMap.set(pending.id, { ...cloudRecord, ...pending, _isOfflineSaved: true });
-        } else {
-            uniqueMap.set(pending.id, { ...pending, _isOfflineSaved: true });
+        fetchRecordsCallbacks.forEach(cb => {
+            try { cb(3, finalRecords, true); } catch {}
+        });
+
+        // 3. Kích hoạt đồng bộ ngầm tự động nếu có hồ sơ tồn đọng
+        if (pendingItems.length > 0) {
+            setTimeout(() => {
+                syncPendingRecordsToCloud(createRecordApi, updateRecordApi);
+            }, 1200);
         }
-    }
 
-    const finalRecords = Array.from(uniqueMap.values());
-    console.log(`[SYNC] Apply state (${finalRecords.length} records ready)`);
+        return finalRecords;
 
-    if (finalRecords.length > 0) {
-        saveToCache(CACHE_KEYS.RECORDS, finalRecords);
-    }
-    onProgress?.(3, finalRecords, true);
+      } catch (error) {
+        logError("fetchRecords", error, true);
+        const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS) || [];
+        const pendingRecords = await getPendingRecords();
+        const map = new Map<string, RecordFile>();
+        idb.forEach(r => { if (r.id) map.set(r.id, r); });
+        pendingRecords.forEach(r => { if (r.id) map.set(r.id, { ...r, _isOfflineSaved: true }); });
+        const fallback = Array.from(map.values());
+        fetchRecordsCallbacks.forEach(cb => {
+            try { cb(3, fallback, true); } catch {}
+        });
+        return fallback;
+      }
+  })().finally(() => {
+      inFlightFetchRecordsPromise = null;
+      fetchRecordsCallbacks.clear();
+  });
 
-    // 3. Kích hoạt đồng bộ ngầm tự động nếu có hồ sơ tồn đọng
-    if (pendingItems.length > 0) {
-        setTimeout(() => {
-            syncPendingRecordsToCloud(createRecordApi, updateRecordApi);
-        }, 1200);
-    }
-
-    return finalRecords;
-
-  } catch (error) {
-    logError("fetchRecords", error, true);
-    const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS) || [];
-    const pendingRecords = await getPendingRecords();
-    const map = new Map<string, RecordFile>();
-    idb.forEach(r => { if (r.id) map.set(r.id, r); });
-    pendingRecords.forEach(r => { if (r.id) map.set(r.id, { ...r, _isOfflineSaved: true }); });
-    return Array.from(map.values());
-  }
+  return inFlightFetchRecordsPromise;
 };
 
 export const getShortCode = (ward: string) => {
@@ -1278,14 +1303,19 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
 
     if (!isOnline()) {
         console.log(`[MUTATION] Supabase offline mode (isOnline=false). Saved to offline queue.`);
-        const offlineRecord = { ...record, sourceTable: targetTable, _isOfflineSaved: true };
+        const offlineRecord = { 
+            ...record, 
+            sourceTable: targetTable, 
+            _isOfflineSaved: true,
+            _baseUpdatedAt: (record as any)._baseUpdatedAt || record.updated_at || (record as any).updatedAt 
+        };
         await addPendingRecord(offlineRecord, 'UPDATE', targetTable);
         syncCacheOnUpdate(offlineRecord);
         return offlineRecord;
     }
 
-    // Lấy previousUpdatedAt từ record truyền vào
-    let previousUpdatedAt = record.updated_at || (record as any).updatedAt;
+    // Lấy previousUpdatedAt từ record truyền vào (_baseUpdatedAt nếu là mutation được lưu từ queue)
+    let previousUpdatedAt = (record as any)._baseUpdatedAt || record.updated_at || (record as any).updatedAt;
 
     // Kiểm tra xung đột trước khi cập nhật nếu có previousUpdatedAt
     if (previousUpdatedAt && isOnline()) {

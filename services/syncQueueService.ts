@@ -352,6 +352,13 @@ const releaseMultiTabLock = () => {
     } catch {}
 };
 
+export interface SyncResult {
+    successCount: number;
+    failCount: number;
+    blockedCount: number;
+    pendingCount: number;
+}
+
 /**
  * Thực hiện đồng bộ toàn bộ hồ sơ đang tồn đọng lên Supabase Cloud:
  * - Khi Web Locks có sẵn: dùng native lock hoàn toàn, KHÔNG tạo LocalStorage heartbeat chồng chéo.
@@ -361,14 +368,15 @@ const releaseMultiTabLock = () => {
 export const syncPendingRecordsToCloud = async (
     createFn: (r: RecordFile, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records') => Promise<RecordFile | null>,
     updateFn: (r: RecordFile, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records') => Promise<RecordFile | null>
-): Promise<{ successCount: number; failCount: number }> => {
+): Promise<SyncResult> => {
     if (!isConfigured || isSyncingInProgress) {
-        return { successCount: 0, failCount: 0 };
+        const currentCount = await getPendingSyncCount();
+        return { successCount: 0, failCount: 0, blockedCount: 0, pendingCount: currentCount };
     }
 
     // Phân nhánh 1: Web Locks API có sẵn trên trình duyệt -> Native Lock độc lập
     if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
-        let result = { successCount: 0, failCount: 0 };
+        let result: SyncResult = { successCount: 0, failCount: 0, blockedCount: 0, pendingCount: 0 };
         try {
             const acquired = await navigator.locks.request('app_sync_engine_native_lock', { ifAvailable: true }, async (lock) => {
                 if (!lock) {
@@ -380,18 +388,21 @@ export const syncPendingRecordsToCloud = async (
                 return true;
             });
             if (!acquired) {
-                return { successCount: 0, failCount: 0 };
+                const currentCount = await getPendingSyncCount();
+                return { successCount: 0, failCount: 0, blockedCount: 0, pendingCount: currentCount };
             }
             return result;
         } catch (nativeErr) {
             console.error('[SyncEngine] Native lock execution error:', nativeErr);
-            return { successCount: 0, failCount: 0 };
+            const currentCount = await getPendingSyncCount();
+            return { successCount: 0, failCount: 0, blockedCount: 0, pendingCount: currentCount };
         }
     } else {
         // Phân nhánh 2: Fallback LocalStorage Lease lock + Heartbeat
         if (!acquireMultiTabLock()) {
             console.warn('[SyncEngine] SKIP - LOCKED by LocalStorage lease in another tab');
-            return { successCount: 0, failCount: 0 };
+            const currentCount = await getPendingSyncCount();
+            return { successCount: 0, failCount: 0, blockedCount: 0, pendingCount: currentCount };
         }
         try {
             return await executeSyncProcess(createFn, updateFn, true);
@@ -412,13 +423,17 @@ const executeSyncProcess = async (
     createFn: (r: RecordFile, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records') => Promise<RecordFile | null>,
     updateFn: (r: RecordFile, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records') => Promise<RecordFile | null>,
     withHeartbeat: boolean
-): Promise<{ successCount: number; failCount: number }> => {
+): Promise<SyncResult> => {
     isSyncingInProgress = true;
     console.log('[SYNC] START');
 
     let successCount = 0;
     let failCount = 0;
     let lockRenewalInterval: any = null;
+
+    let finalPendingCount = 0;
+    let finalBlockedCount = 0;
+    let finalRetryCount = 0;
 
     try {
         if (withHeartbeat) {
@@ -429,7 +444,7 @@ const executeSyncProcess = async (
 
         const itemsToProcess = await getPendingSyncItems();
         if (itemsToProcess.length === 0) {
-            return { successCount: 0, failCount: 0 };
+            return { successCount: 0, failCount: 0, blockedCount: 0, pendingCount: 0 };
         }
 
         console.log(`[SyncEngine] Đang tự động đẩy ${itemsToProcess.length} hồ sơ tồn đọng lên Supabase Cloud...`);
@@ -442,8 +457,8 @@ const executeSyncProcess = async (
             console.log(`[SYNC] TARGET_TABLE: ${item.targetTable}`);
             console.log(`[SYNC] ATTEMPT: ${item.attempts}`);
 
-            // 1. Kiểm tra nếu item đã bị BLOCKED từ trước -> SKIP tuyệt đối
-            if (item.isBlocked || String(item.lastError || '').includes('SYNC_ROUTING_CONFLICT') || String(item.lastError || '').includes('BLOCKED')) {
+            // 1. Kiểm tra nếu item đã bị BLOCKED từ trước -> SKIP và giữ nguyên trạng thái BLOCKED trong queue
+            if (item.isBlocked || String(item.lastError || '').includes('SYNC_ROUTING_CONFLICT') || String(item.lastError || '').includes('BLOCKED') || String(item.lastError || '').includes('CONCURRENCY_CONFLICT')) {
                 console.warn(`[SYNC] SKIP_BLOCKED recordId: ${item.record.id}, targetTable: ${item.targetTable}, attempts: ${item.attempts}, lastError: ${item.lastError}`);
                 outcomeMap.set(item.record.id, {
                     status: 'BLOCKED',
@@ -496,21 +511,23 @@ const executeSyncProcess = async (
                     }
                 }
             } catch (err: any) {
-                failCount++;
                 const errStr = String(err?.message || err || '');
                 const isRoutingConflict = errStr.includes('SYNC_ROUTING_CONFLICT');
+                const isConcurrencyConflict = errStr.includes('CONCURRENCY_CONFLICT');
                 const isTransient = isTransientError(err);
-                const errorType = isRoutingConflict ? 'SYNC_ROUTING_CONFLICT' : (isTransient ? 'TRANSIENT' : 'PERMANENT');
+                const errorType = isRoutingConflict ? 'SYNC_ROUTING_CONFLICT' : (isConcurrencyConflict ? 'CONCURRENCY_CONFLICT' : (isTransient ? 'TRANSIENT' : 'PERMANENT'));
 
                 console.log(`[SYNC] ERROR_TYPE: ${errorType} - ${errStr}`);
 
-                if (isRoutingConflict || !isTransient) {
-                    // Lỗi permanent hoặc routing conflict -> BLOCKED ngay, KHÔNG tăng attempts
-                    const finalErrorMsg = isRoutingConflict ? `SYNC_ROUTING_CONFLICT: ${errStr}` : `BLOCKED: ${errStr}`;
+                if (isRoutingConflict || isConcurrencyConflict || !isTransient) {
+                    // Lỗi xung đột hoặc permanent -> BLOCKED ngay để bảo vệ dữ liệu, KHÔNG ghi đè, KHÔNG xóa khỏi queue
+                    const finalErrorMsg = isRoutingConflict 
+                        ? `SYNC_ROUTING_CONFLICT: ${errStr}` 
+                        : (isConcurrencyConflict ? `CONCURRENCY_CONFLICT: ${errStr}` : `BLOCKED: ${errStr}`);
                     console.error(`[SYNC] BLOCKED recordId: ${item.record.id}, attempts: ${item.attempts}, error: ${finalErrorMsg}`);
                     outcomeMap.set(item.record.id, {
                         status: 'BLOCKED',
-                        attempts: item.attempts, // attempts giữ nguyên
+                        attempts: item.attempts,
                         isBlocked: true,
                         lastError: finalErrorMsg
                     });
@@ -527,6 +544,7 @@ const executeSyncProcess = async (
                             lastError: finalErrorMsg
                         });
                     } else {
+                        failCount++;
                         console.warn(`[SYNC] RETRY recordId: ${item.record.id}, attempt ${newAttempts}/${MAX_ATTEMPTS}`);
                         outcomeMap.set(item.record.id, {
                             status: 'RETRY',
@@ -566,9 +584,12 @@ const executeSyncProcess = async (
             }
 
             await savePendingSyncItems(mergedQueue);
+            finalPendingCount = mergedQueue.length;
+            finalBlockedCount = mergedQueue.filter(i => i.isBlocked).length;
+            finalRetryCount = mergedQueue.filter(i => !i.isBlocked).length;
         });
 
-        console.log(`[SyncEngine] Hoàn tất đợt đồng bộ: ${successCount} thành công, ${failCount} còn tồn`);
+        console.log(`[SyncEngine] Hoàn tất đợt đồng bộ: ${successCount} thành công, ${finalPendingCount} còn tồn (${finalBlockedCount} bị chặn/xung đột, ${finalRetryCount} chờ thử lại)`);
     } catch (e) {
         console.error('[SyncEngine] Lỗi trong quá trình đồng bộ hàng đợi:', e);
     } finally {
@@ -576,5 +597,10 @@ const executeSyncProcess = async (
         isSyncingInProgress = false;
     }
 
-    return { successCount, failCount };
+    return {
+        successCount,
+        failCount: finalRetryCount,
+        blockedCount: finalBlockedCount,
+        pendingCount: finalPendingCount
+    };
 };

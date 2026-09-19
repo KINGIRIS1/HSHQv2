@@ -262,6 +262,9 @@ function App() {
   // Đồng bộ giao diện thông minh bằng useDeferredValue giúp ngăn nghẽn UI khi cập nhật trạng thái
   const deferredRecords = useDeferredValue(rawRecords);
 
+  // Ref lưu chữ ký hồ sơ người dùng đã đồng bộ gần nhất để ngăn gọi lặp vô hạn
+  const lastSyncedProfileSigRef = useRef<string>('');
+
   // --- KIỂM TRA & ĐỒNG BỘ VỚI DB SUPABASE TỨC THÌ KHI MỞ ỨNG DỤNG ---
   useEffect(() => {
     if (currentUser?.username) {
@@ -278,16 +281,20 @@ function App() {
             return;
           }
           const fullyEnriched = await enrichUserWithEmployees(dbUser, employees);
-          const isRoleChanged = fullyEnriched.role !== currentUser.role;
-          const isNameChanged = fullyEnriched.name !== currentUser.name;
-          const isEmpChanged = fullyEnriched.employeeId !== currentUser.employeeId;
-          const isPassChanged = fullyEnriched.password !== currentUser.password;
-          const isActiveChanged = fullyEnriched.active !== currentUser.active;
-          const isDeptChanged = fullyEnriched.department !== currentUser.department;
-          const isPosChanged = fullyEnriched.position !== currentUser.position;
-          const isWardsChanged = JSON.stringify(fullyEnriched.managedWards) !== JSON.stringify(currentUser.managedWards);
+          const sig = `${fullyEnriched.username}|${fullyEnriched.name}|${fullyEnriched.role}|${fullyEnriched.employeeId}|${fullyEnriched.department}|${fullyEnriched.position}|${JSON.stringify(fullyEnriched.managedWards)}`;
+          
+          const isChanged = 
+            fullyEnriched.role !== currentUser.role ||
+            fullyEnriched.name !== currentUser.name ||
+            fullyEnriched.employeeId !== currentUser.employeeId ||
+            fullyEnriched.password !== currentUser.password ||
+            fullyEnriched.active !== currentUser.active ||
+            fullyEnriched.department !== currentUser.department ||
+            fullyEnriched.position !== currentUser.position ||
+            JSON.stringify(fullyEnriched.managedWards) !== JSON.stringify(currentUser.managedWards);
 
-          if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged || isActiveChanged || isDeptChanged || isPosChanged || isWardsChanged) {
+          if (isChanged && lastSyncedProfileSigRef.current !== sig) {
+            lastSyncedProfileSigRef.current = sig;
             console.log(`🔒 Nạp lại phiên làm việc đầy đủ từ Supabase Cloud: [${fullyEnriched.username}] (${fullyEnriched.name})`);
             setCurrentUser(fullyEnriched);
             sessionStorage.setItem('current_user_session', JSON.stringify(fullyEnriched));
@@ -301,13 +308,16 @@ function App() {
   useEffect(() => {
     if (currentUser && Array.isArray(employees) && employees.length > 0) {
       enrichUserWithEmployees(currentUser, employees).then(enriched => {
-        const isNameChanged = enriched.name !== currentUser.name;
-        const isEmpChanged = enriched.employeeId !== currentUser.employeeId;
-        const isDeptChanged = enriched.department !== currentUser.department;
-        const isPosChanged = enriched.position !== currentUser.position;
-        const isWardsChanged = JSON.stringify(enriched.managedWards) !== JSON.stringify(currentUser.managedWards);
+        const sig = `${enriched.username}|${enriched.name}|${enriched.role}|${enriched.employeeId}|${enriched.department}|${enriched.position}|${JSON.stringify(enriched.managedWards)}`;
+        const isChanged = 
+          enriched.name !== currentUser.name ||
+          enriched.employeeId !== currentUser.employeeId ||
+          enriched.department !== currentUser.department ||
+          enriched.position !== currentUser.position ||
+          JSON.stringify(enriched.managedWards) !== JSON.stringify(currentUser.managedWards);
 
-        if (isNameChanged || isEmpChanged || isDeptChanged || isPosChanged || isWardsChanged) {
+        if (isChanged && lastSyncedProfileSigRef.current !== sig) {
+          lastSyncedProfileSigRef.current = sig;
           console.log(`✨ [Đồng bộ Hồ sơ Người dùng] Cập nhật profile đầy đủ cho currentUser: "${currentUser.name}"`);
           setCurrentUser(enriched);
           sessionStorage.setItem('current_user_session', JSON.stringify(enriched));
@@ -334,6 +344,7 @@ function App() {
         }
 
         enrichUserWithEmployees(dbUser, employees).then(fullyEnriched => {
+          const sig = `${fullyEnriched.username}|${fullyEnriched.name}|${fullyEnriched.role}|${fullyEnriched.employeeId}|${fullyEnriched.department}|${fullyEnriched.position}|${JSON.stringify(fullyEnriched.managedWards)}`;
           const isRoleChanged = fullyEnriched.role !== currentUser.role;
           const isNameChanged = fullyEnriched.name !== currentUser.name;
           const isEmpChanged = fullyEnriched.employeeId !== currentUser.employeeId;
@@ -343,7 +354,8 @@ function App() {
           const isPosChanged = fullyEnriched.position !== currentUser.position;
           const isWardsChanged = JSON.stringify(fullyEnriched.managedWards) !== JSON.stringify(currentUser.managedWards);
 
-          if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged || isActiveChanged || isDeptChanged || isPosChanged || isWardsChanged) {
+          if ((isRoleChanged || isNameChanged || isEmpChanged || isPassChanged || isActiveChanged || isDeptChanged || isPosChanged || isWardsChanged) && lastSyncedProfileSigRef.current !== sig) {
+            lastSyncedProfileSigRef.current = sig;
             console.log(`🔒 Thắt chặt phân quyền & Hồ sơ: Đã đồng bộ [${fullyEnriched.username}]: ${currentUser.name} -> ${fullyEnriched.name}`);
             setCurrentUser(fullyEnriched);
             sessionStorage.setItem('current_user_session', JSON.stringify(fullyEnriched));
@@ -365,7 +377,7 @@ function App() {
         });
       }
     }
-  }, [users, employees, currentUser]);
+  }, [users, employees, currentUser?.username, currentUser?.role, currentUser?.employeeId, currentUser?.name, currentUser?.department, currentUser?.position, JSON.stringify(currentUser?.managedWards)]);
 
   // Khi có phiên bản mới hoặc admin phát hành bản mới, tự động mở lại popup cập nhật ngay lập tức
   useEffect(() => {
