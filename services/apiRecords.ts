@@ -18,7 +18,7 @@ export const isOnline = (): boolean => {
     return true;
 };
 
-// 24 cột cơ sở dữ liệu cốt lõi
+// 24 cột cơ sở dữ liệu cốt lõi (hợp nhất cho backward compatibility)
 export const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
     'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
@@ -39,6 +39,179 @@ export const RECORD_DB_COLUMNS = [
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
     'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
 ];
+
+// Schema cột chuẩn riêng cho bảng Đo đạc (land_records)
+export const LAND_RECORDS_DB_COLUMNS = [
+    'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
+    'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
+    'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
+    'pendingCheckDate', 'checkedDate', 'completedWorkDate',
+    'notes', 'privateNotes', 'personalNotes', 
+    'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
+    'measurementNumber', 'excerptNumber',
+    'reminderDate', 'lastRemindedAt', 'deadlineReminded',
+    'receiptNumber', 'resultReturnedDate', 'receiverName',
+    'needsMapCorrection', 'explanationPlan',
+    'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
+    'price', 'advancePayment', 'isHandedOver',
+    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
+    'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
+    'drafterId', 'officeAssignedDate', 'officeCompletedDate',
+    'attachedFiles', 'dossierComponents',
+    'updated_at'
+];
+
+// Schema cột chuẩn riêng cho bảng Đăng ký/Cấp giấy (dangky_records)
+export const DANGKY_RECORDS_DB_COLUMNS = [
+    'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
+    'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
+    'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
+    'pendingCheckDate', 'checkedDate', 'completedWorkDate',
+    'notes', 'privateNotes', 'personalNotes', 
+    'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
+    'reminderDate', 'lastRemindedAt', 'deadlineReminded',
+    'receiptNumber', 'receiptType', 'receiverName', 'returnedBy', 'resultReturnedDate', 'returnedPrice',
+    'needsMapCorrection', 'explanationPlan',
+    'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
+    'price', 'advancePayment', 'isHandedOver',
+    'returnBatch', 'returnBatchDate', 'returnHandoverDept',
+    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
+    'attachedFiles', 'dossierComponents',
+    'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
+    'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate',
+    'updated_at'
+];
+
+// Schema cột chuẩn riêng cho bảng Lưu trữ (luutru_records)
+export const LUUTRU_RECORDS_DB_COLUMNS = [
+    'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
+    'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
+    'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
+    'pendingCheckDate', 'checkedDate', 'completedWorkDate',
+    'notes', 'privateNotes', 'personalNotes', 
+    'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
+    'measurementNumber', 'excerptNumber',
+    'reminderDate', 'lastRemindedAt', 'deadlineReminded',
+    'receiptNumber', 'resultReturnedDate', 'receiverName',
+    'needsMapCorrection', 'explanationPlan',
+    'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
+    'price', 'advancePayment', 'isHandedOver',
+    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
+    'attachedFiles', 'dossierComponents',
+    'type', 'so_hieu', 'trich_yeu', 'ngay_thang', 'noi_nhan_gui', 'created_by',
+    'updated_at'
+];
+
+/**
+ * Lấy danh sách cột database hợp lệ cho từng bảng cụ thể.
+ */
+export const getColumnsForTable = (table: 'land_records' | 'dangky_records' | 'luutru_records' | string): string[] => {
+    if (table === 'dangky_records') return DANGKY_RECORDS_DB_COLUMNS;
+    if (table === 'luutru_records') return LUUTRU_RECORDS_DB_COLUMNS;
+    return LAND_RECORDS_DB_COLUMNS;
+};
+
+/**
+ * Sanitize payload theo đúng schema của bảng đích.
+ * Tuyệt đối không bao giờ gửi trường 'data' lên Supabase cho các bảng record.
+ * 3 trường exportBatch, exportDate, handoverWard luôn được trích xuất thẳng vào cột cấp cao nhất.
+ */
+export const sanitizeRecordPayloadForTable = (
+    data: any,
+    targetTable: 'land_records' | 'dangky_records' | 'luutru_records' | string
+): any => {
+    if (!data) return data;
+    const allowedColumns = getColumnsForTable(targetTable);
+    
+    const normalized: any = { ...data };
+    // Trích xuất 3 trường bàn giao nếu trước đó bị lồng trong data
+    if (normalized.exportBatch === undefined && normalized.data?.exportBatch) {
+        normalized.exportBatch = normalized.data.exportBatch;
+    }
+    if (normalized.exportDate === undefined && (normalized.data?.exportDate || normalized.data?.ngay_hoan_thanh)) {
+        normalized.exportDate = normalized.data.exportDate || normalized.data.ngay_hoan_thanh;
+    }
+    if (normalized.handoverWard === undefined && normalized.data?.handoverWard) {
+        normalized.handoverWard = normalized.data.handoverWard;
+    }
+
+    const sanitized = sanitizeData(normalized, allowedColumns);
+    // Loại bỏ triệt để 'data' và các trường runtime ngoại lai
+    delete (sanitized as any).data;
+    delete (sanitized as any).sourceTable;
+    delete (sanitized as any)._isOfflineSaved;
+    delete (sanitized as any)._isManualCode;
+    return sanitized;
+};
+
+/**
+ * Phân tích thông báo lỗi PGRST204 / 42703 để xác định chính xác cột và bảng gây lỗi.
+ */
+export const extractMissingColumnFromError = (error: any): { tableName?: string; columnName?: string } | null => {
+    if (!error) return null;
+    const msg = String(error.message || error.details || error.hint || '');
+    
+    // Pattern 1: Could not find the 'xyz' column of 'table_name' in the schema cache
+    const matchPgrst = msg.match(/Could not find the '([^']+)' column of '([^']+)'/i);
+    if (matchPgrst) {
+        return { columnName: matchPgrst[1], tableName: matchPgrst[2] };
+    }
+    
+    // Pattern 2: column "xyz" of relation "table_name" does not exist
+    const matchPg = msg.match(/column "?([^"\s]+)"? of relation "?([^"\s]+)"? does not exist/i);
+    if (matchPg) {
+        return { columnName: matchPg[1], tableName: matchPg[2] };
+    }
+
+    // Pattern 3: column "xyz" does not exist
+    const matchColOnly = msg.match(/column "?([^"\s]+)"? does not exist/i);
+    if (matchColOnly) {
+        return { columnName: matchColOnly[1] };
+    }
+
+    return null;
+};
+
+/**
+ * Tự phục hồi payload khi gặp lỗi PGRST204 / 42703:
+ * Chỉ loại bỏ ĐÚNG cột gây lỗi, tuyệt đối không xóa hàng loạt các cột nghiệp vụ khác.
+ * Báo lỗi cảnh báo rõ ràng nếu trường bị thiếu là một cột nghiệp vụ thực tế.
+ */
+export const recoverPayloadFromSchemaError = (
+    payload: any,
+    table: string,
+    error: any
+): { recoveredPayload: any; missingColumn: string | null; isBusinessField: boolean } => {
+    const missingInfo = extractMissingColumnFromError(error);
+    const missingCol = missingInfo?.columnName || null;
+    const tableName = missingInfo?.tableName || table;
+
+    const isBusinessField = Boolean(
+        missingCol && ['exportBatch', 'exportDate', 'handoverWard', 'statusLogs', 'notes', 'price'].includes(missingCol)
+    );
+
+    if (missingCol) {
+        console.warn(`⚠️ [SCHEMA_RECOVERY] Detected missing column '${missingCol}' on table '${tableName}'. Error: ${error.message}`);
+        console.error(`👉 CHẠY CÂU LỆNH SQL NÀY TRÊN SUPABASE ĐỂ BỔ SUNG CỘT BỊ THIẾU:\nALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS "${missingCol}" TEXT;`);
+        if (isBusinessField) {
+            console.error(`❌ [SCHEMA_MISMATCH] Warning: Business column '${missingCol}' does not exist on table '${tableName}'. Database migration needed!`);
+        }
+    } else {
+        console.warn(`⚠️ [SCHEMA_RECOVERY] PGRST204 / 42703 error on table '${tableName}' but could not pinpoint exact column name: ${error.message}`);
+    }
+
+    const removeMissing = (obj: any) => {
+        const copy = { ...obj };
+        delete (copy as any).data;
+        if (missingCol) {
+            delete copy[missingCol];
+        }
+        return copy;
+    };
+
+    const recoveredPayload = Array.isArray(payload) ? payload.map(removeMissing) : removeMissing(payload);
+    return { recoveredPayload, missingColumn: missingCol, isBusinessField };
+};
 
 /**
  * Cơ chế Khóa bảo vệ thời gian thực (Optimistic Timestamp Guard):
@@ -204,6 +377,20 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     // RULE 4: BẮT BUỘC BLOCK ROUTING_UNRESOLVED
     console.error(`[ROUTING_GUARD][UNRESOLVED] Unable to resolve target table for record:`, record);
     throw new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for record (ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}). Mutation blocked.`);
+};
+
+/**
+ * Helper kiểm tra xung đột phiên ghi (Concurrency Conflict).
+ * Bỏ qua sai lệch phần triệu giây (microseconds) giữa Postgres (6 số) và JS ISO string (3 số).
+ * Chỉ coi là xung đột thật sự nếu DB có updated_at mới hơn bản ghi của client trên 2000ms.
+ */
+export const isConcurrencyConflict = (dbUpdatedAt?: string | null, clientUpdatedAt?: string | null): boolean => {
+    if (!dbUpdatedAt || !clientUpdatedAt) return false;
+    const dbTime = new Date(dbUpdatedAt).getTime();
+    const clientTime = new Date(clientUpdatedAt).getTime();
+    if (isNaN(dbTime) || isNaN(clientTime)) return false;
+    // Xung đột chỉ xảy ra khi DB thật sự có bản ghi mới hơn client quá 2 giây (> 2000ms)
+    return (dbTime - clientTime) > 2000;
 };
 
 export interface RoutingValidationResult {
@@ -1012,7 +1199,7 @@ export const createRecordApi = async (record: RecordFile, expectedTargetTable?: 
             group: assignedGroup
         };
         
-        let payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
+        let payload = sanitizeRecordPayloadForTable(recordToSave, targetTable);
         payload.id = standardId;
         payload.receivedDate = validReceivedDate;
 
@@ -1037,12 +1224,11 @@ export const createRecordApi = async (record: RecordFile, expectedTargetTable?: 
             error = res.error;
         }
 
-        // 2. Thử lại nếu thiếu cột trên Supabase (PGRST204 / 42703)
-        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn(`⚠️ [Fallback] Bảng ${targetTable} thiếu một số cột mới. Thử lại không kèm cột tùy chọn...`);
-            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
-            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const res = await supabase.from(targetTable).insert([fallbackPayload]).select();
+        // 2. Thử lại nếu thiếu cột trên Supabase (PGRST204 / 42703) - CHỈ loại bỏ ĐÚNG cột gây lỗi
+        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')) || (error.message && String(error.message).includes('Could not find')))) {
+            console.warn(`⚠️ [PGRST204 Fallback] Bảng ${targetTable} gặp lỗi schema. Đang bóc tách và loại bỏ đúng cột bị thiếu...`);
+            const { recoveredPayload } = recoverPayloadFromSchemaError(payload, targetTable, error);
+            const res = await supabase.from(targetTable).insert([recoveredPayload]).select();
             data = res.data;
             error = res.error;
         }
@@ -1101,45 +1287,41 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
     // Lấy previousUpdatedAt từ record truyền vào
     let previousUpdatedAt = record.updated_at || (record as any).updatedAt;
 
-    // Nếu record không có previousUpdatedAt, phải đọc record hiện tại từ DB trước khi UPDATE để lấy updated_at
-    if (!previousUpdatedAt && isOnline()) {
+    // Kiểm tra xung đột trước khi cập nhật nếu có previousUpdatedAt
+    if (previousUpdatedAt && isOnline()) {
         try {
-            console.log(`[MUTATION][CONCURRENCY] Fetching existing updated_at before UPDATE for ID: ${record.id}`);
-            const { data: fetchRes, error: fetchErr } = await supabase
+            const { data: curData } = await supabase
                 .from(targetTable)
                 .select('updated_at')
                 .eq('id', record.id)
-                .single();
-            if (fetchRes && !fetchErr) {
-                previousUpdatedAt = fetchRes.updated_at;
-                console.log(`[MUTATION][CONCURRENCY] Found existing updated_at in DB: ${previousUpdatedAt}`);
+                .maybeSingle();
+            if (curData && curData.updated_at && isConcurrencyConflict(curData.updated_at, previousUpdatedAt)) {
+                console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${record.id} in ${targetTable} was updated by another session. DB: ${curData.updated_at}, Expected: ${previousUpdatedAt}`);
+                throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${record.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
             }
-        } catch (fetchError) {
-            console.warn(`[MUTATION][CONCURRENCY] Failed to fetch existing updated_at before update:`, fetchError);
+        } catch (fetchError: any) {
+            if (String(fetchError?.message || '').includes('CONCURRENCY_CONFLICT')) {
+                throw fetchError;
+            }
+            console.warn(`[MUTATION][CONCURRENCY] Failed to check existing updated_at before update:`, fetchError);
         }
     }
 
     try {
-        const payload = sanitizeData(record, RECORD_DB_COLUMNS);
+        const payload = sanitizeRecordPayloadForTable(record, targetTable);
         if (!payload.updated_at) {
             payload.updated_at = new Date().toISOString();
         }
 
-        console.log(`[MUTATION][SUPABASE_EXEC] Executing UPDATE on table '${targetTable}' for ID: ${record.id} with where updated_at = ${previousUpdatedAt}`);
+        console.log(`[MUTATION][SUPABASE_EXEC] Executing UPDATE on table '${targetTable}' for ID: ${record.id}`);
 
         let query = supabase.from(targetTable).update(payload).eq('id', record.id);
-        if (previousUpdatedAt) {
-            query = query.eq('updated_at', previousUpdatedAt);
-        }
         let { data, error } = await query.select();
 
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
             console.warn(`⚠️ [22P02 Fallback] Retrying update on ${targetTable} with sanitized payload...`);
             const fallback22P02Payload = sanitizePayloadFor22P02(payload);
             let fallbackQuery = supabase.from(targetTable).update(fallback22P02Payload).eq('id', record.id);
-            if (previousUpdatedAt) {
-                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
-            }
             const res = await fallbackQuery.select();
             data = res.data;
             error = res.error;
@@ -1149,22 +1331,15 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
             console.warn(`⚠️ [Date Fallback] Retrying update on ${targetTable} with date sanitized payload...`);
             const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
             let fallbackQuery = supabase.from(targetTable).update(fallbackDatePayload).eq('id', record.id);
-            if (previousUpdatedAt) {
-                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
-            }
             const res = await fallbackQuery.select();
             data = res.data;
             error = res.error;
         }
 
-        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn(`⚠️ [Column Fallback] Missing optional columns on ${targetTable}. Retrying...`);
-            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
-            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            let fallbackQuery = supabase.from(targetTable).update(fallbackPayload).eq('id', record.id);
-            if (previousUpdatedAt) {
-                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
-            }
+        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')) || (error.message && String(error.message).includes('Could not find')))) {
+            console.warn(`⚠️ [PGRST204 Fallback] Missing columns on ${targetTable}. Retrying with safely recovered payload...`);
+            const { recoveredPayload } = recoverPayloadFromSchemaError(payload, targetTable, error);
+            let fallbackQuery = supabase.from(targetTable).update(recoveredPayload).eq('id', record.id);
             const res = await fallbackQuery.select();
             data = res.data;
             error = res.error;
@@ -1179,13 +1354,37 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
             const { data: checkData } = await supabase.from(targetTable).select('id, updated_at').eq('id', record.id);
             if (checkData && checkData.length > 0) {
                 const currentDbUpdatedAt = checkData[0].updated_at;
-                if (currentDbUpdatedAt !== previousUpdatedAt) {
+                if (isConcurrencyConflict(currentDbUpdatedAt, previousUpdatedAt)) {
                     console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${record.id} in ${targetTable} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
                     throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${record.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
                 }
             }
-            console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${record.id}`);
-            throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${record.id} was not found in table ${targetTable}.`);
+
+            // Cross-Table Auto-Migration: Kiểm tra các bảng khác trước khi báo lỗi
+            const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
+            for (const ot of otherTables) {
+                try {
+                    const { data: otData } = await supabase.from(ot).select('*').eq('id', record.id);
+                    if (otData && otData.length > 0) {
+                        console.log(`[Cross-Table Auto-Migrate] Record ID ${record.id} found in ${ot}, migrating to ${targetTable}...`);
+                        await supabase.from(ot).delete().eq('id', record.id);
+                        break;
+                    }
+                } catch (e) {}
+            }
+
+            console.warn(`[MUTATION][RECOVERY] UPDATE returned 0 rows on ${targetTable} for ID: ${record.id}. Executing upsert recovery...`);
+            let upsertRes = await supabase.from(targetTable).upsert(payload).select();
+            if (upsertRes.error && (upsertRes.error.code === 'PGRST204' || String(upsertRes.error.code) === '42703')) {
+                const { recoveredPayload } = recoverPayloadFromSchemaError(payload, targetTable, upsertRes.error);
+                upsertRes = await supabase.from(targetTable).upsert(recoveredPayload).select();
+            }
+            if (upsertRes.data && upsertRes.data.length > 0) {
+                data = upsertRes.data;
+            } else {
+                console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${record.id}`);
+                throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${record.id} was not found in table ${targetTable}.`);
+            }
         }
 
         const result = mapRecordFromDb({ ...record, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
@@ -1245,45 +1444,41 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
     // Lấy previousUpdatedAt từ fields truyền vào hoặc fetch trực tiếp từ DB
     let previousUpdatedAt = (fields as any).updated_at || (fields as any).updatedAt;
 
-    if (!previousUpdatedAt && isConfigured) {
+    if (previousUpdatedAt && isOnline()) {
         try {
-            console.log(`[MUTATION][CONCURRENCY] Fetching existing updated_at before fields UPDATE for ID: ${id}`);
-            const { data: fetchRes, error: fetchErr } = await supabase
+            const { data: curData } = await supabase
                 .from(targetTable)
                 .select('updated_at')
                 .eq('id', id)
-                .single();
-            if (fetchRes && !fetchErr) {
-                previousUpdatedAt = fetchRes.updated_at;
-                console.log(`[MUTATION][CONCURRENCY] Found existing updated_at in DB for fields: ${previousUpdatedAt}`);
+                .maybeSingle();
+            if (curData && curData.updated_at && isConcurrencyConflict(curData.updated_at, previousUpdatedAt)) {
+                console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${id} in ${targetTable} was updated by another session. DB: ${curData.updated_at}, Expected: ${previousUpdatedAt}`);
+                throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${id} in table ${targetTable} was modified by another user or session. Please refresh.`);
             }
-        } catch (fetchError) {
-            console.warn(`[MUTATION][CONCURRENCY] Failed to fetch existing updated_at before fields update:`, fetchError);
+        } catch (fetchError: any) {
+            if (String(fetchError?.message || '').includes('CONCURRENCY_CONFLICT')) {
+                throw fetchError;
+            }
+            console.warn(`[MUTATION][CONCURRENCY] Failed to check existing updated_at before fields update:`, fetchError);
         }
     }
 
     try {
-        const payload = sanitizeData(fullRecord as any, RECORD_DB_COLUMNS);
+        const payload = sanitizeRecordPayloadForTable(fullRecord as any, targetTable);
         if (!payload.updated_at) {
             payload.updated_at = new Date().toISOString();
         }
         delete payload.id;
 
-        console.log(`[MUTATION][SUPABASE_EXEC] Executing UPDATE fields on table '${targetTable}' for ID: ${id} with where updated_at = ${previousUpdatedAt}`);
+        console.log(`[MUTATION][SUPABASE_EXEC] Executing UPDATE fields on table '${targetTable}' for ID: ${id}`);
 
         let query = supabase.from(targetTable).update(payload).eq('id', id);
-        if (previousUpdatedAt) {
-            query = query.eq('updated_at', previousUpdatedAt);
-        }
         let { data, error } = await query.select();
 
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
             console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi on ${targetTable}...`);
             const fallback22P02Payload = sanitizePayloadFor22P02(payload);
             let fallbackQuery = supabase.from(targetTable).update(fallback22P02Payload).eq('id', id);
-            if (previousUpdatedAt) {
-                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
-            }
             const res = await fallbackQuery.select();
             data = res.data;
             error = res.error;
@@ -1293,22 +1488,16 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             console.warn(`⚠️ [Date Fallback] Retrying updateRecordFieldsApi on ${targetTable}...`);
             const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
             let fallbackQuery = supabase.from(targetTable).update(fallbackDatePayload).eq('id', id);
-            if (previousUpdatedAt) {
-                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
-            }
             const res = await fallbackQuery.select();
             data = res.data;
             error = res.error;
         }
 
-        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn(`⚠️ [Column Fallback] Retrying updateRecordFieldsApi on ${targetTable}...`);
-            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
-            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            let fallbackQuery = supabase.from(targetTable).update(fallbackPayload).eq('id', id);
-            if (previousUpdatedAt) {
-                fallbackQuery = fallbackQuery.eq('updated_at', previousUpdatedAt);
-            }
+        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')) || (error.message && String(error.message).includes('Could not find')))) {
+            console.warn(`⚠️ [PGRST204 Fallback] Retrying updateRecordFieldsApi on ${targetTable} with safely recovered payload...`);
+            const { recoveredPayload } = recoverPayloadFromSchemaError(payload, targetTable, error);
+            delete recoveredPayload.id;
+            let fallbackQuery = supabase.from(targetTable).update(recoveredPayload).eq('id', id);
             const res = await fallbackQuery.select();
             data = res.data;
             error = res.error;
@@ -1323,13 +1512,46 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             const { data: checkData } = await supabase.from(targetTable).select('id, updated_at').eq('id', id);
             if (checkData && checkData.length > 0) {
                 const currentDbUpdatedAt = checkData[0].updated_at;
-                if (currentDbUpdatedAt !== previousUpdatedAt) {
+                if (isConcurrencyConflict(currentDbUpdatedAt, previousUpdatedAt)) {
                     console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${id} in ${targetTable} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
                     throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${id} in table ${targetTable} was modified by another user or session. Please refresh.`);
                 }
             }
-            console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE fields returned 0 modified rows on ${targetTable} for ID: ${id}`);
-            throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${id} was not found in table ${targetTable}.`);
+
+            // Cross-Table Auto-Migration: Kiểm tra các bảng khác trước khi báo lỗi
+            const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
+            let foundInOtherTable: any = null;
+            for (const ot of otherTables) {
+                try {
+                    const { data: otData } = await supabase.from(ot).select('*').eq('id', id);
+                    if (otData && otData.length > 0) {
+                        foundInOtherTable = otData[0];
+                        console.log(`[Cross-Table Auto-Migrate] Record ID ${id} found in ${ot}, migrating to ${targetTable}...`);
+                        await supabase.from(ot).delete().eq('id', id);
+                        break;
+                    }
+                } catch (e) {}
+            }
+
+            console.warn(`[MUTATION][RECOVERY] UPDATE fields returned 0 rows on ${targetTable} for ID: ${id}. Executing upsert recovery...`);
+            const recoveryPayload = sanitizeRecordPayloadForTable({
+                ...(foundInOtherTable || {}),
+                id,
+                ...fields,
+                updated_at: new Date().toISOString()
+            }, targetTable);
+
+            let upsertRes = await supabase.from(targetTable).upsert(recoveryPayload).select();
+            if (upsertRes.error && (upsertRes.error.code === 'PGRST204' || String(upsertRes.error.code) === '42703')) {
+                const { recoveredPayload } = recoverPayloadFromSchemaError(recoveryPayload, targetTable, upsertRes.error);
+                upsertRes = await supabase.from(targetTable).upsert(recoveredPayload).select();
+            }
+            if (upsertRes.data && upsertRes.data.length > 0) {
+                data = upsertRes.data;
+            } else {
+                console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE fields returned 0 modified rows on ${targetTable} for ID: ${id}`);
+                throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${id} was not found in table ${targetTable}.`);
+            }
         }
 
         const result = mapRecordFromDb({ id, ...fields, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
@@ -1372,8 +1594,26 @@ export const deleteRecordApi = async (id: string, record?: Partial<RecordFile>):
     try {
         targetTable = getTargetTable(mergedRecord);
     } catch (error: any) {
-        console.error(`[ROUTING_GUARD][UNRESOLVED] Unable to resolve target table for record ID: ${id}. Delete blocked.`, error);
-        throw error;
+        // Table not resolvable from mergedRecord properties alone, will check Supabase
+    }
+
+    if (!targetTable && isOnline()) {
+        try {
+            const [landRes, dangkyRes, luutruRes] = await Promise.all([
+                supabase.from('land_records').select('id').eq('id', id).maybeSingle(),
+                supabase.from('dangky_records').select('id').eq('id', id).maybeSingle(),
+                supabase.from('luutru_records').select('id').eq('id', id).maybeSingle()
+            ]);
+            if (landRes.data) {
+                targetTable = 'land_records';
+            } else if (dangkyRes.data) {
+                targetTable = 'dangky_records';
+            } else if (luutruRes.data) {
+                targetTable = 'luutru_records';
+            }
+        } catch (dbErr) {
+            console.warn(`[deleteRecordApi] Database lookup for record table failed:`, dbErr);
+        }
     }
 
     if (!targetTable) {
@@ -1705,11 +1945,11 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
             
             const targetTable = getTargetTable(recordPayload);
             if (targetTable === 'luutru_records') {
-                luutruPayload.push(sanitizeData(recordPayload, RECORD_DB_COLUMNS));
+                luutruPayload.push(sanitizeRecordPayloadForTable(recordPayload, 'luutru_records'));
             } else if (targetTable === 'dangky_records') {
-                dangkyPayload.push(sanitizeData(recordPayload, RECORD_DB_COLUMNS));
+                dangkyPayload.push(sanitizeRecordPayloadForTable(recordPayload, 'dangky_records'));
             } else {
-                landPayload.push(sanitizeData(recordPayload, RECORD_DB_COLUMNS));
+                landPayload.push(sanitizeRecordPayloadForTable(recordPayload, 'land_records'));
             }
         }
 
@@ -1733,14 +1973,10 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                     error = res.error;
                 }
 
-                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-                    console.warn(`⚠️ [Fallback] Database is missing columns on ${table}. Retrying batch insert chunk ${i} without new columns...`);
-                    const fallbackPayload = chunk.map(p => {
-                        const fp = sanitizePayloadFor22P02({ ...p });
-                        OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
-                        return fp;
-                    });
-                    const { error: fallbackError } = await supabase.from(table).insert(fallbackPayload);
+                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')) || (error.message && String(error.message).includes('Could not find')))) {
+                    console.warn(`⚠️ [PGRST204 Fallback] Database schema mismatch on ${table} chunk ${i}. Retrying with safely recovered payload...`);
+                    const { recoveredPayload } = recoverPayloadFromSchemaError(chunk, table, error);
+                    const { error: fallbackError } = await supabase.from(table).insert(recoveredPayload);
                     if (fallbackError) throw fallbackError;
                 } else if (error) {
                     if (isTransientError(error)) {
@@ -1973,7 +2209,7 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         if (!merged.id || !isValidUUID(merged.id)) {
                             merged.id = generateStandardUUID();
                         }
-                        const sanitized = sanitizeData(merged, RECORD_DB_COLUMNS);
+                        const sanitized = sanitizeRecordPayloadForTable(merged, dbEntry.table);
                         if (dbEntry.table === 'luutru_records') {
                             luutruUpdates.push(sanitized);
                         } else if (dbEntry.table === 'dangky_records') {
@@ -2005,7 +2241,7 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         newRecord.status = deriveActualSurveyStatus(newRecord);
                     }
                     
-                    const sanitized = sanitizeData(newRecord, RECORD_DB_COLUMNS);
+                    const sanitized = sanitizeRecordPayloadForTable(newRecord, targetTable);
                     if (targetTable === 'luutru_records') {
                         luutruUpdates.push(sanitized);
                     } else if (targetTable === 'dangky_records') {
@@ -2032,14 +2268,10 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         upsertError = res.error;
                     }
 
-                    if (upsertError && (upsertError.code === 'PGRST204' || String(upsertError.code) === '42703' || (upsertError.message && String(upsertError.message).includes('does not exist')))) {
-                        console.warn(`⚠️ [Fallback] Retrying chunk target upsert into ${table} without new columns...`);
-                        const fallbackPayload = upChunk.map(p => {
-                            const fp = sanitizePayloadFor22P02({ ...p });
-                            OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
-                            return fp;
-                        });
-                        const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
+                    if (upsertError && (upsertError.code === 'PGRST204' || String(upsertError.code) === '42703' || (upsertError.message && String(upsertError.message).includes('does not exist')) || (upsertError.message && String(upsertError.message).includes('Could not find')))) {
+                        console.warn(`⚠️ [PGRST204 Fallback] Retrying chunk target upsert into ${table} with safely recovered payload...`);
+                        const { recoveredPayload } = recoverPayloadFromSchemaError(upChunk, table, upsertError);
+                        const { error: fallbackError } = await supabase.from(table).upsert(recoveredPayload);
                         if (fallbackError) {
                             (fallbackError as any).context = `forceUpdateRecordsBatchApi (${table})`;
                             throw fallbackError;
@@ -2119,7 +2351,25 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
     try {
         // 2. TÌM BẢNG VÀ GHÉP DỮ LIỆU ĐẦY ĐỦ (Tránh phán đoán sai bảng do updates chỉ chứa một phần trường)
         const idToExistingMap = new Map<string, RecordFile>();
-        MOCK_RECORDS.forEach(r => idToExistingMap.set(r.id, r));
+        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        cached.forEach(r => { if (r && r.id) idToExistingMap.set(r.id, r); });
+        MOCK_RECORDS.forEach(r => { if (r && r.id && !idToExistingMap.has(r.id)) idToExistingMap.set(r.id, r); });
+
+        const missingIds = updates.map(u => u.id).filter(id => id && !idToExistingMap.has(id)) as string[];
+        if (missingIds.length > 0 && isOnline()) {
+            try {
+                const [landRes, dangkyRes, luutruRes] = await Promise.all([
+                    supabase.from('land_records').select('*').in('id', missingIds),
+                    supabase.from('dangky_records').select('*').in('id', missingIds),
+                    supabase.from('luutru_records').select('*').in('id', missingIds)
+                ]);
+                (landRes.data || []).forEach(r => idToExistingMap.set(r.id, mapRecordFromDb({ ...r, sourceTable: 'land_records' })));
+                (dangkyRes.data || []).forEach(r => idToExistingMap.set(r.id, mapRecordFromDb({ ...r, sourceTable: 'dangky_records' })));
+                (luutruRes.data || []).forEach(r => idToExistingMap.set(r.id, mapRecordFromDb({ ...r, sourceTable: 'luutru_records' })));
+            } catch (fetchErr) {
+                console.warn('[updateRecordsBatchById] Failed to fetch missing records from DB:', fetchErr);
+            }
+        }
 
         const fullMergedUpdates: RecordFile[] = updates.map(u => {
             const existing = u.id ? idToExistingMap.get(u.id) : undefined;
@@ -2131,24 +2381,15 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         const luutruRows: any[] = [];
 
         fullMergedUpdates.forEach(u => {
-            const table = getTargetTable(u);
-            const sanitizedRow = sanitizeData(u, RECORD_DB_COLUMNS);
-
-            if (u.exportBatch || u.exportDate || u.handoverWard) {
-                const currentData = (typeof sanitizedRow.data === 'object' && sanitizedRow.data !== null) ? { ...sanitizedRow.data } : {};
-                if (u.exportBatch) {
-                    currentData.exportBatch = u.exportBatch;
-                    currentData.danh_sach = u.exportBatch;
+            let table: 'land_records' | 'dangky_records' | 'luutru_records' = 'land_records';
+            try {
+                table = getTargetTable(u);
+            } catch (e) {
+                if (u.sourceTable && ['land_records', 'dangky_records', 'luutru_records'].includes(u.sourceTable)) {
+                    table = u.sourceTable as any;
                 }
-                if (u.exportDate) {
-                    currentData.exportDate = u.exportDate;
-                    currentData.ngay_hoan_thanh = u.exportDate;
-                }
-                if (u.handoverWard) {
-                    currentData.handoverWard = u.handoverWard;
-                }
-                sanitizedRow.data = currentData;
             }
+            const sanitizedRow = sanitizeRecordPayloadForTable(u, table);
 
             if (table === 'luutru_records') {
                 luutruRows.push(sanitizedRow);
@@ -2161,33 +2402,62 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
 
         const upsertIntoTable = async (table: 'land_records' | 'dangky_records' | 'luutru_records', payload: any[]) => {
             if (payload.length === 0) return;
-            let { error } = await supabase.from(table).upsert(payload);
+            
+            // Payload ban đầu đã được sanitize theo đúng schema bảng table, tuyệt đối không có 'data'
+            let currentPayload = payload.map(r => sanitizeRecordPayloadForTable(r, table));
+
+            let { error } = await supabase.from(table).upsert(currentPayload);
 
             if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
                 console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordsBatchById on ${table} with 22P02 sanitized payload...`);
-                const fallback22P02Rows = sanitizePayloadFor22P02(payload);
-                const res = await supabase.from(table).upsert(fallback22P02Rows);
+                currentPayload = sanitizePayloadFor22P02(currentPayload);
+                const res = await supabase.from(table).upsert(currentPayload);
                 error = res.error;
             }
 
             if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp'))) {
                 console.warn(`⚠️ [Date Fallback] Retrying updateRecordsBatchById on ${table} with date sanitized payload...`);
-                const fallbackDateRows = payload.map(r => sanitizePayloadForDateErrors(r));
-                const res = await supabase.from(table).upsert(fallbackDateRows);
+                currentPayload = currentPayload.map(r => sanitizePayloadForDateErrors(r));
+                const res = await supabase.from(table).upsert(currentPayload);
                 error = res.error;
             }
 
-            if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-                console.warn(`⚠️ [Fallback] Database is missing columns inside updateRecordsBatchById on ${table}. Retrying without new columns...`);
-                const fallbackPayload = payload.map(r => {
-                    const fp = sanitizePayloadFor22P02({ ...r });
-                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
-                    return fp;
-                });
-                const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
-                if (fallbackError) throw fallbackError;
-            } else if (error) {
-                throw error;
+            if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')) || (error.message && String(error.message).includes('Could not find')))) {
+                console.warn(`⚠️ [PGRST204 Recovery] Table '${table}' schema mismatch inside updateRecordsBatchById:`, error.message);
+                const { recoveredPayload } = recoverPayloadFromSchemaError(currentPayload, table, error);
+                currentPayload = recoveredPayload;
+                const { error: fallbackError } = await supabase.from(table).upsert(currentPayload);
+                error = fallbackError;
+            }
+
+            // Fallback cập nhật từng bản ghi theo ID nếu upsert hàng loạt gặp lỗi
+            // Tuân thủ yêu cầu: fallback single update PHẢI SỬ DỤNG PAYLOAD ĐÃ SANITIZE, không lấy lại object gốc
+            if (error) {
+                console.warn(`⚠️ [updateRecordsBatchById] Upsert failed on ${table}, falling back to single updates by ID with sanitized payload:`, error);
+                let fallbackSuccess = true;
+                for (const row of currentPayload) {
+                    if (!row.id) continue;
+                    const cleanRow = { ...row };
+                    delete cleanRow.id;
+                    delete (cleanRow as any).data;
+                    let { error: singleErr } = await supabase.from(table).update(cleanRow).eq('id', row.id);
+                    if (singleErr && (singleErr.code === 'PGRST204' || String(singleErr.message || '').includes('Could not find') || String(singleErr.code) === '42703')) {
+                        const { recoveredPayload: singleRecovered } = recoverPayloadFromSchemaError(cleanRow, table, singleErr);
+                        delete singleRecovered.id;
+                        const retry = await supabase.from(table).update(singleRecovered).eq('id', row.id);
+                        singleErr = retry.error;
+                    }
+                    if (singleErr) {
+                        console.error(`[updateRecordsBatchById] Single update fallback failed for ID ${row.id}:`, singleErr);
+                        fallbackSuccess = false;
+                        break;
+                    }
+                }
+                if (fallbackSuccess) {
+                    error = null;
+                } else {
+                    throw error;
+                }
             }
         };
 
@@ -2245,7 +2515,14 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         console.warn(`[MUTATION] React State: NOT COMMITTED`);
         logError("updateRecordsBatchById", error);
         for (const u of updates) {
-            const table = getTargetTable(u as RecordFile);
+            let table: any = (u as any).sourceTable;
+            if (!table) {
+                try {
+                    table = getTargetTable(u as RecordFile);
+                } catch {
+                    table = 'land_records';
+                }
+            }
             await addPendingRecord({ ...u, _isOfflineSaved: true } as RecordFile, 'UPDATE', table);
         }
         return { success: false, count: 0, error };
@@ -2257,9 +2534,24 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
     try {
         for (const r of records) {
             const targetTable = getTargetTable(r);
-            const payload = sanitizeData(r, RECORD_DB_COLUMNS);
+            const payload = sanitizeRecordPayloadForTable(r, targetTable);
+            delete payload.id;
+            delete (payload as any).data;
             
             const previousUpdatedAt = r.updated_at || (r as any).updatedAt;
+
+            // Kiểm tra xung đột trước khi update nếu có previousUpdatedAt
+            if (previousUpdatedAt && r.id && isOnline()) {
+                try {
+                    const { data: curData } = await supabase.from(targetTable).select('updated_at').eq('id', r.id).maybeSingle();
+                    if (curData && curData.updated_at && isConcurrencyConflict(curData.updated_at, previousUpdatedAt)) {
+                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${r.id} in bulkUpdate was updated by another session. DB: ${curData.updated_at}, Expected: ${previousUpdatedAt}`);
+                        throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${r.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
+                    }
+                } catch (confErr: any) {
+                    if (String(confErr?.message || '').includes('CONCURRENCY_CONFLICT')) throw confErr;
+                }
+            }
 
             let query = supabase.from(targetTable).update(payload);
             
@@ -2270,18 +2562,23 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
             } else {
                 continue;
             }
-
-            if (previousUpdatedAt) {
-                query = query.eq('updated_at', previousUpdatedAt);
-            }
             
             let { data, error } = await query.select();
+            if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')) || (error.message && String(error.message).includes('Could not find')))) {
+                console.warn(`⚠️ [bulkUpdateDangKyRecordsApi] Schema mismatch on ${targetTable}. Retrying with safely recovered payload...`);
+                const { recoveredPayload } = recoverPayloadFromSchemaError(payload, targetTable, error);
+                delete recoveredPayload.id;
+                let retryQuery = supabase.from(targetTable).update(recoveredPayload);
+                if (r.id) retryQuery = retryQuery.eq('id', r.id);
+                else if (r.code) retryQuery = retryQuery.eq('code', r.code);
+                const res = await retryQuery.select();
+                data = res.data;
+                error = res.error;
+            }
+
             if (error) {
                 console.warn(`⚠️ [bulkUpdateDangKyRecordsApi] Error updating record ${r.id || r.code} in ${targetTable}:`, error);
                 let retryQuery = supabase.from(targetTable).update(payload).eq('id', r.id);
-                if (previousUpdatedAt) {
-                    retryQuery = retryQuery.eq('updated_at', previousUpdatedAt);
-                }
                 const res = await retryQuery.select();
                 data = res.data;
                 error = res.error;
@@ -2293,13 +2590,19 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
                     const { data: checkData } = await supabase.from(targetTable).select('id, updated_at').eq('id', r.id);
                     if (checkData && checkData.length > 0) {
                         const currentDbUpdatedAt = checkData[0].updated_at;
-                        if (currentDbUpdatedAt !== previousUpdatedAt) {
+                        if (isConcurrencyConflict(currentDbUpdatedAt, previousUpdatedAt)) {
                             console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${r.id} in bulkUpdate was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
                             throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${r.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
                         }
                     }
-                    console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${r.id}`);
-                    throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${r.id} was not found in table ${targetTable}.`);
+                    console.warn(`[bulkUpdateDangKyRecordsApi] Attempting upsert recovery on ${targetTable} for ID: ${r.id}`);
+                    const upRes = await supabase.from(targetTable).upsert(payload).select();
+                    if (upRes.data && upRes.data.length > 0) {
+                        data = upRes.data;
+                    } else {
+                        console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${r.id}`);
+                        throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${r.id} was not found in table ${targetTable}.`);
+                    }
                 }
             } else {
                 purgeRecordFromOtherTables(r.id, r.code, targetTable);

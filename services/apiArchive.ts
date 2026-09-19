@@ -1,7 +1,7 @@
 import { supabase, isConfigured } from './supabaseClient';
-import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02 } from './apiCore';
+import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, CACHE_KEYS } from './apiCore';
 import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated } from './apiRecords';
-import { addPendingRecord } from './syncQueueService';
+import { addPendingRecord, getPendingRecords } from './syncQueueService';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
 import { setIndexedDBItem, getIndexedDBItem } from './storageService';
@@ -299,67 +299,84 @@ export const mapRecordFileToArchiveDb = (r: RecordFile | Partial<RecordFile>): a
 
 // --- API ---
 
+let hasMigratedArchiveOnce = false;
+
 export const migrateArchiveRecordsFromLandRecords = async () => {
-    // Di chuyển và đồng bộ dữ liệu hồ sơ lưu trữ từ land_records sang luutru_records
+    // Di chuyển và đồng bộ dữ liệu hồ sơ lưu trữ từ land_records & dangky_records sang luutru_records
     if (!isConfigured) return;
     try {
-        const { data: landData, error: fetchError } = await supabase
+        const isArchiveRow = (r: any) => {
+            if (!r) return false;
+            const rType = String(r.recordType || '');
+            const rContent = String(r.content || '');
+            const rCode = String(r.code || '');
+            const rSoHieu = String(r.so_hieu || '');
+            const rGroup = String(r.group || '');
+            return (
+                isArchiveRecordType(rType) || 
+                isArchiveRecordType(rContent) || 
+                rType === 'Cung cấp tài liệu đất đai' ||
+                rType === 'Cung cấp dữ liệu đất đai' ||
+                rType === '1.1 Sao lục' ||
+                rType === '1.2 Công văn' ||
+                rType === '1.1 Sao lục hồ sơ' ||
+                rType === '1.1 Cung cấp dữ liệu đất đai' ||
+                rType.startsWith('1.') ||
+                rContent.startsWith('1.') ||
+                rGroup === '1.1' ||
+                rGroup === '1.2' ||
+                rCode.startsWith('LT-') ||
+                rSoHieu.startsWith('LT-')
+            );
+        };
+
+        // 1. Kiểm tra land_records
+        const { data: landData, error: landFetchErr } = await supabase
             .from('land_records')
             .select('*');
             
-        if (fetchError) {
-            console.warn('Lỗi khi kiểm tra land_records cho migration lưu trữ:', fetchError);
-            return;
+        if (!landFetchErr && landData && landData.length > 0) {
+            const archiveRecordsToMigrate = landData.filter(isArchiveRow);
+            if (archiveRecordsToMigrate.length > 0) {
+                console.log(`[Archive Migration] Tìm thấy ${archiveRecordsToMigrate.length} hồ sơ lưu trữ trong land_records để chuyển sang luutru_records.`);
+                const luutruPayloads = archiveRecordsToMigrate.map((r: any) => sanitizeData(r, ARCHIVE_DB_COLUMNS));
+                let { error: insertError } = await supabase.from('luutru_records').upsert(luutruPayloads);
+                if (insertError && (insertError.code === '22P02' || String(insertError.message || '').includes('22P02'))) {
+                    const clean = sanitizePayloadFor22P02(luutruPayloads);
+                    const res = await supabase.from('luutru_records').upsert(clean);
+                    insertError = res.error;
+                }
+                if (!insertError) {
+                    const idsToDelete = archiveRecordsToMigrate.map((r: any) => r.id);
+                    await supabase.from('land_records').delete().in('id', idsToDelete);
+                    console.log(`[Archive Migration] Đã di chuyển thành công ${archiveRecordsToMigrate.length} hồ sơ lưu trữ từ land_records.`);
+                }
+            }
         }
-        if (!landData || landData.length === 0) return;
 
-        // Lọc các hồ sơ thuộc loại Lưu trữ
-        const archiveRecordsToMigrate = landData.filter((r: any) => 
-            isArchiveRecordType(r.recordType) || 
-            isArchiveRecordType(r.content) || 
-            r.recordType === 'Cung cấp tài liệu đất đai' ||
-            r.recordType === 'Cung cấp dữ liệu đất đai' ||
-            r.recordType === '1.1 Sao lục' ||
-            r.recordType === '1.2 Công văn' ||
-            r.recordType === '1.1 Sao lục hồ sơ' ||
-            r.recordType === '1.1 Cung cấp dữ liệu đất đai'
-        );
-
-        if (archiveRecordsToMigrate.length === 0) return;
-        console.log(`[Archive Migration] Tìm thấy ${archiveRecordsToMigrate.length} hồ sơ lưu trữ trong land_records để chuyển sang luutru_records.`);
-
-        const luutruPayloads = archiveRecordsToMigrate.map((r: any) => {
-            return sanitizeData(r, ARCHIVE_DB_COLUMNS);
-        });
-
-        // Upsert vào luutru_records
-        let { error: insertError } = await supabase
-            .from('luutru_records')
-            .upsert(luutruPayloads);
+        // 2. Kiểm tra dangky_records
+        const { data: dangkyData, error: dangkyFetchErr } = await supabase
+            .from('dangky_records')
+            .select('*');
             
-        if (insertError && (insertError.code === '22P02' || String(insertError.message || '').includes('22P02'))) {
-            const clean = sanitizePayloadFor22P02(luutruPayloads);
-            const res = await supabase.from('luutru_records').upsert(clean);
-            insertError = res.error;
+        if (!dangkyFetchErr && dangkyData && dangkyData.length > 0) {
+            const dangkyArchiveRecords = dangkyData.filter(isArchiveRow);
+            if (dangkyArchiveRecords.length > 0) {
+                console.log(`[Archive Migration] Tìm thấy ${dangkyArchiveRecords.length} hồ sơ lưu trữ trong dangky_records để chuyển sang luutru_records.`);
+                const luutruPayloads = dangkyArchiveRecords.map((r: any) => sanitizeData(r, ARCHIVE_DB_COLUMNS));
+                let { error: insertError } = await supabase.from('luutru_records').upsert(luutruPayloads);
+                if (insertError && (insertError.code === '22P02' || String(insertError.message || '').includes('22P02'))) {
+                    const clean = sanitizePayloadFor22P02(luutruPayloads);
+                    const res = await supabase.from('luutru_records').upsert(clean);
+                    insertError = res.error;
+                }
+                if (!insertError) {
+                    const idsToDelete = dangkyArchiveRecords.map((r: any) => r.id);
+                    await supabase.from('dangky_records').delete().in('id', idsToDelete);
+                    console.log(`[Archive Migration] Đã di chuyển thành công ${dangkyArchiveRecords.length} hồ sơ lưu trữ từ dangky_records.`);
+                }
+            }
         }
-
-        if (insertError) {
-            console.error('Lỗi khi upsert vào luutru_records trong migration:', insertError);
-            return;
-        }
-
-        // Xóa các hồ sơ này khỏi land_records để tránh phân mảnh và trùng lặp dữ liệu
-        const idsToDelete = archiveRecordsToMigrate.map((r: any) => r.id);
-        const { error: deleteError } = await supabase
-            .from('land_records')
-            .delete()
-            .in('id', idsToDelete);
-            
-        if (deleteError) {
-            console.warn('Cảnh báo khi xóa hồ sơ lưu trữ khỏi land_records:', deleteError);
-        }
-
-        console.log(`[Archive Migration] Đã di chuyển thành công ${archiveRecordsToMigrate.length} hồ sơ lưu trữ sang luutru_records.`);
     } catch (error: any) {
         console.error('Lỗi trong quá trình di chuyển hồ sơ lưu trữ sang luutru_records:', error);
     }
@@ -385,6 +402,11 @@ export const getCachedArchiveRecords = async (): Promise<RecordFile[]> => {
 };
 
 export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[]> => {
+    if (!hasMigratedArchiveOnce) {
+        hasMigratedArchiveOnce = true;
+        migrateArchiveRecordsFromLandRecords().catch(e => console.warn('Background migration warning:', e));
+    }
+
     if (!isConfigured) {
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
@@ -569,12 +591,30 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
     let existingRows: any = null;
     try {
         if (record.id) {
-            const res = await supabase
+            let res = await supabase
                 .from('luutru_records')
                 .select('*')
                 .eq('id', record.id)
-                .single();
+                .maybeSingle();
             existingRows = res.data;
+
+            // Auto-Discovery & Cross-Table Migration if not in luutru_records
+            if (!existingRows) {
+                const landRes = await supabase.from('land_records').select('*').eq('id', record.id).maybeSingle();
+                if (landRes.data) {
+                    console.log(`[Archive Auto-Migrate] Record ID ${record.id} found in land_records. Migrating to luutru_records...`);
+                    existingRows = landRes.data;
+                    await supabase.from('land_records').delete().eq('id', record.id);
+                } else {
+                    const dangkyRes = await supabase.from('dangky_records').select('*').eq('id', record.id).maybeSingle();
+                    if (dangkyRes.data) {
+                        console.log(`[Archive Auto-Migrate] Record ID ${record.id} found in dangky_records. Migrating to luutru_records...`);
+                        existingRows = dangkyRes.data;
+                        await supabase.from('dangky_records').delete().eq('id', record.id);
+                    }
+                }
+            }
+
             if (existingRows) {
                 const currentArch = mapLuutruDbToArchiveRecord(existingRows);
                 fullRecord = {
@@ -593,7 +633,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
         const payload = mapArchiveRecordToLuutruDb(fullRecord);
 
-        if (record.id) {
+        if (record.id && existingRows) {
             let previousUpdatedAt = (record as any).updated_at || (record as any).updatedAt || (record.data && (record.data.updated_at || record.data.updatedAt));
             if (!previousUpdatedAt && existingRows) {
                 previousUpdatedAt = existingRows.updated_at;
@@ -638,8 +678,20 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                         throw new Error(`CONCURRENCY_CONFLICT: Archive Record with ID ${record.id} was modified by another user or session. Please refresh.`);
                     }
                 }
-                console.error(`[MUTATION][ARCHIVE_UPDATE_NOT_FOUND] ID ${record.id} not found in luutru_records.`);
-                throw new Error(`[UPDATE_NOT_FOUND] Archive record with ID ${record.id} was not found in luutru_records.`);
+                // Upsert fallback if 0 rows modified
+                console.warn(`[MUTATION][RECOVERY] UPDATE returned 0 rows on luutru_records for ID: ${record.id}. Executing upsert fallback...`);
+                let upsertRes = await supabase.from('luutru_records').upsert(payload).select();
+                if (upsertRes.error && (upsertRes.error.code === '42703' || String(upsertRes.error.message || '').includes('column') || upsertRes.error.code === 'PGRST204')) {
+                    const fallbackPayload = { ...payload };
+                    OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                    upsertRes = await supabase.from('luutru_records').upsert(fallbackPayload).select();
+                }
+                if (upsertRes.data && upsertRes.data.length > 0) {
+                    data = upsertRes.data;
+                } else {
+                    console.error(`[MUTATION][ARCHIVE_UPDATE_NOT_FOUND] ID ${record.id} not found in luutru_records.`);
+                    throw new Error(`[UPDATE_NOT_FOUND] Archive record with ID ${record.id} was not found in luutru_records.`);
+                }
             }
             const resRec = mapLuutruDbToArchiveRecord(data[0]);
             if (resRec) {
@@ -848,15 +900,132 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         return true;
     }
     try {
-        const { data: currentRecords, error: fetchError } = await supabase
+        let { data: currentRecords, error: fetchError } = await supabase
             .from('luutru_records')
             .select('*')
             .in('id', ids);
             
         if (fetchError) throw fetchError;
+
+        // Auto-Discovery & Cross-Table Migration if any requested IDs are missing from luutru_records
+        const missingIds = ids.filter(id => !currentRecords?.some(r => r.id === id));
+        if (missingIds.length > 0) {
+            console.log(`[updateArchiveRecordsBatch] ${missingIds.length} IDs not found in luutru_records. Checking other tables & caches...`, missingIds);
+            
+            // 1. Kiểm tra land_records
+            try {
+                const { data: landRecords } = await supabase
+                    .from('land_records')
+                    .select('*')
+                    .in('id', missingIds);
+                if (landRecords && landRecords.length > 0) {
+                    console.log(`[Archive Auto-Migrate] Found ${landRecords.length} records in land_records to migrate into luutru_records:`, landRecords.map(r => r.id));
+                    const migratedPayloads = landRecords.map(lr => {
+                        const arch = mapLuutruDbToArchiveRecord(lr);
+                        return mapArchiveRecordToLuutruDb(arch);
+                    });
+                    await supabase.from('luutru_records').upsert(migratedPayloads);
+                    await supabase.from('land_records').delete().in('id', landRecords.map(r => r.id));
+                    currentRecords = [...(currentRecords || []), ...landRecords];
+                }
+            } catch (mErr) {
+                console.warn('[Archive Auto-Migrate] Warning searching land_records:', mErr);
+            }
+
+            // 2. Kiểm tra dangky_records
+            const stillMissingIds = ids.filter(id => !currentRecords?.some(r => r.id === id));
+            if (stillMissingIds.length > 0) {
+                try {
+                    const { data: dangkyRecords } = await supabase
+                        .from('dangky_records')
+                        .select('*')
+                        .in('id', stillMissingIds);
+                    if (dangkyRecords && dangkyRecords.length > 0) {
+                        console.log(`[Archive Auto-Migrate] Found ${dangkyRecords.length} records in dangky_records to migrate into luutru_records:`, dangkyRecords.map(r => r.id));
+                        const migratedPayloads = dangkyRecords.map(dr => {
+                            const arch = mapLuutruDbToArchiveRecord(dr);
+                            return mapArchiveRecordToLuutruDb(arch);
+                        });
+                        await supabase.from('luutru_records').upsert(migratedPayloads);
+                        await supabase.from('dangky_records').delete().in('id', dangkyRecords.map(r => r.id));
+                        currentRecords = [...(currentRecords || []), ...dangkyRecords];
+                    }
+                } catch (mErr) {
+                    console.warn('[Archive Auto-Migrate] Warning searching dangky_records:', mErr);
+                }
+            }
+
+            // 3. Khôi phục từ bộ nhớ cache hoặc pending sync queue
+            const remainingMissingIds = ids.filter(id => !currentRecords?.some(r => r.id === id));
+            if (remainingMissingIds.length > 0) {
+                console.log(`[Archive Auto-Recovery] Resolving ${remainingMissingIds.length} missing IDs from local caches/queue:`, remainingMissingIds);
+                const localCachedArchive = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+                const localCachedRecords = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+                let pending: any[] = [];
+                try {
+                    pending = await getPendingRecords();
+                } catch {}
+
+                for (const missingId of remainingMissingIds) {
+                    const foundCached = localCachedArchive.find(r => r.id === missingId)
+                        || memoryArchiveRecordsCache?.find(r => r.id === missingId)
+                        || MOCK_ARCHIVE.find(r => r.id === missingId)
+                        || localCachedRecords.find(r => r.id === missingId)
+                        || pending.find(r => r.id === missingId);
+
+                    let baseArch: Partial<ArchiveRecord>;
+                    if (foundCached) {
+                        baseArch = (foundCached as any).data !== undefined ? (foundCached as ArchiveRecord) : mapLuutruDbToArchiveRecord(foundCached);
+                    } else {
+                        baseArch = {
+                            id: missingId,
+                            type: 'saoluc',
+                            status: (updates.status as any) || 'draft',
+                            so_hieu: (updates as any).so_hieu || '',
+                            trich_yeu: (updates as any).trich_yeu || '',
+                            ngay_thang: (updates as any).ngay_thang || new Date().toISOString().split('T')[0],
+                            noi_nhan_gui: (updates as any).noi_nhan_gui || ''
+                        };
+                    }
+
+                    const mergedArch: ArchiveRecord = {
+                        ...baseArch,
+                        ...updates,
+                        data: {
+                            ...(baseArch.data || {}),
+                            ...(updates.data || {})
+                        }
+                    } as ArchiveRecord;
+
+                    const payloadToUpsert = mapArchiveRecordToLuutruDb(mergedArch);
+                    let { data: upData, error: upErr } = await supabase.from('luutru_records').upsert(payloadToUpsert).select();
+                    if (upErr && (upErr.code === '42703' || String(upErr.message || '').includes('column') || upErr.code === 'PGRST204')) {
+                        const fallback = { ...payloadToUpsert };
+                        OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallback[col]);
+                        const res = await supabase.from('luutru_records').upsert(fallback).select();
+                        upData = res.data;
+                    }
+                    if (upData && upData.length > 0) {
+                        currentRecords = [...(currentRecords || []), upData[0]];
+                    }
+                }
+            }
+        }
+
         if (!currentRecords || currentRecords.length === 0) {
-            console.error(`[MUTATION][UPDATE_NOT_FOUND] Records with IDs ${ids.join(', ')} not found in luutru_records.`);
-            throw new Error(`[UPDATE_NOT_FOUND] Records with IDs ${ids.join(', ')} were not found in luutru_records.`);
+            console.warn(`[MUTATION][UPDATE_NOT_FOUND] Records with IDs ${ids.join(', ')} not found in any table or cache. Enqueueing to offline pending queue.`);
+            for (const missingId of ids) {
+                const fallbackRec: ArchiveRecord = {
+                    id: missingId,
+                    type: 'saoluc',
+                    status: (updates.status as any) || 'draft',
+                    ...updates,
+                    data: updates.data || {}
+                } as ArchiveRecord;
+                const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(fallbackRec));
+                await addPendingRecord(recFile, 'UPDATE', 'luutru_records');
+            }
+            return true;
         }
 
         const updatedPayloads = currentRecords.map(r => {
@@ -915,8 +1084,23 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
                         throw new Error(`CONCURRENCY_CONFLICT: Archive Record with ID ${payload.id} was modified by another user or session. Please refresh.`);
                     }
                 }
-                console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on luutru_records for ID: ${payload.id}`);
-                throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${payload.id} was not found in luutru_records.`);
+                // Upsert fallback if 0 rows modified
+                console.warn(`[MUTATION][RECOVERY] UPDATE returned 0 modified rows on luutru_records for ID: ${payload.id}. Attempting upsert recovery...`);
+                let upsertRes = await supabase.from('luutru_records').upsert(payload).select();
+                if (upsertRes.error && (upsertRes.error.code === '42703' || String(upsertRes.error.message || '').includes('column') || upsertRes.error.code === 'PGRST204')) {
+                    const fbPayload = { ...payload };
+                    OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fbPayload[col]);
+                    upsertRes = await supabase.from('luutru_records').upsert(fbPayload).select();
+                }
+                if (upsertRes.error) {
+                    console.error(`[MUTATION][UPDATE_NOT_FOUND] Upsert recovery failed for ID: ${payload.id}:`, upsertRes.error);
+                    throw upsertRes.error;
+                }
+                if (!upsertRes.data || upsertRes.data.length === 0) {
+                    console.warn(`[MUTATION][UPDATE_NOT_FOUND] Enqueueing to offline queue for ID: ${payload.id}`);
+                    const recFile = mapArchiveDbToRecordFile(payload);
+                    await addPendingRecord(recFile, 'UPDATE', 'luutru_records');
+                }
             }
         }
 

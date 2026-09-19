@@ -23,6 +23,7 @@ import {
   getRegistrationWorkflow,
   WorkflowStep,
   getAppointmentInfo,
+  calculateRegistrationDeadline,
 } from '../../utils/registrationWorkflows';
 
 interface RegistrationDetailModalProps {
@@ -64,10 +65,16 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   }, [isOpen, onClose]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      if (['receivedDate', 'recordType', 'postingDate', 'taxPaymentDate'].includes(field as string)) {
+        const calc = calculateRegistrationDeadline(next);
+        if (calc.deadline) {
+          next.deadline = calc.deadline;
+        }
+      }
+      return next;
+    });
   };
 
   const handleStatusChange = (
@@ -79,7 +86,8 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     const val = validateCapGiayTransition(
       formData.status,
       newStatus,
-      formData.previousStatus || formData.supplementReturnStatus
+      formData.previousStatus || formData.supplementReturnStatus,
+      formData.recordType
     );
     if (!val.valid) {
       setErrorMsg(val.reason || 'Chuyển trạng thái không hợp lệ theo quy trình Cấp giấy.');
@@ -117,13 +125,19 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
       autoDates.resultReturnedDate = today;
     }
 
-    setFormData((prev) => ({
-      ...prev,
+    const updatedRecordData: RecordFile = {
+      ...formData,
       status: newStatus,
-      statusLogs: [...(prev.statusLogs || []), newLog],
+      statusLogs: [...(formData.statusLogs || []), newLog],
       ...autoDates,
       ...(updatedFields || {}),
-    }));
+    };
+    const calc = calculateRegistrationDeadline(updatedRecordData);
+    if (calc.deadline) {
+      updatedRecordData.deadline = calc.deadline;
+    }
+
+    setFormData(updatedRecordData);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

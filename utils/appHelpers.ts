@@ -4,6 +4,7 @@ import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificat
 import { CAP_GIAY_STEP_ORDER, getCapGiayWorkflowStage } from './capGiayStateMachine';
 import { getDodacWorkflowStage } from './dodacStateMachine';
 import { getLuuTruWorkflowStage } from './luuTruStateMachine';
+import { calculateRegistrationDeadline, getRegistrationWorkflowCategory } from './registrationWorkflows';
 
 /**
  * Unified Workflow Stage Resolver for Dashboard, Report, Filter, KPI, SLA
@@ -196,48 +197,36 @@ export const formatDateKey = (date: Date): string => {
 // Tính hạn trả (deadline) dựa trên loại hồ sơ, ngày nhận, danh sách ngày nghỉ lễ
 export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[]): string => {
     if (!receivedDateStr) return '';
-    let daysToAdd = 30; 
-    const lowerType = (type || '').toLowerCase();
+    const cleanDate = receivedDateStr.split('T')[0];
+    const lowerType = (type || '').toLowerCase().trim();
     const short = getShortRecordType(type);
 
-    if (short === '3.8.2 Xóa ĐK GDBD' || lowerType.includes('3.8.2') || lowerType.includes('xóa đk gdbd') || lowerType.includes('xóa thế chấp') || lowerType.includes('giải chấp')) {
-        daysToAdd = 1;
-    } else if (short === '3.8.1 Đăng ký GDBD' || lowerType.includes('3.8.1') || lowerType.includes('đăng ký gdbd') || lowerType.includes('thế chấp')) {
-        daysToAdd = 3;
-    } else if (
-        short === '3.6.1 Chuyển mục đích' || short === '3.7.1 Đính chính' || short === '3.7.2 Đổi thông tin' ||
-        lowerType.includes('3.6.1') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') ||
-        lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính') || lowerType.includes('đổi thông tin')
-    ) {
-        daysToAdd = 7;
-    } else if (
-        short === '3.2.1 Cấp đổi' || short === '3.3.1 Cấp lại' || short === '1.1 Sao lục' || short === '1.2 Công văn' || short === '2.1 Trích lục' ||
-        lowerType.includes('3.2.1') || lowerType.includes('3.3.1') || lowerType.startsWith('1.1') || lowerType.startsWith('1.2') || lowerType.startsWith('2.1') ||
+    // 1. Nếu là nhóm 3.x (Đăng ký / Cấp giấy), dùng Single Source of Truth
+    const category = getRegistrationWorkflowCategory(type);
+    if (category !== 'unclassified') {
+        const res = calculateRegistrationDeadline({ recordType: type, receivedDate: cleanDate }, holidays);
+        return res.deadline;
+    }
+
+    // Nếu mang tiền tố 3.x mà không phân loại được -> Trả về rỗng, TUYỆT ĐỐI không tính bừa!
+    if (short.startsWith('3.') || lowerType.startsWith('3.')) {
+        return '';
+    }
+
+    // 2. Nhóm 1.x (Lưu trữ) và 2.x (Đo đạc)
+    let daysToAdd = 30; 
+
+    if (
+        short === '1.1 Sao lục' || short === '1.2 Công văn' || short === '2.1 Trích lục' ||
+        lowerType.startsWith('1.1') || lowerType.startsWith('1.2') || lowerType.startsWith('2.1') ||
         lowerType.includes('sao lục') || lowerType.includes('công văn') || lowerType.includes('trích lục')
     ) {
         daysToAdd = 10;
     } else if (
-        short === '3.5.1 Gia hạn' || short === '2.3 Duyệt đơn' ||
-        lowerType.includes('3.5.1') || lowerType.includes('gia hạn') ||
+        short === '2.3 Duyệt đơn' ||
         lowerType.includes('2.3') || lowerType.includes('duyệt đơn') || lowerType.includes('số thửa')
     ) {
         daysToAdd = 12;
-    } else if (
-        short === '3.1.1 Chuyển quyền' || short === '3.1.2 Phân chia quyền' || short === '3.1.3 Theo Bản án / QĐ' ||
-        lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') ||
-        lowerType.includes('chuyển quyền') || lowerType.includes('phân chia')
-    ) {
-        daysToAdd = 13;
-    } else if (
-        short === '3.2.2 Cấp đổi (có thuế)' || short === '3.3.2 Cấp lại (có thuế)' ||
-        lowerType.includes('3.2.2') || lowerType.includes('3.3.2')
-    ) {
-        daysToAdd = 15;
-    } else if (
-        short === '3.4.1 Tách - hợp thửa' || short === '3.4.2 Tách thửa CQ' ||
-        lowerType.includes('3.4.1') || lowerType.includes('3.4.2')
-    ) {
-        daysToAdd = 17;
     } else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
                lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
                lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||

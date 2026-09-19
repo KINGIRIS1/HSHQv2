@@ -1,14 +1,17 @@
 import { RecordStatus, RecordFile } from '../types';
 import { getShortRecordType, DEFAULT_HOLIDAYS } from '../constants';
-import { parseSafeDate, formatDateKey, getSolarDateFromLunar, calculateDeadlineHelper } from './appHelpers';
+import { parseSafeDate, formatDateKey, getSolarDateFromLunar } from './appHelpers';
 
 export type RegistrationWorkflowCategory = 
   | 'tax_transfer'   // Có nghĩa vụ tài chính (chuyển thuế, chờ GNT)
   | 'fast_track'     // Đăng ký biến động không thuế (cấp đổi, đính chính, đổi TT)
-  | 'gdbd'           // Giao dịch bảo đảm / Thế chấp (nhanh 1-3 ngày)
+  | 'gdbd'           // Giao dịch bảo đảm / Thế chấp (alias tương thích ngược)
+  | 'gdbd_register'  // 3.8.1 Đăng ký thế chấp (3 ngày làm việc = 24 giờ)
+  | 'gdbd_release'   // 3.8.2 Xóa thế chấp / Giải chấp (1 ngày làm việc = 8 giờ)
   | 'lost_cert'      // Cấp lại do mất không thuế (có niêm yết 30 ngày)
   | 'lost_cert_tax'  // Cấp lại do mất có thuế (có niêm yết 30 ngày + chuyển thuế)
-  | 'split_plot';    // Tách - hợp thửa đất
+  | 'split_plot'     // Tách - hợp thửa đất (15 ngày làm việc)
+  | 'unclassified';  // Hồ sơ chưa phân loại / thiếu loại
 
 export interface WorkflowStep {
   key: RecordStatus;
@@ -253,18 +256,18 @@ const FAST_TRACK_WORKFLOW: RegistrationWorkflowConfig = {
   ],
 };
 
-// 3. Luồng Giao dịch bảo đảm: 3.8.1, 3.8.2 (Tổng 3 ngày = 24 giờ làm việc)
-const GDBD_WORKFLOW: RegistrationWorkflowConfig = {
-  category: 'gdbd',
-  title: 'Quy trình Đăng ký Giao dịch bảo đảm / Thế chấp',
-  subtitle: 'Áp dụng cho Đăng ký thế chấp (3 ngày) và Xóa đăng ký thế chấp (1 ngày)',
+// 3a. Luồng Đăng ký Thế chấp / GDBD: 3.8.1 (Tổng 3 ngày = 24 giờ làm việc)
+const GDBD_REGISTER_WORKFLOW: RegistrationWorkflowConfig = {
+  category: 'gdbd_register',
+  title: 'Quy trình Đăng ký Thế chấp / Giao dịch bảo đảm (3.8.1)',
+  subtitle: 'Áp dụng cho Đăng ký biện pháp bảo đảm bằng QSDĐ, tài sản gắn liền với đất (3 ngày làm việc)',
   standardDays: 3,
   steps: [
     {
       key: RecordStatus.RECEIVED,
       label: 'Tiếp nhận hồ sơ',
       shortLabel: 'Tiếp nhận',
-      description: 'Tiếp nhận đơn yêu cầu đăng ký biện pháp bảo đảm / xóa đăng ký và hợp đồng thế chấp',
+      description: 'Tiếp nhận đơn yêu cầu đăng ký biện pháp bảo đảm và hợp đồng thế chấp',
       dateField: 'receivedDate',
       badgeColor: 'bg-slate-100 text-slate-700 border-slate-300',
       durationHours: 4,
@@ -286,7 +289,7 @@ const GDBD_WORKFLOW: RegistrationWorkflowConfig = {
       key: RecordStatus.PENDING_SIGN,
       label: 'Chờ ký duyệt',
       shortLabel: 'Ký duyệt',
-      description: 'Trình lãnh đạo Chi nhánh ký chứng nhận ĐKBPBĐ hoặc xác nhận xóa thế chấp',
+      description: 'Trình lãnh đạo Chi nhánh ký chứng nhận ĐKBPBĐ',
       dateField: 'submissionDate',
       badgeColor: 'bg-purple-100 text-purple-800 border-purple-300',
       durationHours: 4,
@@ -328,6 +331,85 @@ const GDBD_WORKFLOW: RegistrationWorkflowConfig = {
     },
   ],
 };
+
+// 3b. Luồng Xóa Đăng ký Thế chấp / Giải chấp: 3.8.2 (Tổng 1 ngày làm việc = 8 giờ)
+const GDBD_RELEASE_WORKFLOW: RegistrationWorkflowConfig = {
+  category: 'gdbd_release',
+  title: 'Quy trình Xóa Đăng ký Thế chấp / Giải chấp (3.8.2)',
+  subtitle: 'Áp dụng cho Xóa đăng ký biện pháp bảo đảm (Giải chấp) - Giải quyết trong 1 ngày làm việc (8 giờ)',
+  standardDays: 1,
+  steps: [
+    {
+      key: RecordStatus.RECEIVED,
+      label: 'Tiếp nhận hồ sơ',
+      shortLabel: 'Tiếp nhận',
+      description: 'Tiếp nhận văn bản thông báo giải chấp / xóa thế chấp của tổ chức tín dụng',
+      dateField: 'receivedDate',
+      badgeColor: 'bg-slate-100 text-slate-700 border-slate-300',
+      durationHours: 1,
+      durationDays: 0.125,
+      durationLabel: '1 giờ',
+    },
+    {
+      key: RecordStatus.APPRAISAL,
+      label: 'Xóa đăng ký & Cập nhật CSDL ngăn chặn',
+      shortLabel: 'Xác nhận xóa',
+      description: 'Kiểm tra hồ sơ gốc, xóa đăng ký thế chấp trên sổ địa chính và CSDL ngăn chặn',
+      dateField: 'appraisalDate',
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+      durationHours: 4,
+      durationDays: 0.5,
+      durationLabel: '4 giờ',
+    },
+    {
+      key: RecordStatus.PENDING_SIGN,
+      label: 'Chờ ký duyệt',
+      shortLabel: 'Ký duyệt',
+      description: 'Lãnh đạo Chi nhánh ký duyệt xác nhận xóa thế chấp',
+      dateField: 'submissionDate',
+      badgeColor: 'bg-purple-100 text-purple-800 border-purple-300',
+      durationHours: 1,
+      durationDays: 0.125,
+      durationLabel: '1 giờ',
+    },
+    {
+      key: RecordStatus.PENDING_HANDOVER,
+      label: 'Chờ bàn giao',
+      shortLabel: 'Chờ bàn giao',
+      description: 'Đóng dấu hoàn tất, chuyển bàn giao',
+      dateField: 'approvalDate',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      durationHours: 1,
+      durationDays: 0.125,
+      durationLabel: '1 giờ',
+    },
+    {
+      key: RecordStatus.HANDOVER,
+      label: 'Đã giao 1 cửa',
+      shortLabel: 'Giao 1 cửa',
+      description: 'Bàn giao Bộ phận Một cửa giao trả kết quả cho người sử dụng đất',
+      dateField: 'completedDate',
+      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+      durationHours: 1,
+      durationDays: 0.125,
+      durationLabel: '1 giờ',
+    },
+    {
+      key: RecordStatus.RETURNED,
+      label: 'Đã trả kết quả',
+      shortLabel: 'Đã trả',
+      description: 'Hoàn tất thủ tục xóa thế chấp',
+      dateField: 'resultReturnedDate',
+      badgeColor: 'bg-green-100 text-green-800 border-green-300',
+      durationHours: 0,
+      durationDays: 0,
+      durationLabel: 'Hoàn tất',
+    },
+  ],
+};
+
+// Giữ alias tương thích
+const GDBD_WORKFLOW = GDBD_REGISTER_WORKFLOW;
 
 // 4. Luồng Cấp lại do mất không thuế: 3.3.1 (Tổng 10 ngày VPĐK = 80 giờ + Niêm yết 30 ngày)
 const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
@@ -661,27 +743,73 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
   ],
 };
 
+// 6. Luồng Chưa Phân Loại: Áp dụng khi thiếu hoặc chưa xác định rõ loại hồ sơ
+const UNCLASSIFIED_WORKFLOW: RegistrationWorkflowConfig = {
+  category: 'unclassified',
+  title: 'Hồ sơ chưa phân loại quy trình',
+  subtitle: 'Loại hồ sơ chưa được xác định hoặc thiếu thông tin, cần bổ sung loại hồ sơ để tính thời hạn',
+  standardDays: 0,
+  steps: [
+    {
+      key: RecordStatus.RECEIVED,
+      label: 'Tiếp nhận hồ sơ',
+      shortLabel: 'Tiếp nhận',
+      description: 'Hồ sơ tiếp nhận chưa được phân loại',
+      dateField: 'receivedDate',
+      badgeColor: 'bg-slate-100 text-slate-700 border-slate-300',
+      durationHours: 0,
+      durationDays: 0,
+      durationLabel: 'Chưa xác định',
+    },
+    {
+      key: RecordStatus.RETURNED,
+      label: 'Đã trả kết quả',
+      shortLabel: 'Đã trả',
+      description: 'Kết thúc',
+      dateField: 'resultReturnedDate',
+      badgeColor: 'bg-green-100 text-green-800 border-green-300',
+      durationHours: 0,
+      durationDays: 0,
+      durationLabel: 'Hoàn tất',
+    },
+  ],
+};
+
 /**
  * Xác định phân loại luồng quy trình dựa trên loại hồ sơ
+ * TUYỆT ĐỐI KHÔNG tự động chuyển sang tax_transfer nếu thiếu hoặc không hợp lệ!
  */
 export const getRegistrationWorkflowCategory = (type: string | undefined | null): RegistrationWorkflowCategory => {
-  if (!type) return 'tax_transfer';
+  if (!type || typeof type !== 'string' || !type.trim()) {
+    return 'unclassified';
+  }
   const short = getShortRecordType(type);
   const lower = type.toLowerCase().trim();
 
-  // 1. Giao dịch bảo đảm / Thế chấp (3.8.1, 3.8.2)
+  // 1. Xóa đăng ký thế chấp / Giải chấp (3.8.2) - 1 ngày làm việc = 8 giờ
   if (
-    short.startsWith('3.8') ||
-    lower.includes('3.8.1') ||
+    short === '3.8.2 Xóa ĐK GDBD' ||
     lower.includes('3.8.2') ||
-    lower.includes('gdbd') ||
-    lower.includes('thế chấp') ||
+    lower.includes('xóa đk gdbd') ||
+    lower.includes('xóa thế chấp') ||
     lower.includes('giải chấp')
   ) {
-    return 'gdbd';
+    return 'gdbd_release';
   }
 
-  // 2. Cấp lại do mất có thuế (3.3.2)
+  // 2. Đăng ký thế chấp / GDBD (3.8.1) - 3 ngày làm việc = 24 giờ
+  if (
+    short === '3.8.1 Đăng ký GDBD' ||
+    lower.includes('3.8.1') ||
+    lower.includes('đăng ký gdbd') ||
+    lower.includes('đăng ký thế chấp') ||
+    (lower.includes('thế chấp') && !lower.includes('xóa')) ||
+    (lower.includes('gdbd') && !lower.includes('xóa'))
+  ) {
+    return 'gdbd_register';
+  }
+
+  // 3. Cấp lại do mất có thuế (3.3.2) - 13 ngày làm việc + 30 ngày niêm yết
   if (
     short === '3.3.2 Cấp lại có thuế' ||
     lower.includes('3.3.2') ||
@@ -690,7 +818,7 @@ export const getRegistrationWorkflowCategory = (type: string | undefined | null)
     return 'lost_cert_tax';
   }
 
-  // 3. Cấp lại do mất không thuế (3.3.1)
+  // 4. Cấp lại do mất không thuế (3.3.1) - 10 ngày làm việc + 30 ngày niêm yết
   if (
     short === '3.3.1 Cấp lại' ||
     (lower.includes('3.3.1') && !lower.includes('thuế')) ||
@@ -699,34 +827,134 @@ export const getRegistrationWorkflowCategory = (type: string | undefined | null)
     return 'lost_cert';
   }
 
-  // 4. Tách - Hợp thửa (3.4.1) - tách thông thường không chuyển quyền
+  // 5. Tách thửa chuyển quyền (3.4.2) -> Luồng có thuế
+  if (
+    short === '3.4.2 Tách thửa CQ' ||
+    lower.includes('3.4.2') ||
+    (lower.includes('tách') && lower.includes('cq'))
+  ) {
+    return 'tax_transfer';
+  }
+
+  // 6. Tách - Hợp thửa thông thường (3.4.1, 3.4.2) - 17 ngày làm việc
   if (
     short === '3.4.1 Tách - hợp thửa' ||
-    (lower.includes('3.4.1') && !lower.includes('cq')) ||
-    (lower.includes('tách') && lower.includes('hợp') && !lower.includes('cq'))
+    short === '3.4.2 Tách thửa CQ' ||
+    lower.includes('3.4.1') ||
+    lower.includes('3.4.2') ||
+    (lower.includes('tách') && lower.includes('hợp')) ||
+    lower.includes('tách thửa') ||
+    lower.includes('hợp thửa')
   ) {
     return 'split_plot';
   }
 
-  // 5. Đăng ký biến động không thuế (3.2.1, 3.5.1, 3.7.1, 3.7.2)
+  // 7. Đăng ký biến động không thuế (3.2.1, 3.5.1, 3.6.1, 3.7.1, 3.7.2)
   if (
     short === '3.2.1 Cấp đổi' ||
     short === '3.5.1 Gia hạn' ||
+    short === '3.6.1 Chuyển mục đích' ||
     short === '3.7.1 Đính chính' ||
     short === '3.7.2 Đổi thông tin' ||
     (lower.includes('3.2.1') && !lower.includes('thuế')) ||
     lower.includes('3.5.1') ||
+    lower.includes('3.6.1') ||
     lower.includes('3.7.1') ||
     lower.includes('3.7.2') ||
+    (lower.includes('cấp đổi') && !lower.includes('thuế')) ||
     lower.includes('gia hạn') ||
+    lower.includes('chuyển mục đích') ||
     lower.includes('đính chính') ||
     lower.includes('đổi thông tin')
   ) {
     return 'fast_track';
   }
 
-  // 6. Mặc định là Luồng Có thuế (3.1.1, 3.1.2, 3.1.3, 3.2.2, 3.4.2, 3.6.1)
-  return 'tax_transfer';
+  // 8. Đăng ký biến động có thuế (3.1.1, 3.1.2, 3.1.3, 3.2.2)
+  if (
+    short === '3.1.1 Chuyển quyền' ||
+    short === '3.1.2 Phân chia quyền' ||
+    short === '3.1.3 Theo Bản án / QĐ' ||
+    short === '3.2.2 Cấp đổi (có thuế)' ||
+    lower.includes('3.1.1') ||
+    lower.includes('3.1.2') ||
+    lower.includes('3.1.3') ||
+    lower.includes('3.2.2') ||
+    lower.includes('chuyển quyền') ||
+    lower.includes('thừa kế') ||
+    lower.includes('tặng cho') ||
+    lower.includes('phân chia') ||
+    lower.includes('bản án')
+  ) {
+    return 'tax_transfer';
+  }
+
+  // Trường hợp không khớp danh mục đăng ký hợp lệ: Báo unclassified, KHÔNG TỰ Ý CHUYỂN THUẾ!
+  console.warn('[RegistrationWorkflow] Hồ sơ thiếu hoặc không khớp danh mục loại hợp lệ:', type);
+  return 'unclassified';
+};
+
+/**
+ * Lấy số ngày làm việc chuẩn theo từng loại thủ tục cụ thể thuộc nhóm 3.x
+ */
+export const getSpecificRegistrationDuration = (type: string | undefined | null): number => {
+  if (!type || typeof type !== 'string' || !type.trim()) return 0;
+  const short = getShortRecordType(type);
+  const lower = type.toLowerCase().trim();
+
+  // 3.8.2 Xóa ĐK GDBD / Giải chấp: 1 ngày làm việc
+  if (short === '3.8.2 Xóa ĐK GDBD' || lower.includes('3.8.2') || lower.includes('xóa đk gdbd') || lower.includes('xóa thế chấp') || lower.includes('giải chấp')) {
+    return 1;
+  }
+  // 3.8.1 Đăng ký GDBD / Thế chấp: 3 ngày làm việc
+  if (short === '3.8.1 Đăng ký GDBD' || lower.includes('3.8.1') || lower.includes('đăng ký gdbd') || lower.includes('thế chấp')) {
+    return 3;
+  }
+  // 3.6.1, 3.7.1, 3.7.2: 7 ngày làm việc
+  if (
+    short === '3.6.1 Chuyển mục đích' || short === '3.7.1 Đính chính' || short === '3.7.2 Đổi thông tin' ||
+    lower.includes('3.6.1') || lower.includes('3.7.1') || lower.includes('3.7.2') ||
+    lower.includes('chuyển mục đích') || lower.includes('đính chính') || lower.includes('đổi thông tin')
+  ) {
+    return 7;
+  }
+  // 3.2.1 Cấp đổi, 3.3.1 Cấp lại do mất (thời gian VPĐK): 10 ngày làm việc
+  if (
+    short === '3.2.1 Cấp đổi' || short === '3.3.1 Cấp lại' ||
+    lower.includes('3.2.1') || lower.includes('3.3.1') ||
+    (lower.includes('cấp lại') && !lower.includes('thuế'))
+  ) {
+    return 10;
+  }
+  // 3.5.1 Gia hạn: 12 ngày làm việc
+  if (short === '3.5.1 Gia hạn' || lower.includes('3.5.1') || lower.includes('gia hạn')) {
+    return 12;
+  }
+  // 3.1.1, 3.1.2, 3.1.3: 13 ngày làm việc
+  if (
+    short === '3.1.1 Chuyển quyền' || short === '3.1.2 Phân chia quyền' || short === '3.1.3 Theo Bản án / QĐ' ||
+    lower.includes('3.1.1') || lower.includes('3.1.2') || lower.includes('3.1.3') ||
+    lower.includes('chuyển quyền') || lower.includes('phân chia') || lower.includes('bản án')
+  ) {
+    return 13;
+  }
+  // 3.2.2 Cấp đổi có thuế, 3.3.2 Cấp lại có thuế: 15 ngày làm việc
+  if (
+    short === '3.2.2 Cấp đổi (có thuế)' || short === '3.3.2 Cấp lại (có thuế)' ||
+    lower.includes('3.2.2') || lower.includes('3.3.2') ||
+    (lower.includes('cấp lại') && lower.includes('thuế'))
+  ) {
+    return 15;
+  }
+  // 3.4.1 Tách - hợp thửa, 3.4.2 Tách thửa CQ: 17 ngày làm việc
+  if (
+    short === '3.4.1 Tách - hợp thửa' || short === '3.4.2 Tách thửa CQ' ||
+    lower.includes('3.4.1') || lower.includes('3.4.2') ||
+    lower.includes('tách') || lower.includes('hợp')
+  ) {
+    return 17;
+  }
+  return 0;
 };
 
 /**
@@ -735,8 +963,11 @@ export const getRegistrationWorkflowCategory = (type: string | undefined | null)
 export const getRegistrationWorkflow = (type: string | undefined | null): RegistrationWorkflowConfig => {
   const category = getRegistrationWorkflowCategory(type);
   switch (category) {
+    case 'gdbd_release':
+      return GDBD_RELEASE_WORKFLOW;
+    case 'gdbd_register':
     case 'gdbd':
-      return GDBD_WORKFLOW;
+      return GDBD_REGISTER_WORKFLOW;
     case 'lost_cert':
       return LOST_CERT_WORKFLOW;
     case 'lost_cert_tax':
@@ -746,8 +977,10 @@ export const getRegistrationWorkflow = (type: string | undefined | null): Regist
     case 'fast_track':
       return FAST_TRACK_WORKFLOW;
     case 'tax_transfer':
-    default:
       return TAX_TRANSFER_WORKFLOW;
+    case 'unclassified':
+    default:
+      return UNCLASSIFIED_WORKFLOW;
   }
 };
 
@@ -1088,7 +1321,7 @@ export const getStepSlaInfo = (
  * Cấu trúc ngày hẹn giải quyết (2 Giai đoạn: Hẹn lấy TB Thuế và Hẹn Trả kết quả GCN)
  */
 export interface AppointmentInfo {
-  phase: 'tax_notice' | 'final_result';
+  phase: 'tax_notice' | 'final_result' | 'unclassified';
   label: string;
   shortLabel: string;
   appointmentDate: string; // YYYY-MM-DD
@@ -1135,6 +1368,7 @@ export const addWorkingDays = (
   if (!startDateStr) return '';
   const parsedStart = parseSafeDate(startDateStr);
   if (!parsedStart) return '';
+  if (daysToAdd <= 0) return formatDateKey(parsedStart);
   
   const startDate = new Date(parsedStart.getTime());
   let currentDate = new Date(startDate.getTime());
@@ -1176,85 +1410,256 @@ export const addWorkingDays = (
 };
 
 /**
+ * Đếm số ngày làm việc hành chính giữa 2 mốc thời gian (loại trừ T7, CN, ngày lễ)
+ * Phục vụ tính thời gian tạm dừng (PAUSE) để gia hạn deadline khi RESUME
+ */
+export const calculateWorkingDaysBetween = (
+  startDateStr: string | Date | null | undefined,
+  endDateStr: string | Date | null | undefined,
+  holidays: any[] = DEFAULT_HOLIDAYS
+): number => {
+  if (!startDateStr || !endDateStr) return 0;
+  const start = parseSafeDate(startDateStr);
+  const end = parseSafeDate(endDateStr);
+  if (!start || !end || start >= end) return 0;
+
+  const holidaySet = new Set<string>();
+  const currentYear = start.getFullYear();
+  const yearsToCheck = [currentYear, currentYear + 1, end.getFullYear()];
+  const effectiveHolidays = (Array.isArray(holidays) && holidays.length > 0) ? holidays : DEFAULT_HOLIDAYS;
+
+  effectiveHolidays.forEach(h => {
+    yearsToCheck.forEach(year => {
+      if (h.isLunar) {
+        const solarDate = getSolarDateFromLunar(h.day, h.month, year);
+        if (solarDate) holidaySet.add(formatDateKey(solarDate));
+      } else {
+        const solarDate = new Date(year, h.month - 1, h.day);
+        holidaySet.add(formatDateKey(solarDate));
+      }
+    });
+  });
+
+  let workingDays = 0;
+  const cur = new Date(start.getTime());
+  cur.setHours(0, 0, 0, 0);
+  const endBoundary = new Date(end.getTime());
+  endBoundary.setHours(0, 0, 0, 0);
+
+  while (cur < endBoundary) {
+    cur.setDate(cur.getDate() + 1);
+    const dayOfWeek = cur.getDay();
+    const dateStr = formatDateKey(cur);
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(dateStr)) {
+      workingDays++;
+    }
+  }
+
+  return workingDays;
+};
+
+export interface RegistrationDeadlineResult {
+  deadline: string;
+  appointmentDate: string;
+  category: RegistrationWorkflowCategory;
+  workingDays: number;
+  hasPostingNotice: boolean;
+  postingEndDate?: string;
+  description: string;
+  phase: 'tax_notice' | 'final_result' | 'unclassified';
+}
+
+/**
+ * SINGLE SOURCE OF TRUTH: Tính toán Deadline và Ngày hẹn cho toàn bộ Module Đăng ký / Cấp giấy
+ * Tuân thủ nghiêm ngặt 4 loại thời gian và quy chế phối hợp:
+ * 1. Fast-track (3.2.1: 10 ngày, 3.5.1: 12 ngày, 3.6.1: 7 ngày, 3.7.1: 7 ngày, 3.7.2: 7 ngày)
+ * 2. GDBD Xóa thế chấp (3.8.2): 1 ngày làm việc (8 giờ)
+ * 3. GDBD Đăng ký thế chấp (3.8.1): 3 ngày làm việc (24 giờ)
+ * 4. Tách - hợp thửa (3.4.1, 3.4.2): 17 ngày làm việc
+ * 5. Cấp lại mất không thuế (3.3.1): 10 ngày làm việc VPĐK + 30 ngày niêm yết (tính từ postingDate)
+ * 6. Cấp lại mất có thuế (3.3.2): 15 ngày làm việc VPĐK + 30 ngày niêm yết
+ * 7. Có thuế thông thường (3.1.1, 3.1.2, 3.1.3: 13 ngày; 3.2.2: 15 ngày)
+ *    - Giai đoạn 1 (Chưa nộp thuế): Hẹn lấy TB Thuế = receivedDate + 5 ngày làm việc
+ *    - Hạn xử lý chuẩn (deadline): receivedDate + statutory workingDays
+ * 8. Chưa phân loại: Trả về rỗng, KHÔNG tự ý default sang thuế!
+ */
+export const calculateRegistrationDeadline = (
+  record: Partial<RecordFile>,
+  holidays: any[] = DEFAULT_HOLIDAYS
+): RegistrationDeadlineResult => {
+  const category = getRegistrationWorkflowCategory(record.recordType);
+  const workingDays = getSpecificRegistrationDuration(record.recordType);
+
+  if (category === 'unclassified' || workingDays === 0) {
+    return {
+      deadline: '',
+      appointmentDate: '',
+      category: 'unclassified',
+      workingDays: 0,
+      hasPostingNotice: false,
+      description: 'Hồ sơ chưa được phân loại quy trình hợp lệ, cần bổ sung loại hồ sơ để tính thời hạn.',
+      phase: 'unclassified',
+    };
+  }
+
+  const receivedDate = record.receivedDate ? record.receivedDate.split('T')[0] : '';
+  if (!receivedDate) {
+    return {
+      deadline: '',
+      appointmentDate: '',
+      category,
+      workingDays,
+      hasPostingNotice: category === 'lost_cert' || category === 'lost_cert_tax',
+      description: 'Chưa có ngày tiếp nhận hồ sơ.',
+      phase: 'unclassified',
+    };
+  }
+
+  // 1. Cấp lại do mất (3.3.1 & 3.3.2): Bắt buộc có postingDate (30 ngày niêm yết + workingDays)
+  if (category === 'lost_cert' || category === 'lost_cert_tax') {
+    let postingEndDate: string | undefined = undefined;
+    if (record.postingEndDate) {
+      postingEndDate = record.postingEndDate.split('T')[0];
+    } else if (record.postingDate) {
+      postingEndDate = addCalendarDays(record.postingDate.split('T')[0], 30);
+    }
+
+    if (postingEndDate) {
+      const deadline = addWorkingDays(postingEndDate, workingDays, holidays);
+      const isTaxPaid = Boolean(record.taxPaymentDate);
+      const isLostCertTax = category === 'lost_cert_tax';
+      const postTaxStatuses = [
+        RecordStatus.PENDING_PRINT_CERT,
+        RecordStatus.PENDING_CHECK,
+        RecordStatus.PENDING_SIGN,
+        RecordStatus.PENDING_HANDOVER,
+        RecordStatus.HANDOVER,
+        RecordStatus.RETURNED,
+      ];
+      const isPostTax = isTaxPaid || postTaxStatuses.includes(record.status as RecordStatus);
+
+      let phase: 'tax_notice' | 'final_result' = 'final_result';
+      let appointmentDate = deadline;
+
+      if (isLostCertTax && !isPostTax) {
+        phase = 'tax_notice';
+        appointmentDate = addWorkingDays(postingEndDate, 5, holidays);
+      }
+
+      return {
+        deadline,
+        appointmentDate,
+        category,
+        workingDays,
+        hasPostingNotice: true,
+        postingEndDate,
+        description: isLostCertTax && !isPostTax
+          ? 'Hẹn lấy Thông báo thuế (30 ngày niêm yết tại UBND xã + 5 ngày làm việc chuyển và xác định thuế)'
+          : `Hẹn trả kết quả Cấp lại GCN do mất (30 ngày niêm yết tại UBND xã + ${workingDays} ngày làm việc Chi nhánh)`,
+        phase,
+      };
+    }
+
+    // Chưa có postingDate: Không tính bừa deadline
+    return {
+      deadline: '',
+      appointmentDate: '',
+      category,
+      workingDays,
+      hasPostingNotice: true,
+      description: 'Chờ xác định ngày niêm yết công khai tại UBND cấp xã (30 ngày lịch theo Điều 36 NĐ 101/2024).',
+      phase: category === 'lost_cert_tax' ? 'tax_notice' : 'final_result',
+    };
+  }
+
+  // 2. Có thuế thông thường (3.1.1, 3.1.2, 3.1.3, 3.2.2)
+  if (category === 'tax_transfer') {
+    const statutoryDeadline = addWorkingDays(receivedDate, workingDays, holidays);
+    const isTaxPaid = Boolean(record.taxPaymentDate);
+    const postTaxStatuses = [
+      RecordStatus.PENDING_PRINT_CERT,
+      RecordStatus.PENDING_CHECK,
+      RecordStatus.PENDING_SIGN,
+      RecordStatus.PENDING_HANDOVER,
+      RecordStatus.HANDOVER,
+      RecordStatus.RETURNED,
+    ];
+    const isPostTax = isTaxPaid || postTaxStatuses.includes(record.status as RecordStatus);
+
+    if (isPostTax) {
+      return {
+        deadline: statutoryDeadline,
+        appointmentDate: statutoryDeadline,
+        category,
+        workingDays,
+        hasPostingNotice: false,
+        description: `Hẹn trả kết quả Giấy chứng nhận (${workingDays} ngày làm việc theo quy định)`,
+        phase: 'final_result',
+      };
+    }
+
+    // Giai đoạn 1: Chờ thông báo thuế (5 ngày làm việc từ ngày tiếp nhận)
+    const taxNoticeDate = addWorkingDays(receivedDate, 5, holidays);
+    return {
+      deadline: statutoryDeadline,
+      appointmentDate: taxNoticeDate,
+      category,
+      workingDays,
+      hasPostingNotice: false,
+      description: 'Hẹn lấy Thông báo nộp thuế (5 ngày làm việc từ ngày tiếp nhận hồ sơ)',
+      phase: 'tax_notice',
+    };
+  }
+
+  // 3. Các luồng không thuế khác (fast_track, gdbd_register, gdbd_release, split_plot)
+  const deadline = addWorkingDays(receivedDate, workingDays, holidays);
+  return {
+    deadline,
+    appointmentDate: deadline,
+    category,
+    workingDays,
+    hasPostingNotice: false,
+    description: `Hẹn trả kết quả theo quy định (${workingDays} ngày làm việc)`,
+    phase: 'final_result',
+  };
+};
+
+/**
  * Tính toán Ngày hẹn trả kết quả theo nghiệp vụ 2 giai đoạn (Hẹn TB Thuế & Hẹn Trả GCN)
+ * Trực tiếp sử dụng calculateRegistrationDeadline để đảm bảo 100% đồng nhất
  */
 export const getAppointmentInfo = (
   record: RecordFile,
   holidays: any[] = DEFAULT_HOLIDAYS
 ): AppointmentInfo => {
+  const calc = calculateRegistrationDeadline(record, holidays);
   const category = getRegistrationWorkflowCategory(record.recordType);
-  const isTaxCategory = category === 'tax_transfer' || category === 'lost_cert_tax';
-  const receivedDate = record.receivedDate || formatDateKey(new Date());
 
-  const isTaxPaid = Boolean(record.taxPaymentDate);
-  const postTaxStatuses = [
-    RecordStatus.PENDING_PRINT_CERT,
-    RecordStatus.PENDING_CHECK,
-    RecordStatus.PENDING_SIGN,
-    RecordStatus.SIGNED,
-    RecordStatus.HANDOVER,
-    RecordStatus.RETURNED,
-  ];
-  const isPostTaxStatus = postTaxStatuses.includes(record.status);
-
-  // Giai đoạn 1: Hồ sơ có thuế nhưng chưa nộp thuế (chờ TB thuế / chờ nộp tiền)
-  if (isTaxCategory && !isTaxPaid && !isPostTaxStatus) {
-    let appDate = '';
-    let desc = '';
-
-    if (category === 'lost_cert_tax') {
-      // 3.3.2 Cấp lại có thuế: 30 ngày niêm yết xã + 5 ngày làm việc xác định thuế
-      const postingEndDate = record.postingEndDate || addCalendarDays(receivedDate, 30);
-      appDate = addWorkingDays(postingEndDate, 5, holidays);
-      desc = 'Ngày hẹn dự kiến lấy Thông báo thuế (Bao gồm 30 ngày niêm yết tại UBND xã + 5 ngày làm việc xác định thuế)';
-    } else {
-      // 3.1.x, 3.2.2, 3.4.2, 3.6.1... các thủ tục có thuế thông thường: 5 ngày làm việc
-      appDate = addWorkingDays(receivedDate, 5, holidays);
-      desc = 'Ngày hẹn dự kiến lấy Thông báo thuế (5 ngày làm việc từ ngày tiếp nhận hồ sơ)';
-    }
-
+  if (calc.phase === 'tax_notice') {
     return {
       phase: 'tax_notice',
       label: 'Ngày hẹn lấy Thông báo thuế (Dự kiến)',
       shortLabel: 'Hẹn lấy TB Thuế',
-      appointmentDate: appDate,
-      formattedAppointmentDate: formatDateToVN(appDate),
+      appointmentDate: calc.appointmentDate,
+      formattedAppointmentDate: formatDateToVN(calc.appointmentDate),
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-      description: desc,
+      description: calc.description,
       isTaxPhase: true,
-      isPostingPhase: category === 'lost_cert_tax' && record.status === RecordStatus.PENDING_POSTING,
+      isPostingPhase: (category === 'lost_cert' || category === 'lost_cert_tax') && record.status === RecordStatus.APPRAISAL,
     };
   }
 
-  // Giai đoạn 2: Đã nộp tiền thuế (hoặc Hồ sơ thuộc luồng Không phát sinh thuế) -> Trả kết quả GCN
-  let appDate = '';
-  let desc = '';
-
-  if (isTaxCategory) {
-    // Đã nộp thuế: Tính từ ngày nộp thuế + 10 ngày làm việc xử lý còn lại của VPĐK
-    const baseDate = record.taxPaymentDate || record.printCertDate || receivedDate;
-    appDate = addWorkingDays(baseDate, 10, holidays);
-    desc = 'Ngày hẹn dự kiến Trả kết quả Giấy chứng nhận (10 ngày làm việc sau khi công dân nộp Giấy nộp tiền thuế)';
-  } else if (category === 'lost_cert') {
-    // 3.3.1 Cấp lại không thuế: 30 ngày niêm yết xã + 10 ngày làm việc VPĐK
-    const postingEndDate = record.postingEndDate || addCalendarDays(receivedDate, 30);
-    appDate = addWorkingDays(postingEndDate, 10, holidays);
-    desc = 'Ngày hẹn dự kiến Trả kết quả (Bao gồm 30 ngày niêm yết tại UBND xã + 10 ngày làm việc của Chi nhánh)';
-  } else {
-    // Thủ tục không thuế tiêu chuẩn (Chuyển quyền không thuế, Cấp đổi không thuế, Thế chấp...)
-    appDate = record.deadline || calculateDeadlineHelper(record.recordType || '', receivedDate, holidays);
-    desc = 'Ngày hẹn dự kiến Trả kết quả theo quy định Chi nhánh';
-  }
-
   return {
-    phase: 'final_result',
-    label: 'Ngày hẹn Trả kết quả (Dự kiến)',
-    shortLabel: 'Hẹn trả GCN',
-    appointmentDate: appDate,
-    formattedAppointmentDate: formatDateToVN(appDate),
-    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    description: desc,
+    phase: calc.phase,
+    label: calc.phase === 'unclassified' ? 'Chưa phân loại' : 'Ngày hẹn Trả kết quả (Dự kiến)',
+    shortLabel: calc.phase === 'unclassified' ? 'Chưa phân loại' : 'Hẹn trả GCN',
+    appointmentDate: calc.appointmentDate,
+    formattedAppointmentDate: formatDateToVN(calc.appointmentDate),
+    badgeColor: calc.phase === 'unclassified'
+      ? 'bg-slate-100 text-slate-700 border-slate-300'
+      : 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    description: calc.description,
     isTaxPhase: false,
-    isPostingPhase: category === 'lost_cert' && record.status === RecordStatus.PENDING_POSTING,
+    isPostingPhase: (category === 'lost_cert' || category === 'lost_cert_tax') && record.status === RecordStatus.APPRAISAL,
   };
 };

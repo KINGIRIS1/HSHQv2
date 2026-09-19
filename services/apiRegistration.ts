@@ -3,6 +3,7 @@ import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, Re
 import { connectionManager } from './connectionService';
 import { sanitizeData, isBlankRecord } from './apiCore';
 import { getTargetTable, RECORD_DB_COLUMNS } from './apiRecords';
+import { calculateRegistrationDeadline, addCalendarDays } from '../utils/registrationWorkflows';
 
 /**
  * Service chuyên trách 100% độc lập cho bảng dangky_records (Tổ Đăng ký / Cấp giấy)
@@ -157,7 +158,14 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.status !== undefined) payload.status = record.status;
   if (record.receivedBy !== undefined) payload.receivedBy = record.receivedBy;
   if (record.receivedDate !== undefined) payload.receivedDate = record.receivedDate || null;
-  if (record.deadline !== undefined) payload.deadline = record.deadline || null;
+  if (record.deadline !== undefined) {
+    payload.deadline = record.deadline || null;
+  } else if (record.receivedDate) {
+    const calc = calculateRegistrationDeadline(record as RecordFile);
+    if (calc.deadline) {
+      payload.deadline = calc.deadline;
+    }
+  }
   if (record.assignedTo !== undefined) payload.assignedTo = record.assignedTo;
   if (record.assignedDate !== undefined) payload.assignedDate = record.assignedDate || null;
   if (record.checkedBy !== undefined) payload.checkedBy = record.checkedBy;
@@ -195,8 +203,15 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.lastRemindedAt !== undefined) payload.lastRemindedAt = record.lastRemindedAt || null;
   if (record.deadlineReminded !== undefined) payload.deadlineReminded = Boolean(record.deadlineReminded);
   if (record.appraisalDate !== undefined) payload.appraisalDate = record.appraisalDate || null;
-  if (record.postingDate !== undefined) payload.postingDate = record.postingDate || null;
-  if (record.postingEndDate !== undefined) payload.postingEndDate = record.postingEndDate || null;
+  if (record.postingDate !== undefined) {
+    payload.postingDate = record.postingDate || null;
+    if (payload.postingDate && !record.postingEndDate) {
+      payload.postingEndDate = addCalendarDays(payload.postingDate, 30);
+    }
+  }
+  if (record.postingEndDate !== undefined && payload.postingEndDate === undefined) {
+    payload.postingEndDate = record.postingEndDate || null;
+  }
   if (record.taxTransferDate !== undefined) payload.taxTransferDate = record.taxTransferDate || null;
   if (record.taxKv7Date !== undefined) payload.taxKv7Date = record.taxKv7Date || null;
   if (record.taxPaymentDate !== undefined) payload.taxPaymentDate = record.taxPaymentDate || null;

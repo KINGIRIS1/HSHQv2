@@ -128,10 +128,14 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
             tax_transfer: { label: 'Có thuế', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
             fast_track: { label: 'Không thuế', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
             gdbd: { label: 'Thế chấp/GDBD', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+            gdbd_register: { label: 'ĐK Thế chấp', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+            gdbd_release: { label: 'Giải chấp', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
             lost_cert: { label: 'Mất GCN', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+            lost_cert_tax: { label: 'Mất GCN (có thuế)', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
             split_plot: { label: 'Tách/Hợp', cls: 'bg-teal-50 text-teal-800 border-teal-200' },
+            unclassified: { label: 'Chưa phân loại', cls: 'bg-slate-100 text-slate-500 border-slate-300' },
           };
-          const badge = catBadges[cat] || catBadges.tax_transfer;
+          const badge = catBadges[cat] || catBadges.unclassified;
 
           return (
             <div className="flex flex-col gap-0.5">

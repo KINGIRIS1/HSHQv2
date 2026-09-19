@@ -683,7 +683,8 @@ export const useAppData = (currentUser: User | null) => {
 
     const handleDeleteRecord = async (id: string) => {
         try {
-            const success = await deleteRecordApi(id);
+            const rec = records.find(r => r.id === id);
+            const success = await deleteRecordApi(id, rec);
             if (success) {
                 setRecords(prev => prev.filter(r => r.id !== id));
             }
@@ -697,8 +698,8 @@ export const useAppData = (currentUser: User | null) => {
     const handleBatchDeleteRecords = async (ids: string[]) => {
         if (!ids || ids.length === 0) return true;
         try {
-            // Optimistically update memory only if no error occurs, or we can update it after delete success
-            const success = await deleteRecordsBatchApi(ids);
+            const recordsToDelete = ids.map(id => records.find(r => r.id === id)).filter(Boolean) as RecordFile[];
+            const success = await deleteRecordsBatchApi(ids, recordsToDelete);
             if (success) {
                 setRecords(prev => prev.filter(r => !ids.includes(r.id)));
             }

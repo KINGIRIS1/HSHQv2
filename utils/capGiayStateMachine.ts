@@ -1,4 +1,6 @@
 import { RecordStatus, RecordFile } from '../types';
+import { DEFAULT_HOLIDAYS } from '../constants';
+import { getRegistrationWorkflow, addWorkingDays, calculateWorkingDaysBetween } from './registrationWorkflows';
 
 /**
  * STATE MACHINE ĐỘC LẬP CHO MODULE CẤP GIẤY / ĐĂNG KÝ BIẾN ĐỘNG
@@ -114,7 +116,8 @@ export interface CapGiayTransitionValidation {
 export function validateCapGiayTransition(
   currentStatus: RecordStatus | string,
   targetStatus: RecordStatus | string,
-  previousStatus?: RecordStatus | string | null
+  previousStatus?: RecordStatus | string | null,
+  recordType?: string | null
 ): CapGiayTransitionValidation {
   // 1. Chặn các trạng thái bị cấm tuyệt đối
   if ((CAP_GIAY_FORBIDDEN_STATUSES as string[]).includes(String(targetStatus))) {
@@ -149,9 +152,9 @@ export function validateCapGiayTransition(
     return { valid: true, targetStatus };
   }
 
-  // 5. Chuyển sang Chờ bổ sung (PENDING_SUPPLEMENT): Cho phép từ mọi bước trong luồng chính
+  // 5. Chuyển sang Chờ bổ sung (PENDING_SUPPLEMENT): Cho phép từ mọi bước trong luồng xử lý
   if (targetStatus === RecordStatus.PENDING_SUPPLEMENT) {
-    if (CAP_GIAY_MAIN_FLOW.includes(currentStatus as CapGiayStatus)) {
+    if (isCapGiayStatus(currentStatus)) {
       return { valid: true, targetStatus };
     }
     return {
@@ -177,9 +180,17 @@ export function validateCapGiayTransition(
     return { valid: true, targetStatus: previousStatus };
   }
 
-  // 7. Kiểm soát luồng chính tuần tự (Strict sequential)
-  const currentIdx = CAP_GIAY_MAIN_FLOW.indexOf(currentStatus as CapGiayStatus);
-  const targetIdx = CAP_GIAY_MAIN_FLOW.indexOf(targetStatus);
+  // 7. Kiểm soát luồng chính tuần tự theo Workflow của loại hồ sơ (hoặc mặc định CAP_GIAY_MAIN_FLOW)
+  let flowSteps: CapGiayStatus[] = CAP_GIAY_MAIN_FLOW;
+  if (recordType) {
+    const wf = getRegistrationWorkflow(recordType);
+    if (wf && wf.steps && wf.steps.length > 0) {
+      flowSteps = wf.steps.map(s => s.key as CapGiayStatus);
+    }
+  }
+
+  const currentIdx = flowSteps.indexOf(currentStatus as CapGiayStatus);
+  const targetIdx = flowSteps.indexOf(targetStatus);
 
   if (currentIdx !== -1 && targetIdx !== -1) {
     // Bước kế tiếp ngay sau
@@ -195,6 +206,15 @@ export function validateCapGiayTransition(
       valid: false,
       reason: `Không được chuyển nhảy bước từ "${CAP_GIAY_STATUS_LABELS[currentStatus as CapGiayStatus]}" sang "${CAP_GIAY_STATUS_LABELS[targetStatus]}". Phải tuân thủ thứ tự tuần tự của quy trình.`
     };
+  }
+
+  // Nếu không thuộc flow cụ thể nhưng vẫn trong 14 trạng thái
+  if (currentIdx === -1 && CAP_GIAY_MAIN_FLOW.includes(currentStatus as CapGiayStatus)) {
+    const mainCurIdx = CAP_GIAY_MAIN_FLOW.indexOf(currentStatus as CapGiayStatus);
+    const mainTargetIdx = CAP_GIAY_MAIN_FLOW.indexOf(targetStatus);
+    if (mainTargetIdx === mainCurIdx + 1 || mainTargetIdx === mainCurIdx - 1) {
+      return { valid: true, targetStatus };
+    }
   }
 
   return {
@@ -305,19 +325,36 @@ export function handleCapGiaySupplement(
   };
 }
 
-export function resumeFromSupplement(record: RecordFile): { nextStatus: RecordStatus; updates: Partial<RecordFile> } {
+export function resumeFromSupplement(
+  record: RecordFile,
+  holidays: any[] = DEFAULT_HOLIDAYS
+): { nextStatus: RecordStatus; updates: Partial<RecordFile> } {
   const targetStatus = (record.supplementReturnStatus as RecordStatus) || (record.previousStatus as RecordStatus);
   if (!targetStatus || !isCapGiayStatus(targetStatus)) {
     console.error('CRITICAL: Thiếu supplementReturnStatus / previousStatus khi hoàn thành bổ sung:', record);
     throw new Error('Không xác định được trạng thái trước khi bổ sung (supplementReturnStatus) để phục hồi hồ sơ.');
   }
   const now = new Date().toISOString();
+  
+  // Tính số ngày làm việc tạm dừng để bù vào deadline
+  const pauseStart = record.supplementStartedAt || record.supplementRequestedAt;
+  let updatedDeadline = record.deadline;
+  let extendedDays = 0;
+  
+  if (pauseStart) {
+    extendedDays = calculateWorkingDaysBetween(pauseStart, now, holidays);
+    if (extendedDays > 0 && record.deadline) {
+      updatedDeadline = addWorkingDays(record.deadline, extendedDays, holidays);
+    }
+  }
+
   return {
     nextStatus: targetStatus,
     updates: {
       status: targetStatus,
       supplementCompletedAt: now,
       supplementReturnedDate: now,
+      deadline: updatedDeadline,
       previousStatus: undefined,
       supplementReturnStatus: undefined,
     },
