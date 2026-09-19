@@ -44,7 +44,17 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
 
   // Helper lấy ngày xuất hiệu lực và chuẩn hóa ngày dạng YYYY-MM-DD
   const getRecordEffectiveExportDate = (r: RecordFile): string => {
-      const raw = r.exportDate || (r as any).data?.ngay_hoan_thanh || r.completedDate || r.resultReturnedDate || r.approvalDate || r.receivedDate || new Date().toISOString();
+      let raw = r.exportDate;
+      if (!raw && r.exportBatch) {
+          const dmyMatch = String(r.exportBatch).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          if (dmyMatch) {
+              const day = String(dmyMatch[1]).padStart(2, '0');
+              const month = String(dmyMatch[2]).padStart(2, '0');
+              const year = dmyMatch[3];
+              return `${year}-${month}-${day}`;
+          }
+      }
+      raw = raw || (r as any).data?.ngay_hoan_thanh || r.completedDate || r.resultReturnedDate || r.approvalDate || r.receivedDate || new Date().toISOString();
       const parsed = parseSafeDate(raw);
       return parsed ? formatDateKey(parsed) : String(raw).split('T')[0];
   };
@@ -101,10 +111,36 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
       }
     });
 
-    // Sắp xếp giảm dần theo ngày
+    const getBatchNum = (batchVal: string | number) => {
+        const pure = getPureBatchNumber(batchVal);
+        if (pure) {
+            const parsed = parseInt(pure, 10);
+            if (!isNaN(parsed)) return parsed;
+        }
+        const match = String(batchVal).match(/Đợt\s*0*(\d+)/i) || String(batchVal).match(/^(\d+)$/);
+        return match && match[1] ? parseInt(match[1], 10) : 0;
+    };
+
+    // Sắp xếp ưu tiên: Ngày lớn nhất (mới nhất) lên đầu, cùng ngày thì đợt lớn nhất lên đầu
     return Object.entries(batches)
-        .map(([key, value]) => ({ key, ...value }))
-        .sort((a, b) => b.date.localeCompare(a.date));
+        .map(([key, value]) => ({ 
+            key, 
+            ...value,
+            batchNum: getBatchNum(value.batch)
+        }))
+        .sort((a, b) => {
+            // 1. So sánh ngày giảm dần (ngày mới nhất / lớn nhất lên đầu)
+            const dateCompare = b.date.localeCompare(a.date);
+            if (dateCompare !== 0) {
+                return dateCompare;
+            }
+            // 2. Cùng ngày: So sánh số đợt giảm dần (đợt lớn nhất lên đầu)
+            if (a.batchNum !== b.batchNum) {
+                return b.batchNum - a.batchNum;
+            }
+            // 3. Fallback: So sánh chuỗi tự nhiên giảm dần
+            return String(b.batch).localeCompare(String(a.batch), undefined, { numeric: true });
+        });
   }, [categoryRecords, type]);
 
   // Synchronize selected batch key stably to prevent resetting selection

@@ -61,7 +61,17 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
             batches.add(bName);
         });
-        setAvailableBatches(Array.from(batches).sort());
+        const sorted = Array.from(batches).sort((a, b) => {
+            const getBatchNum = (str: string) => {
+                const match = String(str).match(/Đợt\s*0*(\d+)/i) || String(str).match(/^(\d+)$/);
+                return match && match[1] ? parseInt(match[1], 10) : 0;
+            };
+            const numA = getBatchNum(a);
+            const numB = getBatchNum(b);
+            if (numA !== numB) return numB - numA;
+            return b.localeCompare(a, undefined, { numeric: true });
+        });
+        setAvailableBatches(sorted);
         setSelectedBatch('all'); // Reset batch selection
     }, [selectedDate, selectedWard, records]);
 
