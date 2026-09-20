@@ -42,6 +42,40 @@ CREATE TABLE IF NOT EXISTS dangky_records (
     "submittedTo" TEXT,
     "approvalDate" DATE,
     "completedDate" DATE,
+
+    -- Tiến độ Thẩm định, Niêm yết, Thuế & In GCN (Module Cấp giấy)
+    "appraisalDate" DATE,
+    "postingDate" DATE,
+    "postingEndDate" DATE,
+    "taxTransferDate" DATE,
+    "taxKv7Date" DATE,
+    "taxPaymentDate" DATE,
+    "printCertDate" DATE,
+    "pendingHandoverDate" DATE,
+
+    -- Phân công & Kích hoạt In GCN, Giấy nộp tiền
+    "printStaffId" TEXT,
+    "print_staff_id" TEXT,
+    "printStaffAssignedAt" TIMESTAMPTZ,
+    "print_staff_assigned_at" TIMESTAMPTZ,
+    "printAssignmentStatus" TEXT,
+    "print_assignment_status" TEXT,
+    "printDeadlineStartAt" TIMESTAMPTZ,
+    "print_deadline_start_at" TIMESTAMPTZ,
+    "paymentReceivedAt" TIMESTAMPTZ,
+    "payment_received_at" TIMESTAMPTZ,
+    "paymentReceiptDate" DATE,
+    "payment_receipt_date" DATE,
+
+    -- Bổ sung hồ sơ & Phục hồi
+    "previousStatus" TEXT,
+    "supplementReturnStatus" TEXT,
+    "supplementReason" TEXT,
+    "supplementRequestedBy" TEXT,
+    "supplementRequestedAt" TIMESTAMPTZ,
+    "supplementStartedAt" TIMESTAMPTZ,
+    "supplementCompletedBy" TEXT,
+    "supplementCompletedAt" TIMESTAMPTZ,
     
     -- Tài chính & Biên lai
     price NUMERIC,

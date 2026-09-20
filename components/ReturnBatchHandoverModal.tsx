@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
-import { X, Calendar, Plus, History, CheckCircle2, Building, Send, FileSpreadsheet } from 'lucide-react';
+import { X, Calendar, Plus, History, CheckCircle2, Building, Send, FileSpreadsheet, Loader2 } from 'lucide-react';
 
 interface ReturnBatchHandoverModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (batch: number, date: string, deptName: string) => void;
+  onConfirm: (batch: number, date: string, deptName: string) => Promise<void> | void;
   records: RecordFile[];
   selectedCount: number;
   targetRecords?: RecordFile[];
@@ -25,12 +25,16 @@ export const ReturnBatchHandoverModal: React.FC<ReturnBatchHandoverModalProps> =
   const [batchDate, setBatchDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [deptName, setDeptName] = useState<string>('Tổ Đo đạc & Kỹ thuật');
   const [customDept, setCustomDept] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
   // Auto-calculate next batch number for returned records today
   useEffect(() => {
     if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
       let maxBatch = 0;
       records.forEach((r) => {
         if (r.returnBatch && r.returnBatchDate && r.returnBatchDate.startsWith(todayStr)) {
@@ -44,10 +48,21 @@ export const ReturnBatchHandoverModal: React.FC<ReturnBatchHandoverModalProps> =
 
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (isSubmittingRef.current || isSubmitting) return;
     const finalDept = deptName === 'Khác' ? customDept.trim() || 'Phòng Chuyên môn' : deptName;
-    onConfirm(batchNumber, batchDate, finalDept);
-    onClose();
+    
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await onConfirm(batchNumber, batchDate, finalDept);
+      onClose();
+    } catch (err) {
+      console.error("Lỗi chốt danh sách:", err);
+    } finally {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
   };
 
   return (
@@ -172,18 +187,30 @@ export const ReturnBatchHandoverModal: React.FC<ReturnBatchHandoverModalProps> =
         {/* Footer Actions */}
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors"
+            disabled={isSubmitting}
+            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             Hủy bỏ
           </button>
           <button
+            type="button"
             onClick={handleConfirm}
-            disabled={targetRecords.length === 0}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs shadow-sm transition-all flex items-center gap-2"
+            disabled={targetRecords.length === 0 || isSubmitting}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer"
           >
-            <CheckCircle2 size={16} />
-            Chốt Bàn Giao ({targetRecords.length} hồ sơ)
+            {isSubmitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Đang chốt</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={16} />
+                <span>Đồng ý</span>
+              </>
+            )}
           </button>
         </div>
       </div>

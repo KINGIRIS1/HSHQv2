@@ -1,15 +1,40 @@
-import React from 'react';
-import { X, FileSignature } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, FileSignature, Loader2 } from 'lucide-react';
 
 interface BulkSignConfirmModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: () => void;
+    onConfirm: (() => Promise<void>) | (() => void);
     count: number;
 }
 
 const BulkSignConfirmModal: React.FC<BulkSignConfirmModalProps> = ({ isOpen, onClose, onConfirm, count }) => {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = useRef(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+        }
+    }, [isOpen]);
+
     if (!isOpen) return null;
+
+    const handleConfirm = async () => {
+        if (isSubmittingRef.current || isSubmitting) return;
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+        try {
+            await onConfirm();
+            onClose();
+        } catch (err) {
+            console.error("Lỗi ký duyệt đợt:", err);
+        } finally {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+        }
+    };
 
     return (
         <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-[9999] p-4 backdrop-blur-xs animate-fade-in">
@@ -22,7 +47,8 @@ const BulkSignConfirmModal: React.FC<BulkSignConfirmModalProps> = ({ isOpen, onC
                     </h2>
                     <button 
                         onClick={onClose} 
-                        className="text-purple-100 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-all cursor-pointer"
+                        disabled={isSubmitting}
+                        className="text-purple-100 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
                         aria-label="Đóng"
                     >
                         <X size={20} />
@@ -41,16 +67,25 @@ const BulkSignConfirmModal: React.FC<BulkSignConfirmModalProps> = ({ isOpen, onC
                     <button 
                         type="button"
                         onClick={onClose}
-                        className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 active:scale-[0.98] transition-all text-slate-700 font-bold text-sm rounded-xl cursor-pointer shadow-xs"
+                        disabled={isSubmitting}
+                        className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 active:scale-[0.98] transition-all text-slate-700 font-bold text-sm rounded-xl cursor-pointer shadow-xs disabled:opacity-50"
                     >
                         Hủy
                     </button>
                     <button 
                         type="button"
-                        onClick={onConfirm}
-                        className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-xl shadow-md shadow-purple-500/10 hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer"
+                        onClick={handleConfirm}
+                        disabled={isSubmitting}
+                        className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-xl shadow-md shadow-purple-500/10 hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
                     >
-                        Xác nhận
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                <span>Đang duyệt</span>
+                            </>
+                        ) : (
+                            <span>Đồng ý</span>
+                        )}
                     </button>
                 </div>
             </div>

@@ -58,28 +58,28 @@ const GlobalConfirmModal = () => {
     let Icon = HelpCircle;
     let iconTheme = 'bg-blue-50 text-blue-600 ring-blue-50/80';
     let btnTheme = 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20';
-    let confirmText = 'Xác nhận';
+    let confirmText = 'Đồng ý';
 
     if (isDelete) {
         Icon = Trash2;
         iconTheme = 'bg-red-50 text-red-600 ring-red-50/80';
         btnTheme = 'bg-red-600 hover:bg-red-700 shadow-red-500/20';
-        confirmText = 'Đồng ý xóa';
+        confirmText = 'Đồng ý';
     } else if (isSign) {
         Icon = PenTool;
         iconTheme = 'bg-emerald-50 text-emerald-600 ring-emerald-50/80';
         btnTheme = 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20';
-        confirmText = 'Đồng ý ký duyệt';
+        confirmText = 'Đồng ý';
     } else if (isHandover) {
         Icon = Send;
         iconTheme = 'bg-teal-50 text-teal-600 ring-teal-50/80';
         btnTheme = 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20';
-        confirmText = 'Đồng ý bàn giao';
+        confirmText = 'Đồng ý';
     } else if (isBulk) {
         Icon = Layers;
         iconTheme = 'bg-orange-50 text-orange-600 ring-orange-50/80';
         btnTheme = 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/20';
-        confirmText = 'Đồng ý thực hiện';
+        confirmText = 'Đồng ý';
     }
 
     return (

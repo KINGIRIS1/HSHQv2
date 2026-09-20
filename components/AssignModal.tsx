@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Employee, RecordFile, User as AppUser } from '../types';
-import { X, Check, MapPin, User, Users, Search, Briefcase, Compass, FileText, Archive, Building2, Shield, Layers } from 'lucide-react';
+import { X, Check, MapPin, User, Users, Search, Briefcase, Compass, FileText, Archive, Building2, Shield, Layers, Loader2 } from 'lucide-react';
 import { removeVietnameseTones, groupEmployeesByDepartment, getDepartmentBadgeStyle } from '../utils/appHelpers';
 
 interface DeptConfig {
@@ -177,6 +177,15 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   const [selectedDept, setSelectedDept] = useState<string>('');
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  }, [isOpen]);
 
   // Tự động xác định địa bàn mục tiêu từ các hồ sơ được chọn
   const targetWardName = useMemo(() => {
@@ -321,10 +330,20 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   };
 
   // Xác nhận giao việc và lưu thông tin người được giao vào localStorage
-  const handleConfirmAssign = () => {
-      if (selectedEmpId && selectedDept) {
+  const handleConfirmAssign = async () => {
+      if (isSubmittingRef.current || isSubmitting) return;
+      if (!selectedEmpId || !selectedDept) return;
+
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
+      try {
           localStorage.setItem(`last_assigned_${selectedDept}`, selectedEmpId);
-          onConfirm(selectedEmpId);
+          await onConfirm(selectedEmpId);
+      } catch (err) {
+          console.error("Lỗi phân công:", err);
+      } finally {
+          setIsSubmitting(false);
+          isSubmittingRef.current = false;
       }
   };
 
@@ -533,17 +552,30 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
             </div>
             <div className="flex gap-3">
                 <button 
+                    type="button"
                     onClick={onClose} 
-                    className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200"
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200 disabled:opacity-50"
                 >
                     Hủy bỏ
                 </button>
                 <button 
+                    type="button"
                     onClick={handleConfirmAssign}
-                    disabled={!selectedEmpId}
-                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-black tracking-wider shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center gap-2"
+                    disabled={!selectedEmpId || isSubmitting}
+                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-black tracking-wider shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
                 >
-                    <Check size={18} className="stroke-[2.5]" /> Xác nhận
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 size={18} className="animate-spin" />
+                            <span>Đang giao</span>
+                        </>
+                    ) : (
+                        <>
+                            <Check size={18} className="stroke-[2.5]" />
+                            <span>Đồng ý</span>
+                        </>
+                    )}
                 </button>
             </div>
         </div>

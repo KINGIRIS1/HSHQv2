@@ -257,12 +257,6 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
           {/* TAB 1: TIẾN ĐỘ & TRẠNG THÁI */}
           {activeTab === 'status' && (
             <div className="space-y-5">
-              {/* Quy trình & Thanh tiến độ điều khiển */}
-              <RegistrationWorkflowStepper
-                record={formData}
-                onChangeStatus={handleStatusChange}
-              />
-
               {/* Thông tin Cán bộ và Hạn giải quyết */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">

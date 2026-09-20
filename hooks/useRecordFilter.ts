@@ -59,6 +59,8 @@ export const useRecordFilter = (
     
     // Cập nhật type cho handoverTab để hỗ trợ 'returned'
     const [handoverTab, setHandoverTab] = useState<'today' | 'history' | 'returned'>('today');
+    // Tab Thuế gồm 3 nhóm: Chờ chuyển thuế (transfer), Chờ thuế KV7 (area7), Chờ giấy nộp tiền (notice)
+    const [taxSubTab, setTaxSubTab] = useState<'transfer' | 'area7' | 'notice'>('transfer');
  
     // Sorting & Pagination
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
@@ -73,7 +75,7 @@ export const useRecordFilter = (
         if (currentPage !== 1) {
             setCurrentPage(1);
         }
-    }, [currentView, sortConfig, warningFilter, filterWard, filterRecordType, filterStatus, filterEmployee, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, filterAssignedFromDate, filterAssignedToDate, handoverTab, searchTerm]);
+    }, [currentView, sortConfig, warningFilter, filterWard, filterRecordType, filterStatus, filterEmployee, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, filterAssignedFromDate, filterAssignedToDate, handoverTab, taxSubTab, searchTerm]);
 
     // --- WARNING CHECK LOGIC ---
     const checkWarningPermission = (r: RecordFile) => {
@@ -152,11 +154,19 @@ export const useRecordFilter = (
         } else if (currentView === 'test_measurement_field') {
             result = result.filter(r => r.status === RecordStatus.APPRAISAL);
         } else if (currentView === 'test_measurement_office') {
-            result = result.filter(r => 
-                r.status === RecordStatus.TAX_TRANSFER || 
-                r.status === RecordStatus.PENDING_TAX_KV7 || 
-                r.status === RecordStatus.PENDING_TAX_PAYMENT
-            );
+            if (taxSubTab === 'transfer') {
+                result = result.filter(r => r.status === RecordStatus.TAX_TRANSFER);
+            } else if (taxSubTab === 'area7') {
+                result = result.filter(r => r.status === RecordStatus.PENDING_TAX_KV7);
+            } else if (taxSubTab === 'notice') {
+                result = result.filter(r => r.status === RecordStatus.PENDING_TAX_PAYMENT);
+            } else {
+                result = result.filter(r => 
+                    r.status === RecordStatus.TAX_TRANSFER || 
+                    r.status === RecordStatus.PENDING_TAX_KV7 || 
+                    r.status === RecordStatus.PENDING_TAX_PAYMENT
+                );
+            }
         } else if (currentView === 'measurement_field') {
             result = result.filter(r => {
                 // Thủ tục 2.1, 2.3 (Nội nghiệp trực tiếp / Trích lục / Duyệt đơn) KHÔNG thuộc Đo đạc thực địa
@@ -251,6 +261,11 @@ export const useRecordFilter = (
             }
         } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks' || currentView === 'test_assign_tasks') {
             result = result.filter(r => {
+                if (currentView === 'test_assign_tasks') {
+                    if (r.status === RecordStatus.PENDING_TAX_PAYMENT && r.paymentReceivedAt && r.printAssignmentStatus === 'WAITING_ASSIGNMENT') {
+                        return true;
+                    }
+                }
                 // Đã bàn giao 1 cửa, đã trả kết quả, đã rút, đã trả thì không ở Chưa giao
                 if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER) return false;
                 // Đã chuyển bước ký / kiểm tra / xuất đợt
@@ -264,11 +279,8 @@ export const useRecordFilter = (
             result = result.filter(r => r.status === RecordStatus.PENDING_SUPPLEMENT);
         } else if (currentView === 'test_print_cert') {
             result = result.filter(r => {
-                if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
-                if (r.submissionDate || r.submittedTo) return false;
-                if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
-                return true;
+                if (r.status === RecordStatus.PENDING_PRINT_CERT || (r.status as string) === 'PENDING_PRINT_CERT') return true;
+                return false;
             });
         }
 
@@ -389,7 +401,7 @@ export const useRecordFilter = (
         });
 
         return result;
-    }, [records, searchTerm, filterWard, filterRecordType, filterStatus, filterEmployee, filterDate, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
+    }, [records, searchTerm, filterWard, filterRecordType, filterStatus, filterEmployee, filterDate, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, taxSubTab, currentUser, employees]);
 
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
@@ -444,11 +456,19 @@ export const useRecordFilter = (
                 } else if (currentView === 'test_measurement_field') {
                     candidates = candidates.filter(r => r.status === RecordStatus.APPRAISAL);
                 } else if (currentView === 'test_measurement_office') {
-                    candidates = candidates.filter(r => 
-                        r.status === RecordStatus.TAX_TRANSFER || 
-                        r.status === RecordStatus.PENDING_TAX_KV7 || 
-                        r.status === RecordStatus.PENDING_TAX_PAYMENT
-                    );
+                    if (taxSubTab === 'transfer') {
+                        candidates = candidates.filter(r => r.status === RecordStatus.TAX_TRANSFER);
+                    } else if (taxSubTab === 'area7') {
+                        candidates = candidates.filter(r => r.status === RecordStatus.PENDING_TAX_KV7);
+                    } else if (taxSubTab === 'notice') {
+                        candidates = candidates.filter(r => r.status === RecordStatus.PENDING_TAX_PAYMENT);
+                    } else {
+                        candidates = candidates.filter(r => 
+                            r.status === RecordStatus.TAX_TRANSFER || 
+                            r.status === RecordStatus.PENDING_TAX_KV7 || 
+                            r.status === RecordStatus.PENDING_TAX_PAYMENT
+                        );
+                    }
                 } else if (currentView === 'measurement_field') {
                     candidates = candidates.filter(r => {
                         if (isOfficeOnlySurveyProcedure(r.recordType)) return false;
@@ -477,11 +497,7 @@ export const useRecordFilter = (
                     });
                 } else if (currentView === 'test_print_cert') {
                     candidates = candidates.filter(r => {
-                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
-                        if (r.submissionDate || r.submittedTo) return false;
-                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
-                        return true;
+                        return r.status === RecordStatus.PENDING_PRINT_CERT || (r.status as string) === 'PENDING_PRINT_CERT';
                     });
                 } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'test_completed_list') {
                     candidates = candidates.filter(r => {
@@ -515,7 +531,7 @@ export const useRecordFilter = (
             });
         }
         return { overdue, approaching };
-    }, [records, currentUser, employees, currentView, isDirector]);
+    }, [records, currentUser, employees, currentView, isDirector, taxSubTab]);
 
     return {
         filteredRecords, paginatedRecords, totalPages, warningCount,
@@ -534,6 +550,7 @@ export const useRecordFilter = (
         filterEmployee, setFilterEmployee,
         warningFilter, setWarningFilter,
         handoverTab, setHandoverTab,
+        taxSubTab, setTaxSubTab,
         sortConfig, setSortConfig,
         currentPage, setCurrentPage,
         itemsPerPage, setItemsPerPage

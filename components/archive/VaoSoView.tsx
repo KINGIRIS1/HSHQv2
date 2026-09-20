@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, allocateNextVaoSoNumbers } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, SlidersHorizontal, ChevronDown, ChevronUp, Clock, AlertTriangle, Eye, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, ChevronDown, ChevronUp, Clock, AlertTriangle, Eye, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, matchDepartmentKey, parseSafeDate } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
@@ -38,13 +38,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned'>('all');
-    const [mainTab, setMainTab] = useState<'all' | 'chua_giao' | 'tham_dinh' | 'thue' | 'in_gcn' | 'kiem_tra' | 'trinh_ky' | 'vao_so' | 'giao_1_cua'>('all');
-    const [thueSubTab, setThueSubTab] = useState<'phieu_chuyen' | 'khu_vuc_7' | 'thong_bao'>('phieu_chuyen');
-    const [giao1CuaSubTab, setGiao1CuaSubTab] = useState<'cho_ban_giao' | 'cho_tra_kq' | 'da_tra_kq'>('cho_ban_giao');
+    const [activeTab, setActiveTab] = useState<'all' | 'unallocated' | 'pending' | 'scanned'>('all');
     const [showFilterPopover, setShowFilterPopover] = useState(false);
     const filterPopoverRef = useRef<HTMLDivElement>(null);
-    const [showColumnSelector, setShowColumnSelector] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -142,7 +138,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     useEffect(() => {
         setSelectedIds(new Set());
         setCurrentPage(1);
-    }, [activeTab, mainTab, thueSubTab, giao1CuaSubTab, warningFilter, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus, itemsPerPage]);
+    }, [activeTab, warningFilter, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus, itemsPerPage]);
 
     // Helper kiểm tra hồ sơ quá hạn trong Cấp giấy
     const isArchiveOverdue = (r: ArchiveRecord): boolean => {
@@ -259,114 +255,29 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const filteredRecords = useMemo(() => {
         let filtered = records;
 
-        // 1. Phân loại độc lập tuyệt đối theo Quy trình (mainTab & subTab)
-        if (mainTab === 'chua_giao') {
-            filtered = filtered.filter(r => 
-                (!r.data?.assigned_employee && !r.data?.can_bo_thu_ly && !r.data?.assigned_to) || 
-                r.data?.stage === 'chua_giao' ||
-                r.data?.status === 'Chưa giao' ||
-                r.status === 'draft'
-            );
-        } else if (mainTab === 'tham_dinh') {
-            filtered = filtered.filter(r => 
-                r.data?.stage === 'tham_dinh' || 
-                (r.data?.loai_ho_so || '').toLowerCase().includes('thẩm định') || 
-                (r.trich_yeu || '').toLowerCase().includes('thẩm định') ||
-                (r.data?.status || '').toLowerCase().includes('thẩm định') ||
-                r.status === 'executed'
-            );
-        } else if (mainTab === 'thue') {
-            if (thueSubTab === 'phieu_chuyen') {
-                filtered = filtered.filter(r => 
-                    r.data?.tax_stage === 'phieu_chuyen' || 
-                    (r.data?.stage === 'thue' && (!r.data?.tax_stage || r.data?.tax_stage === 'phieu_chuyen')) ||
-                    (r.data?.status || '').toLowerCase().includes('phiếu chuyển')
-                );
-            } else if (thueSubTab === 'khu_vuc_7') {
-                filtered = filtered.filter(r => 
-                    r.data?.tax_stage === 'khu_vuc_7' || 
-                    r.data?.area_zone === '7' || 
-                    (r.data?.status || '').toLowerCase().includes('khu vực 7')
-                );
-            } else if (thueSubTab === 'thong_bao') {
-                filtered = filtered.filter(r => 
-                    r.data?.tax_stage === 'thong_bao' || 
-                    (r.data?.status || '').toLowerCase().includes('thông báo thuế')
-                );
-            } else {
-                filtered = filtered.filter(r => 
-                    r.data?.stage === 'thue' || 
-                    (r.data?.status || '').toLowerCase().includes('thuế')
-                );
-            }
-        } else if (mainTab === 'in_gcn') {
-            filtered = filtered.filter(r => 
-                r.data?.stage === 'in_gcn' || 
-                (r.data?.loai_ho_so || '').toLowerCase().includes('in gcn') || 
-                (r.trich_yeu || '').toLowerCase().includes('in gcn') ||
-                (r.data?.status || '').toLowerCase().includes('in')
-            );
-        } else if (mainTab === 'kiem_tra') {
-            filtered = filtered.filter(r => 
-                r.data?.stage === 'kiem_tra' || 
-                r.status === 'pending_check' || 
-                (r.data?.status || '').toLowerCase().includes('kiểm tra')
-            );
-        } else if (mainTab === 'trinh_ky') {
-            filtered = filtered.filter(r => 
-                r.data?.stage === 'trinh_ky' || 
-                r.status === 'pending_sign' || 
-                (r.data?.status || '').toLowerCase().includes('trình ký') || 
-                (r.data?.status || '').toLowerCase().includes('ký duyệt')
-            );
-        } else if (mainTab === 'vao_so') {
-            if (activeTab === 'all') {
-                filtered = filtered.filter(r => 
-                    r.data?.stage === 'vao_so' || 
-                    r.status === 'signed' || 
-                    r.data?.so_vao_so || 
-                    (r.data?.status || '').toLowerCase().includes('vào sổ') || 
-                    (r.data?.status || '').toLowerCase().includes('vào so') || 
-                    r.type === 'vaoso'
-                );
-            } else if (activeTab === 'pending') {
-                filtered = filtered.filter(r => 
-                    (r.data?.stage === 'vao_so' || r.data?.so_vao_so || r.type === 'vaoso') && 
-                    r.data?.is_pending_scan && !r.data?.is_scanned
-                );
-            } else if (activeTab === 'scanned') {
-                filtered = filtered.filter(r => 
-                    (r.data?.stage === 'vao_so' || r.data?.so_vao_so || r.type === 'vaoso') && 
-                    r.data?.is_scanned
-                );
-            }
-        } else if (mainTab === 'giao_1_cua') {
-            if (giao1CuaSubTab === 'cho_ban_giao') {
-                filtered = filtered.filter(r => 
-                    r.data?.one_door_stage === 'cho_ban_giao' || 
-                    (r.data?.stage === 'giao_1_cua' && (!r.data?.one_door_stage || r.data?.one_door_stage === 'cho_ban_giao')) ||
-                    (r.data?.status || '').toLowerCase().includes('chờ bàn giao')
-                );
-            } else if (giao1CuaSubTab === 'cho_tra_kq') {
-                filtered = filtered.filter(r => 
-                    r.data?.one_door_stage === 'cho_tra_kq' || 
-                    (r.data?.status || '').toLowerCase().includes('chờ trả')
-                );
-            } else if (giao1CuaSubTab === 'da_tra_kq') {
-                filtered = filtered.filter(r => 
-                    r.data?.one_door_stage === 'da_tra_kq' || 
-                    r.status === 'completed' || 
-                    (r.data?.status || '').toLowerCase().includes('đã trả')
-                );
-            } else {
-                filtered = filtered.filter(r => 
-                    r.data?.stage === 'giao_1_cua' || 
-                    (r.data?.status || '').toLowerCase().includes('1 cửa') || 
-                    (r.data?.status || '').toLowerCase().includes('một cửa')
-                );
-            }
+        // 1. Phân loại theo Trạng thái Scan (activeTab)
+        const isVaoSoBase = (r: ArchiveRecord) => (
+            r.type === 'vaoso' || 
+            r.data?.stage === 'vao_so' || 
+            r.status === 'signed' || 
+            !!r.data?.so_vao_so || 
+            (r.data?.status || '').toLowerCase().includes('vào sổ') || 
+            (r.data?.status || '').toLowerCase().includes('vào so')
+        );
+
+        if (activeTab === 'all') {
+            // Tất cả hồ sơ: hiển thị trọn vẹn toàn bộ hồ sơ thuộc cả 3 tab (Chờ Vô Số + Chờ Scan + Đã Scan)
+            filtered = filtered.filter(isVaoSoBase);
+        } else if (activeTab === 'unallocated') {
+            // Chờ Vô Số: Hồ sơ tiếp nhận/ký duyệt chuyển vào đây, cán bộ lấy số và cập nhật các trường
+            filtered = filtered.filter(r => isVaoSoBase(r) && !r.data?.is_scanned && !r.data?.is_pending_scan);
+        } else if (activeTab === 'pending') {
+            // Chờ Scan: Cán bộ vô số đã chuyển sang chờ scan, đang chờ quét tài liệu
+            filtered = filtered.filter(r => isVaoSoBase(r) && !r.data?.is_scanned && !!r.data?.is_pending_scan);
+        } else if (activeTab === 'scanned') {
+            // Đã Scan: Sau khi scan hoàn tất chuyển qua đã scan và được lưu cố định tại đây
+            filtered = filtered.filter(r => isVaoSoBase(r) && !!r.data?.is_scanned);
         }
-        // mainTab === 'all' giữ nguyên toàn bộ hồ sơ trong module Cấp giấy
 
         // 2. Bộ lọc cảnh báo Quá hạn / Tới hạn
         if (warningFilter === 'overdue') {
@@ -408,7 +319,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         }
 
         return filtered;
-    }, [records, searchTerm, activeTab, mainTab, thueSubTab, giao1CuaSubTab, warningFilter, fromDate, toDate, filterWard, filterEmployee, filterRecordType]);
+    }, [records, searchTerm, activeTab, warningFilter, fromDate, toDate, filterWard, filterEmployee, filterRecordType]);
 
     // Pagination (chuẩn module Đo đạc)
     const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
@@ -463,7 +374,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const handleCellChange = (id: string, key: string, value: string) => {
         setRecords(prev => prev.map(r => {
             if (r.id === id) {
-                return { ...r, data: { ...r.data, [key]: value } };
+                const updatedData = { ...r.data, [key]: value };
+                return { ...r, data: updatedData };
             }
             return r;
         }));
@@ -471,8 +383,18 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     const handleBlur = async (record: ArchiveRecord) => {
         setSavingId(record.id);
-        await saveArchiveRecord(record);
-        setSavingId(null);
+        const latest = records.find(x => x.id === record.id) || record;
+        try {
+            const res = await saveArchiveRecord(latest);
+            const savedRec = res?.record;
+            if (savedRec) {
+                setRecords(prev => prev.map(x => x.id === record.id ? { ...x, ...savedRec, data: { ...x.data, ...(savedRec.data || {}) } } : x));
+            }
+        } catch (err) {
+            console.error("Lỗi khi lưu hồ sơ tự động:", err);
+        } finally {
+            setSavingId(null);
+        }
     };
 
     const toggleEdit = (id: string) => {
@@ -495,25 +417,35 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     const handleGetBookNumber = async (record: ArchiveRecord) => {
-        // Fetch latest to avoid conflicts if possible
-        const latestStored = await getSystemSetting('vaoso_current_book_number');
-        const baseNum = latestStored || currentBookNumber;
-        const nextNumStr = incrementString(baseNum);
-        const formattedNum = `CN ${nextNumStr}`;
-        
-        const updatedRecord = {
-            ...record,
-            data: { ...record.data, so_vao_so: formattedNum }
-        };
-        
-        // Optimistic update
-        setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
-        setCurrentBookNumber(nextNumStr);
-        await saveSystemSetting('vaoso_current_book_number', nextNumStr);
+        try {
+            // Sử dụng hàm cấp số nguyên tử chống trùng từ DB
+            const nextNums = await allocateNextVaoSoNumbers("CN", 1);
+            const formattedNum = nextNums[0]; // Trả về dạng "CN 00123"
 
-        setSavingId(record.id);
-        await saveArchiveRecord(updatedRecord);
-        setSavingId(null);
+            // Trích xuất số thô để đồng bộ UI phụ nếu cần
+            const nextNumStr = formattedNum.replace(/\D/g, '');
+            
+            const updatedRecord = {
+                ...record,
+                data: { ...record.data, so_vao_so: formattedNum }
+            };
+            
+            // Optimistic update
+            setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+            setCurrentBookNumber(nextNumStr);
+            await saveSystemSetting('vaoso_current_book_number', nextNumStr);
+
+            setSavingId(record.id);
+            const res = await saveArchiveRecord(updatedRecord);
+            const savedRec = res?.record;
+            if (savedRec) {
+                setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...savedRec, data: { ...r.data, ...(savedRec.data || {}) } } : r));
+            }
+            setSavingId(null);
+        } catch (err) {
+            console.error("Lỗi khi cấp số tự động:", err);
+            alert("Không thể tự động cấp số. Vui lòng thử lại hoặc nhập thủ công.");
+        }
     };
 
     const handleImportClick = () => {
@@ -1054,106 +986,59 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     return (
         <div className="flex flex-col h-full bg-white">
-            {/* HÀNG 1: TABS QUY TRÌNH CHÍNH (NẰM Ở TRÊN CÙNG) */}
-            <div className="flex border-b border-gray-200 bg-slate-50 px-4 pt-2 overflow-x-auto gap-1">
-                <button
-                    onClick={() => setMainTab('all')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'all'
-                            ? 'border-blue-600 text-blue-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <FileText size={16} /> Tất cả hồ sơ
-                </button>
+            {/* Input file ẩn phục vụ việc Nhập Excel */}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                accept=".xlsx, .xls"
+                style={{ display: 'none' }} 
+            />
 
-                <button
-                    onClick={() => setMainTab('chua_giao')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'chua_giao'
-                            ? 'border-blue-600 text-blue-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <UserPlus size={16} /> Chưa giao
-                </button>
-
-                <button
-                    onClick={() => setMainTab('tham_dinh')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'tham_dinh'
-                            ? 'border-blue-600 text-blue-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <CheckSquare size={16} /> Thẩm định
-                </button>
-
-                <button
-                    onClick={() => setMainTab('thue')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'thue'
-                            ? 'border-amber-600 text-amber-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <Landmark size={16} /> Thuế
-                </button>
-
-                <button
-                    onClick={() => setMainTab('in_gcn')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'in_gcn'
-                            ? 'border-teal-600 text-teal-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <Printer size={16} /> In GCN
-                </button>
-
-                <button
-                    onClick={() => setMainTab('kiem_tra')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'kiem_tra'
-                            ? 'border-purple-600 text-purple-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <ClipboardList size={16} /> Kiểm tra
-                </button>
-
-                <button
-                    onClick={() => setMainTab('trinh_ky')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'trinh_ky'
-                            ? 'border-indigo-600 text-indigo-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <PenTool size={16} /> Trình ký
-                </button>
-
-                <button
-                    onClick={() => setMainTab('vao_so')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'vao_so'
-                            ? 'border-teal-600 text-teal-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <BookOpen size={16} /> Vào số GCN
-                </button>
-
-                <button
-                    onClick={() => setMainTab('giao_1_cua')}
-                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                        mainTab === 'giao_1_cua'
-                            ? 'border-emerald-600 text-emerald-700 bg-white shadow-2xs rounded-t-lg'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
-                    }`}
-                >
-                    <Send size={16} /> Giao 1 cửa
-                </button>
+            {/* HÀNG 1: PHÂN NHÓM TRẠNG THÁI TÁC NGHIỆP (Đưa các tab ra sát lề trái, bỏ icon & tiêu đề) */}
+            <div className="flex items-center border-b border-gray-200 bg-slate-50/80 px-4 overflow-x-auto shrink-0 h-[46px]">
+                <div className="flex h-full items-center gap-1">
+                    <button
+                        onClick={() => setActiveTab('all')}
+                        className={`flex items-center gap-1.5 h-full px-5 py-2 text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                            activeTab === 'all'
+                                ? 'border-teal-600 text-teal-700 bg-teal-50/50 shadow-2xs'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
+                        }`}
+                    >
+                        Tất cả hồ sơ
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('unallocated')}
+                        className={`flex items-center gap-1.5 h-full px-5 py-2 text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                            activeTab === 'unallocated'
+                                ? 'border-amber-500 text-amber-700 bg-amber-50/50 shadow-2xs'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
+                        }`}
+                    >
+                        Chờ Vô Số
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('pending')}
+                        className={`flex items-center gap-1.5 h-full px-5 py-2 text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                            activeTab === 'pending'
+                                ? 'border-blue-600 text-blue-700 bg-blue-50/50 shadow-2xs'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
+                        }`}
+                    >
+                        Chờ Scan
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('scanned')}
+                        className={`flex items-center gap-1.5 h-full px-5 py-2 text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                            activeTab === 'scanned'
+                                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 shadow-2xs'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
+                        }`}
+                    >
+                        Đã Scan
+                    </button>
+                </div>
             </div>
 
             {/* HÀNG 2: THANH TÌM KIẾM, BỘ LỌC VÀ NÚT XUẤT EXCEL (ĐỒNG BỘ VỚI MODULE ĐO ĐẠC) */}
@@ -1314,242 +1199,119 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 </div>
             </div>
 
-            {/* HÀNG 3: NÚT CẢNH BÁO QUÁ HẠN/TỚI HẠN Ở NGOÀI CÙNG BÊN TRÁI (ẨN TẠI VÀO SỐ GCN VÀ GIAO 1 CỬA), TIẾP THEO LÀ SUB-TABS VÀ NÚT TÁC NGHIỆP (CHUẨN ĐO ĐẠC) */}
-            <div className="px-4 py-2.5 border-b border-gray-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
-                {/* PHẦN BÊN TRÁI HÀNG 3: CÁC NÚT CẢNH BÁO (NGOÀI CÙNG TRÁI) + SUBTABS + NÚT NHẬP MỚI */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                    {/* CÁC NÚT CẢNH BÁO QUÁ HẠN / TỚI HẠN (ẨN TẠI TAB 'VÀO SỐ GCN' VÀ 'GIAO 1 CỬA') */}
-                    {mainTab !== 'vao_so' && mainTab !== 'giao_1_cua' && (
-                        <div className="flex gap-2 mr-1">
-                            <button
-                                type="button"
-                                onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'none' : 'overdue')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${
-                                    warningFilter === 'overdue'
-                                        ? 'bg-red-600 text-white'
-                                        : 'bg-white text-red-600'
-                                }`}
-                                title="Lọc các hồ sơ đã quá hạn xử lý (Bấm lại để hủy)"
-                            >
-                                <AlertTriangle size={16} /> {warningCounts.overdue}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'none' : 'approaching')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${
-                                    warningFilter === 'approaching'
-                                        ? 'bg-orange-500 text-white'
-                                        : 'bg-white text-orange-600'
-                                }`}
-                                title="Lọc các hồ sơ sắp đến hạn xử lý trong 1-3 ngày (Bấm lại để hủy)"
-                            >
-                                <Clock size={16} /> {warningCounts.approaching}
-                            </button>
-
-                            {warningFilter !== 'none' && (
-                                <button
-                                    onClick={() => setWarningFilter('none')}
-                                    className="text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex items-center justify-center"
-                                    title="Bỏ lọc cảnh báo"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-                    )}
-
-                    {mainTab !== 'vao_so' ? (
+            {/* HÀNG 3: THANH CHỨC NĂNG TÁC NGHIỆP CỦA VÀO SỔ GCN (ĐẦY ĐỦ CÁC CHỨC NĂNG ĐÃ LẬP TRÌNH) */}
+            <div className="px-4 py-2.5 border-b border-gray-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                {/* PHẦN BÊN TRÁI: CÁC NÚT NHẬP LIỆU & CHUYỂN TRẠNG THÁI SCAN */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {(activeTab === 'all' || activeTab === 'unallocated') && (
                         <>
-                            {/* Subtabs riêng cho từng nghiệp vụ */}
-                            {mainTab === 'thue' && (
-                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
-                                    <button
-                                        onClick={() => setThueSubTab('phieu_chuyen')}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                            thueSubTab === 'phieu_chuyen'
-                                                ? 'bg-amber-100 text-amber-800 shadow-2xs'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        Phiếu chuyển thuế
-                                    </button>
-                                    <button
-                                        onClick={() => setThueSubTab('khu_vuc_7')}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                            thueSubTab === 'khu_vuc_7'
-                                                ? 'bg-amber-100 text-amber-800 shadow-2xs'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        Thuế khu vực 7
-                                    </button>
-                                    <button
-                                        onClick={() => setThueSubTab('thong_bao')}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                            thueSubTab === 'thong_bao'
-                                                ? 'bg-amber-100 text-amber-800 shadow-2xs'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        Thông báo thuế
-                                    </button>
-                                </div>
-                            )}
-
-                            {mainTab === 'giao_1_cua' && (
-                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
-                                    <button
-                                        onClick={() => setGiao1CuaSubTab('cho_ban_giao')}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                            giao1CuaSubTab === 'cho_ban_giao'
-                                                ? 'bg-emerald-100 text-emerald-800 shadow-2xs'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        Chờ bàn giao
-                                    </button>
-                                    <button
-                                        onClick={() => setGiao1CuaSubTab('cho_tra_kq')}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                            giao1CuaSubTab === 'cho_tra_kq'
-                                                ? 'bg-emerald-100 text-emerald-800 shadow-2xs'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        Chờ trả kết quả
-                                    </button>
-                                    <button
-                                        onClick={() => setGiao1CuaSubTab('da_tra_kq')}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                            giao1CuaSubTab === 'da_tra_kq'
-                                                ? 'bg-emerald-100 text-emerald-800 shadow-2xs'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        Đã trả kết quả
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Nút Nhập mới chuẩn khung viền xanh theo mẫu module Đo đạc */}
+                            {/* Thêm mới thủ công */}
                             <button
                                 onClick={handleAddNew}
                                 className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-400 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
+                                title="Thêm một dòng hồ sơ trống mới"
                             >
                                 <Plus size={15} />
-                                <span>Nhập mới</span>
+                                <span>Thêm dòng</span>
                             </button>
-                        </>
-                    ) : null}
-                </div>
 
-                {/* BÊN PHẢI HÀNG 3: CÁC NÚT TÁC NGHIỆP TƯƠNG ỨNG (CHUẨN ĐỒNG NHẤT VỚI MODULE ĐO ĐẠC) */}
-                <div className="flex flex-wrap items-center gap-2 ml-auto">
-                    {mainTab !== 'vao_so' && (
-                        <>
-                            {/* Nút Giao việc (khi có chọn hồ sơ) */}
-                            {selectedIds.size > 0 && (
-                                <button
-                                    onClick={() => {
-                                        alert(`Tính năng Giao việc cho ${selectedIds.size} hồ sơ đang được áp dụng.`);
-                                    }}
-                                    className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
-                                    title="Giao việc cho nhân viên"
-                                >
-                                    <Users size={15} />
-                                    <span>Giao việc ({selectedIds.size})</span>
-                                </button>
-                            )}
-
-                            {/* Nút Trình kiểm tra - CHỈ HIỆN TẠI TAB 'In GCN' khi có tích chọn hồ sơ */}
-                            {mainTab === 'in_gcn' && selectedIds.size > 0 && (
-                                <button
-                                    onClick={() => {
-                                        alert(`Đã trình kiểm tra ${selectedIds.size} hồ sơ.`);
-                                    }}
-                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors cursor-pointer"
-                                    title="Trình kiểm tra hồ sơ"
-                                >
-                                    <CheckSquare size={15} />
-                                    <span>Trình kiểm tra ({selectedIds.size})</span>
-                                </button>
-                            )}
-
-                            {/* Nút Trình ký - CHỈ HIỆN TẠI TAB 'Kiểm tra' khi có tích chọn hồ sơ */}
-                            {mainTab === 'kiem_tra' && selectedIds.size > 0 && (
-                                <button
-                                    onClick={() => {
-                                        alert(`Đã trình ký ${selectedIds.size} hồ sơ.`);
-                                    }}
-                                    className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-teal-700 shadow-2xs transition-colors cursor-pointer"
-                                    title="Trình ký lãnh đạo"
-                                >
-                                    <PenTool size={15} />
-                                    <span>Trình ký ({selectedIds.size})</span>
-                                </button>
-                            )}
-
-                            {/* Nút Trả hồ sơ (khi có chọn hồ sơ) */}
-                            {selectedIds.size > 0 && (
-                                <button
-                                    onClick={() => {
-                                        alert(`Trả lại ${selectedIds.size} hồ sơ.`);
-                                    }}
-                                    className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-rose-700 shadow-2xs transition-colors cursor-pointer"
-                                    title="Trả hồ sơ về bước trước"
-                                >
-                                    <ChevronLeft size={15} />
-                                    <span>Trả hồ sơ ({selectedIds.size})</span>
-                                </button>
-                            )}
-
-                            {/* Nút Xử lý All (khi có chọn hồ sơ) */}
-                            {selectedIds.size > 0 && (
-                                <button
-                                    onClick={() => {
-                                        alert(`Xử lý hàng loạt cho ${selectedIds.size} hồ sơ.`);
-                                    }}
-                                    className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-amber-700 shadow-2xs transition-colors cursor-pointer"
-                                    title="Xử lý hàng loạt hồ sơ đã chọn"
-                                >
-                                    <RefreshCw size={15} />
-                                    <span>Xử lý All ({selectedIds.size})</span>
-                                </button>
-                            )}
-
-                            {/* Nút Chốt hồ sơ */}
+                            {/* Nhập Excel */}
                             <button
-                                onClick={() => {
-                                    alert('Đang cập nhật trạng thái chốt danh sách hồ sơ.');
-                                }}
-                                className="flex items-center gap-1.5 bg-white text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
-                                title="Chốt danh sách hồ sơ"
+                                onClick={handleImportClick}
+                                className="flex items-center gap-1.5 bg-white text-blue-700 border border-blue-400 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-50 shadow-2xs transition-colors cursor-pointer"
+                                title="Nhập danh sách từ file Excel"
                             >
-                                <ClipboardList size={15} />
-                                <span>Chốt hồ sơ</span>
+                                <Upload size={15} />
+                                <span>Nhập Excel</span>
                             </button>
 
-                            {/* Nút Xuất DS */}
+                            {/* Tải file mẫu */}
                             <button
-                                onClick={handleExportExcel}
-                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
-                                title="Xuất danh sách ra file Excel"
+                                onClick={handleDownloadTemplate}
+                                className="flex items-center gap-1.5 bg-white text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-slate-100 shadow-2xs transition-colors cursor-pointer"
+                                title="Tải file mẫu Excel dùng để import"
                             >
                                 <FileSpreadsheet size={15} />
-                                <span>Xuất DS</span>
+                                <span>Tải file mẫu</span>
                             </button>
 
-                            {/* Nút Tùy chỉnh ẩn/hiện cột */}
-                            <button
-                                onClick={() => setShowColumnSelector(!showColumnSelector)}
-                                className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
-                                title="Tùy chỉnh ẩn/hiện cột"
-                            >
-                                <SlidersHorizontal size={16} />
-                            </button>
+                            {/* Chuyển Scan (khi tích chọn hồ sơ) */}
+                            {selectedIds.size > 0 && (
+                                <button
+                                    onClick={handleMoveToPending}
+                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Chuyển các hồ sơ đã chọn sang danh sách Chờ Scan"
+                                >
+                                    <Send size={15} />
+                                    <span>Chuyển Scan ({selectedIds.size})</span>
+                                </button>
+                            )}
                         </>
                     )}
+
+                    {activeTab === 'pending' && (
+                        <>
+                            {/* Tạo đợt scan (khi tích chọn hồ sơ) */}
+                            {selectedIds.size > 0 ? (
+                                <button
+                                    onClick={handleOpenBatchModal}
+                                    className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-purple-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Tạo đợt quét (Scan) mới cho các hồ sơ đã chọn"
+                                >
+                                    <CheckSquare size={15} />
+                                    <span>Xác nhận đợt Scan ({selectedIds.size})</span>
+                                </button>
+                            ) : (
+                                <span className="text-xs text-slate-500 italic pl-1">Vui lòng tích chọn hồ sơ để tạo đợt quét (Scan)</span>
+                            )}
+                        </>
+                    )}
+
+                    {activeTab === 'scanned' && (
+                        <span className="text-xs text-slate-500 italic pl-1">Danh sách các hồ sơ đã hoàn thành quét (Scan)</span>
+                    )}
+                </div>
+
+                {/* PHẦN BÊN PHẢI: CÁC TIỆN ÍCH XUẤT SỔ ĐỊA CHÍNH, MỤC KÊ & CÀI ĐẶT KHO SỐ */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Xuất Sổ Địa Chính */}
+                    <button
+                        onClick={() => setShowExportSoDiaChinhModal(true)}
+                        className="flex items-center gap-1.5 bg-white text-teal-700 border border-teal-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-teal-50 shadow-2xs transition-colors cursor-pointer"
+                        title="Mở bảng cấu hình xuất Sổ địa chính"
+                    >
+                        <BookOpen size={15} />
+                        <span>Sổ địa chính</span>
+                    </button>
+
+                    {/* Xuất Sổ Mục Kê */}
+                    <button
+                        onClick={() => setShowExportSoMucKeModal(true)}
+                        className="flex items-center gap-1.5 bg-white text-amber-700 border border-amber-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-amber-50 shadow-2xs transition-colors cursor-pointer"
+                        title="Mở bảng cấu hình Sổ mục kê"
+                    >
+                        <ClipboardList size={15} />
+                        <span>Sổ mục kê</span>
+                    </button>
+
+                    {/* Biên bản bàn giao */}
+                    <button
+                        onClick={() => setShowExportHandoverModal(true)}
+                        className="flex items-center gap-1.5 bg-white text-indigo-700 border border-indigo-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-50 shadow-2xs transition-colors cursor-pointer"
+                        title="Mở bảng cấu hình Biên bản bàn giao GCN"
+                    >
+                        <FileOutput size={15} />
+                        <span>Biên bản bàn giao</span>
+                    </button>
+
+                    {/* Cài đặt kho số - Chỉ hiển thị icon bánh răng */}
+                    <button
+                        onClick={() => setShowSettingsModal(true)}
+                        className="p-1.5 bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 hover:text-teal-700 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
+                        title="Cài đặt kho số"
+                    >
+                        <Settings size={16} />
+                    </button>
                 </div>
             </div>
 
@@ -1564,8 +1326,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 ) : (
                     <>
                     <div className="inline-block min-w-full align-middle flex-1 overflow-auto">
-                        {mainTab === 'vao_so' ? (
-                            /* BẢNG RIÊNG DÀNH CHO TAB VÀO SỐ GCN */
+                        {/* BẢNG RIÊNG DÀNH CHO TAB VÀO SỐ GCN */}
                             <table className="min-w-full table-fixed border-collapse">
                                 <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
                                     <tr>
@@ -1698,20 +1459,21 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                                 {r.data?.[col.key] || ''}
                                                             </div>
                                                         ) : col.key === 'so_vao_so' ? (
-                                                            <div className="flex h-full">
+                                                            <div className="flex h-full items-center">
                                                                 <input 
                                                                     type="text"
-                                                                    className="flex-1 min-w-0 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                                    className="flex-1 min-w-0 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none font-semibold text-teal-800"
                                                                     value={r.data?.[col.key] || ''}
                                                                     onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
                                                                     onBlur={() => handleBlur(r)}
                                                                     readOnly={activeTab === 'scanned'} 
+                                                                    placeholder="Tự gõ hoặc tự động..."
                                                                 />
-                                                                {activeTab === 'all' && (
+                                                                {activeTab !== 'scanned' && (
                                                                     <button 
                                                                         onClick={() => handleGetBookNumber(r)}
-                                                                        className="px-2 bg-gray-100 hover:bg-blue-100 text-blue-600 border-l border-gray-200 transition-colors"
-                                                                        title="Lấy số vào sổ tiếp theo"
+                                                                        className="p-1.5 hover:bg-teal-50 text-teal-600 hover:text-teal-800 transition-colors rounded mr-1"
+                                                                        title="Cấp số tự động (Bấm để tự điền, bạn có thể tự sửa lại nếu muốn)"
                                                                     >
                                                                         <Hash size={14} />
                                                                     </button>
@@ -1806,7 +1568,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             )}
                                             <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200">
                                                 <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
-                                                    {activeTab === 'all' && (
+                                                    {(activeTab === 'all' || activeTab === 'unallocated') && (
                                                         <>
                                                             <button 
                                                                 onClick={() => toggleEdit(r.id)} 
@@ -1837,7 +1599,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                     )) : (
                                         <tr>
                                             <td colSpan={COLUMNS.length + 5} className="p-8 text-center text-gray-400 italic">
-                                                {activeTab === 'all' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".' : 
+                                                {activeTab === 'all' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm dòng".' : 
+                                                 activeTab === 'unallocated' ? 'Chưa có hồ sơ Chờ Vô Số nào.' :
                                                  activeTab === 'pending' ? 'Chưa có hồ sơ chờ chuyển scan.' :
                                                  'Chưa có hồ sơ nào được chuyển Scan.'}
                                             </td>
@@ -1845,148 +1608,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                     )}
                                 </tbody>
                             </table>
-                        ) : (
-                            /* BẢNG 13 CỘT CHI TIẾT DÀNH CHO TẤT CẢ CÁC TAB CỦA MODULE CẤP GIẤY */
-                            <table className="min-w-full border-collapse">
-                                <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
-                                    <tr className="text-xs font-bold text-gray-700 uppercase">
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-10 text-center bg-gray-100 sticky left-0 z-20">
-                                            <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))} />
-                                        </th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-36 text-left bg-gray-100 whitespace-nowrap">MÃ HỒ SƠ</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 min-w-[200px] text-left bg-gray-100 whitespace-nowrap">THÔNG TIN CHỦ SỬ DỤNG</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 min-w-[150px] text-left bg-gray-100 whitespace-nowrap">LOẠI HỒ SƠ</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-32 text-center bg-gray-100 whitespace-nowrap">THỜI HẠN XỬ LÝ</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-32 text-left bg-gray-100 whitespace-nowrap">XÃ PHƯỜNG</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-16 text-center bg-gray-100 whitespace-nowrap">TỜ</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-16 text-center bg-gray-100 whitespace-nowrap">THỦA</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-36 text-left bg-gray-100 whitespace-nowrap">GIAO NHÂN VIÊN</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-36 text-left bg-gray-100 whitespace-nowrap">HOÀN THÀNH / ĐỢT</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-32 text-center bg-gray-100 whitespace-nowrap">TRẠNG THÁI</th>
-                                        <th className="p-2.5 border-b border-r border-gray-200 w-28 text-center bg-gray-100 whitespace-nowrap">BIÊN LAI</th>
-                                        <th className="p-2.5 border-b border-gray-200 w-28 text-center bg-gray-100 sticky right-0 z-20 whitespace-nowrap">THAO TÁC</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 text-xs">
-                                    {paginatedRecords.length > 0 ? (
-                                        paginatedRecords.map((r) => (
-                                            <tr key={r.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.has(r.id) ? 'bg-blue-50/60' : ''}`}>
-                                                {/* 1. Checkbox */}
-                                                <td className="p-2.5 border-r border-gray-200 text-center bg-white sticky left-0 z-10 group-hover:bg-slate-50">
-                                                    <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
-                                                </td>
-
-                                                {/* 2. Mã hồ sơ */}
-                                                <td className="p-2.5 border-r border-gray-200 font-mono font-bold text-teal-800 whitespace-nowrap">
-                                                    <span className="bg-teal-50 px-2 py-1 rounded border border-teal-200 inline-block">
-                                                        {r.data?.so_bien_nhan || r.data?.so_thu_tuc || r.data?.ma_ho_so || `HS-${r.id.substring(0,6).toUpperCase()}`}
-                                                    </span>
-                                                </td>
-
-                                                {/* 3. Thông tin chủ sử dụng */}
-                                                <td className="p-2.5 border-r border-gray-200">
-                                                    <div className="font-bold text-slate-800 text-sm">{r.data?.ten_chu_su_dung || r.data?.chu_su_dung || r.trich_yeu || '-'}</div>
-                                                    {(r.data?.cccd || r.data?.dia_chi) && (
-                                                        <div className="text-[11px] text-gray-500 mt-0.5">{r.data?.cccd || r.data?.dia_chi}</div>
-                                                    )}
-                                                </td>
-
-                                                {/* 4. Loại hồ sơ */}
-                                                <td className="p-2.5 border-r border-gray-200 text-slate-700 font-medium">
-                                                    {r.data?.loai_ho_so || r.data?.loai_bien_dong || 'Đăng ký cấp GCN'}
-                                                </td>
-
-                                                {/* 5. Thời hạn xử lý */}
-                                                <td className="p-2.5 border-r border-gray-200 text-center whitespace-nowrap">
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                                        <Clock size={12} />
-                                                        {r.data?.han_xu_ly || r.data?.ngay_hen_tra ? (new Date(r.data?.han_xu_ly || r.data?.ngay_hen_tra).toLocaleDateString('vi-VN')) : 'Trong hạn'}
-                                                    </span>
-                                                </td>
-
-                                                {/* 6. Xã phường */}
-                                                <td className="p-2.5 border-r border-gray-200 text-slate-700 font-medium whitespace-nowrap">
-                                                    {r.data?.xa_phuong || r.data?.dia_danh || '-'}
-                                                </td>
-
-                                                {/* 7. Tờ */}
-                                                <td className="p-2.5 border-r border-gray-200 text-center font-bold text-slate-800">
-                                                    {r.data?.so_to || '-'}
-                                                </td>
-
-                                                {/* 8. Thửa */}
-                                                <td className="p-2.5 border-r border-gray-200 text-center font-bold text-slate-800">
-                                                    {r.data?.so_thua || '-'}
-                                                </td>
-
-                                                {/* 9. Giao nhân viên */}
-                                                <td className="p-2.5 border-r border-gray-200 text-slate-700 whitespace-nowrap font-medium">
-                                                    {r.data?.assigned_employee || r.data?.can_bo_thu_ly ? (
-                                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                                                            <Users size={12} />
-                                                            {r.data?.assigned_employee || r.data?.can_bo_thu_ly}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-gray-400 italic">Chưa giao</span>
-                                                    )}
-                                                </td>
-
-                                                {/* 10. Hoàn thành / Đợt */}
-                                                <td className="p-2.5 border-r border-gray-200 text-slate-600 whitespace-nowrap">
-                                                    {r.data?.batch_name || r.data?.ngay_hoan_thanh || '-'}
-                                                </td>
-
-                                                {/* 11. Trạng thái */}
-                                                <td className="p-2.5 border-r border-gray-200 text-center whitespace-nowrap">
-                                                    <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                                                        (r.data?.status || r.data?.stage || '').includes('Hoàn thành') || (r.data?.status || '').includes('Đã trả')
-                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                                            : (r.data?.status || r.data?.stage || '').includes('Thuế')
-                                                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                                            : 'bg-blue-100 text-blue-800 border border-blue-300'
-                                                    }`}>
-                                                        {r.data?.status || r.data?.stage || 'Đang xử lý'}
-                                                    </span>
-                                                </td>
-
-                                                {/* 12. Biên lai */}
-                                                <td className="p-2.5 border-r border-gray-200 text-center whitespace-nowrap">
-                                                    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                        {r.data?.so_bien_lai || r.data?.bien_lai || 'Đã thu'}
-                                                    </span>
-                                                </td>
-
-                                                {/* 13. Thao tác */}
-                                                <td className="p-2.5 text-center bg-white sticky right-0 group-hover:bg-slate-50 z-10 border-l border-gray-200">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <button
-                                                            onClick={() => toggleEdit(r.id)}
-                                                            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                                            title="Chỉnh sửa"
-                                                        >
-                                                            <Edit size={16} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(r)}
-                                                            className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                            title="Xóa"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={13} className="p-8 text-center text-gray-400 italic">
-                                                Không tìm thấy dữ liệu hồ sơ phù hợp.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        )}
                     </div>
                     {/* Pagination Controls chuẩn phong cách module Đo đạc */}
                     {filteredRecords.length > 0 && (

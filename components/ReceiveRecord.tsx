@@ -260,9 +260,21 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
 
     const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
 
+    const getPrimaryName = (rawName?: string | null): string => {
+        if (!rawName) return '';
+        const name = rawName.trim();
+        const splitMatch = name.split(/[,;\n\r]|\s+(?:và|cùng|kèm theo)\s+/i);
+        if (splitMatch && splitMatch.length > 0 && splitMatch[0].trim()) {
+            return splitMatch[0].trim();
+        }
+        return name;
+    };
+
+    const primaryName = getPrimaryName(dataToUse.customerName);
+
     const printData = {
         code: val(dataToUse.code),
-        customerName: val(dataToUse.customerName),
+        customerName: val(primaryName || dataToUse.customerName),
         landPlot: val(dataToUse.landPlot),
         mapSheet: val(dataToUse.mapSheet),
         
@@ -277,11 +289,11 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
         MA_HO_SO: val(dataToUse.code),
         CODE: val(dataToUse.code),
 
-        TEN: val(dataToUse.customerName).toUpperCase(), 
-        HO_TEN: val(dataToUse.customerName).toUpperCase(),
-        CHU_SU_DUNG: val(dataToUse.customerName).toUpperCase(),
-        KHACH_HANG: val(dataToUse.customerName).toUpperCase(),
-        ONG_BA: val(dataToUse.customerName).toUpperCase(), 
+        TEN: val(primaryName || dataToUse.customerName).toUpperCase(), 
+        HO_TEN: val(primaryName || dataToUse.customerName).toUpperCase(),
+        CHU_SU_DUNG: val(primaryName || dataToUse.customerName).toUpperCase(),
+        KHACH_HANG: val(primaryName || dataToUse.customerName).toUpperCase(),
+        ONG_BA: val(primaryName || dataToUse.customerName).toUpperCase(), 
 
         SDT: val(dataToUse.phoneNumber), 
         DIEN_THOAI: val(dataToUse.phoneNumber),

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { X, CheckCircle, AlertCircle, FileSignature } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { X, CheckCircle, AlertCircle, FileSignature, Loader2 } from 'lucide-react';
 import { RecordFile, UserRole, User, Employee, DossierComponentItem } from '../../types';
 import { isArchiveRecordType } from '../../constants';
 import DossierComponentSection from './DossierComponentSection';
@@ -8,7 +8,7 @@ interface SubmitModalProps {
     isOpen: boolean;
     onClose: () => void;
     records: RecordFile[];
-    onConfirm: (directorId: string, components?: DossierComponentItem[]) => void;
+    onConfirm: (directorId: string, components?: DossierComponentItem[]) => Promise<void> | void;
     users: User[];
     employees: Employee[];
     isCheckMode?: boolean; // MỚI: Chế độ trình kiểm tra
@@ -16,6 +16,15 @@ interface SubmitModalProps {
 
 const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onConfirm, users, employees, isCheckMode }) => {
     const [selectedDirector, setSelectedDirector] = useState<string>('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = useRef(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+        }
+    }, [isOpen]);
 
     const isSingle = records.length === 1;
     const initialRecord = records[0] || null;
@@ -77,13 +86,23 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
 
     if (!isOpen) return null;
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
+        if (isSubmittingRef.current || isSubmitting) return;
         if (!selectedDirector) {
             alert(isCheckMode ? 'Vui lòng chọn người kiểm tra.' : 'Vui lòng chọn người được trình ký.');
             return;
         }
-        onConfirm(selectedDirector, isSingle ? components : undefined);
-        setSelectedDirector('');
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+        try {
+            await onConfirm(selectedDirector, isSingle ? components : undefined);
+            setSelectedDirector('');
+        } catch (err) {
+            console.error("Lỗi khi trình duyệt:", err);
+        } finally {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+        }
     };
 
     return (
@@ -162,18 +181,30 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
 
                 <div className="flex justify-end gap-3 p-4 border-t border-gray-100 bg-gray-50 shrink-0">
                     <button 
+                        type="button"
                         onClick={onClose} 
-                        className="px-4 py-2 text-gray-600 bg-white border border-gray-200 hover:bg-gray-100 rounded-xl font-medium transition-colors cursor-pointer text-xs"
+                        disabled={isSubmitting}
+                        className="px-4 py-2 text-gray-600 bg-white border border-gray-200 hover:bg-gray-100 rounded-xl font-medium transition-colors cursor-pointer text-xs disabled:opacity-50"
                     >
                         Hủy
                     </button>
                     <button 
+                        type="button"
                         onClick={handleSubmit} 
-                        disabled={!selectedDirector}
-                        className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-white transition-all shadow-md cursor-pointer text-xs ${selectedDirector ? (isCheckMode ? 'bg-orange-600 hover:bg-orange-700' : 'bg-indigo-600 hover:bg-indigo-700') : 'bg-gray-300 cursor-not-allowed'}`}
+                        disabled={!selectedDirector || isSubmitting}
+                        className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-white transition-all shadow-md cursor-pointer text-xs ${selectedDirector && !isSubmitting ? (isCheckMode ? 'bg-orange-600 hover:bg-orange-700' : 'bg-indigo-600 hover:bg-indigo-700') : 'bg-gray-300 cursor-not-allowed opacity-60'}`}
                     >
-                        <CheckCircle size={16} />
-                        Xác nhận
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                <span>Đang trình</span>
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle size={16} />
+                                <span>Đồng ý</span>
+                            </>
+                        )}
                     </button>
                 </div>
             </div>

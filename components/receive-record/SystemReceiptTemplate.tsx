@@ -269,6 +269,19 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     const currentUserName = receiverOfficerName;
     const wardName = getNormalizedWard(data.ward || '');
 
+    // Trích xuất tên người đại diện / chủ chính từ chuỗi tên khách hàng (nếu có danh sách đồng sở hữu)
+    const getPrimaryOwnerName = (rawName?: string | null): string => {
+        if (!rawName) return '';
+        const name = rawName.trim();
+        const splitMatch = name.split(/[,;\n\r]|\s+(?:và|cùng|kèm theo)\s+/i);
+        if (splitMatch && splitMatch.length > 0 && splitMatch[0].trim()) {
+            return splitMatch[0].trim();
+        }
+        return name;
+    };
+
+    const primaryCustomerName = getPrimaryOwnerName(data.customerName);
+
     const getDisplayLandAddress = () => {
         let addr = '';
         if (data.address) {
@@ -442,7 +455,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             {/* Content */}
                             <div>
                                 <div className="receipt-line" style={{ marginBottom: '5px' }}>Bộ phận tiếp nhận và trả kết quả: <span style={{ fontWeight: 'bold' }}>Văn phòng Đăng ký đất đai Thành phố Đồng Nai - Chi nhánh Hớn Quản</span></div>
-                                <div className="receipt-line" style={{ marginBottom: '5px' }}>Tiếp nhận hồ sơ của: <span style={{ fontWeight: 'bold' }}>{data.customerName}</span></div>
+                                <div className="receipt-line" style={{ marginBottom: '5px' }}>Tiếp nhận hồ sơ của: <span style={{ fontWeight: 'bold' }}>{primaryCustomerName || data.customerName || ''}</span></div>
                                 <div className="receipt-line" style={{ marginBottom: '5px' }}>CCCD/MST: <span style={{ fontWeight: 'bold' }}>{data.cccd || ''}</span></div>
                                 <div className="receipt-line" style={{ marginBottom: '5px' }}>Số điện thoại: {data.phoneNumber}</div>
                                 <div className="receipt-line" style={{ display: 'flex', marginBottom: '5px' }}>

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { RecordFile, Employee, User } from '../types';
-import { X, Clock, Calendar } from 'lucide-react';
+import { X, Clock, Calendar, Loader2 } from 'lucide-react';
 
 interface ExtendDeadlineModalProps {
   isOpen: boolean;
@@ -28,7 +28,19 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
     return '';
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+      setErrorMsg('');
+      if (record && record.deadline) {
+        setNewDeadline(record.deadline.split('T')[0]);
+      }
+    }
+  }, [isOpen, record]);
 
   if (!isOpen || !record) return null;
 
@@ -46,11 +58,13 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
     if (!newDeadline) {
       setErrorMsg('Vui lòng chọn ngày gia hạn mới!');
       return;
     }
     setErrorMsg('');
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       const now = new Date();
@@ -62,6 +76,7 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
       setErrorMsg('Có lỗi xảy ra khi thực hiện gia hạn.');
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -140,16 +155,23 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="w-1/2 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-[#334155] rounded-xl font-bold text-sm transition-all active:scale-95 cursor-pointer text-center shadow-xs"
+              className="w-1/2 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-[#334155] rounded-xl font-bold text-sm transition-all active:scale-95 cursor-pointer text-center shadow-xs disabled:opacity-50"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !newDeadline}
-              className="w-1/2 py-3 bg-[#f59e0b] hover:bg-[#d97706] disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer text-center"
+              className="w-1/2 py-3 bg-[#f59e0b] hover:bg-[#d97706] disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
-              {isSubmitting ? 'Đang lưu...' : 'Lưu và in'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Đang lưu</span>
+                </>
+              ) : (
+                <span>Đồng ý</span>
+              )}
             </button>
           </div>
         </form>

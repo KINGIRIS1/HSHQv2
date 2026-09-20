@@ -1,13 +1,14 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import { getWardLabel, GROUPS } from '../constants';
 import { formatDateDDMMYYYY, formatBatchName, parseSafeDate, formatDateKey, getPureBatchNumber, calculateNextBatchNumberForDate, getRecordModuleKey } from '../utils/appHelpers';
 import { fetchChinhLyRecords } from '../services/apiUtilities';
+import { Loader2 } from 'lucide-react';
 
 interface AddToBatchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (batch: string, date: string, handoverWard?: string) => void;
+  onConfirm: (batch: string, date: string, handoverWard?: string) => Promise<void> | void;
   records: RecordFile[];
   selectedCount: number;
   targetRecords?: RecordFile[];
@@ -20,16 +21,25 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   onClose, 
   onConfirm, 
   records, 
-  selectedCount,
-  targetRecords = [],
+  selectedCount, 
+  targetRecords = [], 
   wards = [],
 }) => {
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [selectedExistingBatch, setSelectedExistingBatch] = useState<string>('');
   const [selectedHandoverWard, setSelectedHandoverWard] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   
   // State xác nhận danh sách chỉnh lý
   const [needsCorrectionConfirm, setNeedsCorrectionConfirm] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  }, [isOpen]);
 
   // Ngày hiện tại cho đợt mới (YYYY-MM-DD theo giờ địa phương, tránh lệch múi giờ UTC)
   const todayStr = useMemo(() => formatDateKey(new Date()), []);
@@ -216,31 +226,43 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 
   const todayFmt = formatDateDDMMYYYY(todayStr);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+      if (isSubmittingRef.current || isSubmitting) return;
       if (!selectedHandoverWard || !selectedHandoverWard.trim()) {
           alert('Vui lòng chọn Xã/phường nhận kết quả.');
           return;
       }
       const handoverWard = selectedHandoverWard;
 
-      if (mode === 'new') {
-          onConfirm(String(nextBatchInfo.batchNum), nextBatchInfo.date, handoverWard);
-      } else {
-          if (!selectedExistingBatch) {
-              alert('Vui lòng chọn một đợt cũ.');
-              return;
-          }
-          const found = historyBatches.find(h => h.label === selectedExistingBatch);
-          const pureNum = getPureBatchNumber(selectedExistingBatch);
-          if (found) {
-              onConfirm(pureNum || found.label, found.fullDate, handoverWard);
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
+      try {
+          if (mode === 'new') {
+              await onConfirm(String(nextBatchInfo.batchNum), nextBatchInfo.date, handoverWard);
           } else {
-              onConfirm(pureNum || selectedExistingBatch, new Date().toISOString(), handoverWard);
+              if (!selectedExistingBatch) {
+                  alert('Vui lòng chọn một đợt cũ.');
+                  setIsSubmitting(false);
+                  isSubmittingRef.current = false;
+                  return;
+              }
+              const found = historyBatches.find(h => h.label === selectedExistingBatch);
+              const pureNum = getPureBatchNumber(selectedExistingBatch);
+              if (found) {
+                  await onConfirm(pureNum || found.label, found.fullDate, handoverWard);
+              } else {
+                  await onConfirm(pureNum || selectedExistingBatch, new Date().toISOString(), handoverWard);
+              }
           }
+          setNeedsCorrectionConfirm(false);
+          setSelectedHandoverWard('');
+          onClose();
+      } catch (err) {
+          console.error("Lỗi chốt danh sách giao 1 cửa:", err);
+      } finally {
+          setIsSubmitting(false);
+          isSubmittingRef.current = false;
       }
-      setNeedsCorrectionConfirm(false);
-      setSelectedHandoverWard('');
-      onClose();
   };
 
   return (
@@ -250,7 +272,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
             <h3 className="font-bold text-gray-800 text-base">Chốt DS Giao 1 Cửa</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-red-500 font-bold text-lg">✕</button>
+            <button onClick={onClose} disabled={isSubmitting} className="text-gray-400 hover:text-red-500 font-bold text-lg disabled:opacity-50">✕</button>
         </div>
 
         {/* Body */}
@@ -364,16 +386,27 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
         {/* Footer */}
         <div className="p-4 border-t bg-gray-50 flex justify-end gap-2.5">
             <button 
+                type="button"
                 onClick={onClose} 
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors"
+                disabled={isSubmitting}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors disabled:opacity-50"
             >
                 Hủy bỏ
             </button>
             <button 
+                type="button"
                 onClick={handleConfirm} 
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                disabled={isSubmitting}
+                className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
             >
-                Xác nhận
+                {isSubmitting ? (
+                    <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Đang chốt</span>
+                    </>
+                ) : (
+                    <span>Đồng ý</span>
+                )}
             </button>
         </div>
 

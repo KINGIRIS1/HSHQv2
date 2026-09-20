@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { X, Search, Layers, UserCheck, CheckCircle2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { X, Search, Layers, UserCheck, CheckCircle2, Loader2 } from 'lucide-react';
 import { RecordFile, Employee, DossierComponentItem } from '../../types';
 import { removeVietnameseTones } from '../../utils/appHelpers';
 import DossierComponentSection from './DossierComponentSection';
@@ -22,6 +22,14 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDrafterId, setSelectedDrafterId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  }, [isOpen]);
 
   const isSingle = records.length === 1;
   const initialRecord = records[0] || null;
@@ -71,10 +79,12 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
+    if (isSubmittingRef.current || isSubmitting) return;
     if (!selectedDrafterId) {
       alert('Vui lòng chọn Chuyên viên Biên tập bản đồ.');
       return;
     }
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       await onConfirm(selectedDrafterId, isSingle ? components : undefined);
@@ -84,6 +94,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
       alert('Đã xảy ra lỗi khi chuyển biên tập bản đồ. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -200,7 +211,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs"
+            className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs disabled:opacity-50"
           >
             Hủy bỏ
           </button>
@@ -210,7 +221,17 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
             disabled={isSubmitting || !selectedDrafterId}
             className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận'}
+            {isSubmitting ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Đang giao</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={14} />
+                <span>Đồng ý</span>
+              </>
+            )}
           </button>
         </div>
       </div>

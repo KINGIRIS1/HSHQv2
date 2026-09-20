@@ -294,6 +294,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     "check_list",
     "handover_list",
     "director_completed",
+    "measurement_field",
+    "measurement_office",
+    "pending_supplement_list",
   ].includes(currentView || "");
 
   const isTestMeasurementView = [
@@ -406,9 +409,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             setIsManualCode(false);
             const initialRecBy = currentUser?.employeeId || '';
             let defaultRecType = '';
+            const initialSourceTable = isTestMeasurementView ? 'dangky_records' : (isArchiveView ? 'luutru_records' : 'land_records');
+            const initialGroup = isTestMeasurementView ? '3. Đăng ký đất đai, cấp GCN' : (isArchiveView ? '1. Cung cấp thông tin, dữ liệu đất đai' : '2. Đo đạc bản đồ');
             setFormData({
               ...defaultState,
               recordType: defaultRecType,
+              sourceTable: initialSourceTable,
+              group: initialGroup,
               receivedDate: new Date().toISOString(),
               deadline: '',
               price: undefined,
@@ -691,12 +698,24 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         cleanData.receiptType = undefined;
     }
 
-    if (isTestMeasurementView || initialData?.sourceTable === 'dangky_records') {
+    const recType = cleanData.recordType || '';
+    if (isCertificateRecordType(recType) || String(recType).trim().startsWith('3.') || isTestMeasurementView) {
         cleanData.sourceTable = 'dangky_records';
-    } else if (isArchiveView || initialData?.sourceTable === 'luutru_records') {
+        if (!cleanData.group || cleanData.group.startsWith('1.') || cleanData.group.startsWith('2.')) {
+            cleanData.group = '3. Đăng ký đất đai, cấp GCN';
+        }
+    } else if (String(recType).trim().startsWith('1.') || isArchiveRecordType(recType) || isArchiveView) {
         cleanData.sourceTable = 'luutru_records';
-    } else if (isMeasurementView || initialData?.sourceTable === 'land_records') {
+        if (!cleanData.group || cleanData.group.startsWith('2.') || cleanData.group.startsWith('3.')) {
+            cleanData.group = '1. Cung cấp thông tin, dữ liệu đất đai';
+        }
+    } else if (String(recType).trim().startsWith('2.') || isSurveyRecordType(recType) || isMeasurementView) {
         cleanData.sourceTable = 'land_records';
+        if (!cleanData.group || cleanData.group.startsWith('1.') || cleanData.group.startsWith('3.')) {
+            cleanData.group = '2. Đo đạc bản đồ';
+        }
+    } else if (initialData?.sourceTable) {
+        cleanData.sourceTable = initialData.sourceTable;
     }
 
     onSubmit(cleanData as any);

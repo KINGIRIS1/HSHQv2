@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
 import { STATUS_LABELS, SURVEY_SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, isArchiveRecordType, isArchiveRecord } from '../constants';
-import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar, History, User, Building2, Clock, Info } from 'lucide-react';
-import { getDepartmentForRecord, getPureBatchNumber, groupEmployeesByDepartment, confirmAction } from '../utils/appHelpers';
+import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar, History, User, Building2, Clock, Info, Loader2 } from 'lucide-react';
+import { getDepartmentForRecord, getPureBatchNumber, groupEmployeesByDepartment } from '../utils/appHelpers';
 
 interface BulkUpdateModalProps {
   isOpen: boolean;
@@ -23,6 +23,14 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   const [customDate, setCustomDate] = useState<string>('');
   const [statusEmployee, setStatusEmployee] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsProcessing(false);
+      isProcessingRef.current = false;
+    }
+  }, [isOpen]);
 
   // Reset values when targetField or targetValue changes
   useEffect(() => {
@@ -239,6 +247,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   const filteredEmployees = getFilteredEmployees();
 
   const handleConfirm = async () => {
+    if (isProcessingRef.current || isProcessing) return;
     if (!targetValue) {
         alert("Vui lòng chọn giá trị mới cần cập nhật.");
         return;
@@ -248,15 +257,9 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         return;
     }
 
-    const count = activeRecordsToUpdate.length;
-    const confirmTitle = targetField === 'historyStatus' ? 'Cập nhật lịch sử tiến độ' : 'Xác nhận xử lý hàng loạt';
-    const confirmMessage = targetField === 'historyStatus'
-      ? `Bạn có chắc chắn muốn cập nhật lịch sử tiến độ cho ${count} hồ sơ đang chọn không?`
-      : `Bạn có chắc chắn muốn cập nhật ${count} hồ sơ đang chọn không?`;
-
-    const isConfirmed = await confirmAction(confirmMessage, confirmTitle);
-    if (isConfirmed) {
-        setIsProcessing(true);
+    isProcessingRef.current = true;
+    setIsProcessing(true);
+    try {
         let isoDate: string | undefined = undefined;
         if (customDate) {
             const d = new Date(customDate.includes('T') ? customDate : customDate + "T12:00:00");
@@ -274,8 +277,13 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
 
         const finalVal = targetField === 'exportBatch' ? getPureBatchNumber(targetValue) : targetValue;
         await onConfirm(targetField as keyof RecordFile, finalVal, isoDate, targetIds, extraData);
-        setIsProcessing(false);
         onClose();
+    } catch (err) {
+        console.error("Lỗi cập nhật hàng loạt:", err);
+        alert("Đã xảy ra lỗi khi cập nhật hàng loạt hồ sơ.");
+    } finally {
+        setIsProcessing(false);
+        isProcessingRef.current = false;
     }
   };
 
@@ -548,18 +556,29 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         </div>
 
         <div className="p-4 border-t bg-gray-50 flex justify-end gap-2.5">
-            <button onClick={onClose} disabled={isProcessing} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors">
+            <button 
+                type="button"
+                onClick={onClose} 
+                disabled={isProcessing} 
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors disabled:opacity-50"
+            >
                 Hủy bỏ
             </button>
             <button 
+                type="button"
                 onClick={handleConfirm} 
                 disabled={isProcessing || !targetValue || activeRecordsToUpdate.length === 0}
-                className="px-5 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="px-5 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
             >
-                {isProcessing ? 'Đang xử lý...' : (
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Đang lưu</span>
+                  </>
+                ) : (
                   <>
                     <CheckCircle2 size={16} />
-                    <span>Cập nhật ngay ({activeRecordsToUpdate.length})</span>
+                    <span>Đồng ý ({activeRecordsToUpdate.length})</span>
                   </>
                 )}
             </button>

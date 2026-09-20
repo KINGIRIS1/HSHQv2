@@ -1,11 +1,11 @@
 
-import React, { useEffect } from 'react';
-import { X, AlertTriangle, Trash2 } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { X, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (() => Promise<void>) | (() => void);
   title?: string;
   message?: string;
   record?: {
@@ -24,19 +24,44 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   message,
   record
 }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  }, [isOpen]);
+
   // Lắng nghe phím Escape để đóng hộp thoại mà không thực hiện xóa
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !isSubmitting) {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isSubmitting]);
 
   if (!isOpen) return null;
+
+  const handleDelete = async () => {
+    if (isSubmittingRef.current || isSubmitting) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      console.error("Lỗi xóa hồ sơ:", err);
+    } finally {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  };
 
   const formatDateDDMMYYYY = (dateStr?: string | null) => {
     if (!dateStr) return '---';
@@ -130,20 +155,28 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           <button 
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-slate-700 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-2xs"
+            disabled={isSubmitting}
+            className="px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-slate-700 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-2xs disabled:opacity-50"
           >
             Hủy bỏ
           </button>
           <button 
             type="button"
-            onClick={() => { 
-              onConfirm(); 
-              onClose(); 
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-red-500/20 cursor-pointer"
+            onClick={handleDelete}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-red-500/20 cursor-pointer disabled:opacity-50"
           >
-            <Trash2 size={16} />
-            Đồng ý xóa
+            {isSubmitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Đang xóa</span>
+              </>
+            ) : (
+              <>
+                <Trash2 size={16} />
+                <span>Đồng ý</span>
+              </>
+            )}
           </button>
         </div>
       </div>

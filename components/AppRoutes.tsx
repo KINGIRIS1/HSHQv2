@@ -22,6 +22,7 @@ import {
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey, groupEmployeesByDepartment } from "../utils/appHelpers";
 import { checkUserPermission } from "../utils/permissionUtils";
 import { exportCustomRecordsToExcel } from "../utils/excelExport";
+import { getRegistrationWorkflowCategory } from "../utils/registrationWorkflows";
 
 // Components
 import DashboardView from "./DashboardView";
@@ -36,6 +37,7 @@ import RecordRow from "./RecordRow";
 import WorkScheduleView from "./WorkScheduleView";
 import SaoLucView from "./archive/SaoLucView";
 import CongVanView from "./archive/CongVanView";
+import VaoSoView from "./archive/VaoSoView";
 import SystemView from "./SystemView";
 import BarcodeGeneratorView from "./BarcodeGeneratorView";
 
@@ -91,6 +93,10 @@ import {
   Compass,
   PenTool,
   Printer,
+  CreditCard,
+  FileCheck2,
+  UserCheck,
+  ArrowRight,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -244,6 +250,22 @@ interface AppRoutesProps {
   handleSyncPendingRecords?: () => Promise<any>;
   handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
   handleBatchDeleteRecords?: (ids: string[]) => Promise<boolean>;
+
+  // Cấp giấy workflows
+  taxSubTab?: 'transfer' | 'area7' | 'notice';
+  setTaxSubTab?: React.Dispatch<React.SetStateAction<'transfer' | 'area7' | 'notice'>>;
+  setIsPreAssignPrintModalOpen?: (b: boolean) => void;
+  setPreAssignTargetRecords?: (r: RecordFile[]) => void;
+  setIsConfirmPaymentModalOpen?: (b: boolean) => void;
+  setConfirmPaymentTargetRecords?: (r: RecordFile[]) => void;
+  setIsHandoverTaxModalOpen?: (b: boolean) => void;
+  setHandoverTaxTargetRecords?: (r: RecordFile[]) => void;
+  setIsHandoverPostingModalOpen?: (b: boolean) => void;
+  setHandoverPostingTargetRecords?: (r: RecordFile[]) => void;
+  setIsHandoverPrintModalOpen?: (b: boolean) => void;
+  setHandoverPrintTargetRecords?: (r: RecordFile[]) => void;
+  handleAdvanceTaxStatus?: (records: RecordFile[], targetStatus: RecordStatus.PENDING_TAX_KV7 | RecordStatus.PENDING_TAX_PAYMENT) => Promise<void>;
+  onAdvanceTaxStatus?: (records: RecordFile[], targetStatus: RecordStatus.PENDING_TAX_KV7 | RecordStatus.PENDING_TAX_PAYMENT) => Promise<void>;
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
@@ -507,8 +529,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     
     props.setColumnOrder(newOrder);
   };
-
-  const [taxSubTab, setTaxSubTab] = React.useState<'transfer' | 'area7' | 'notice'>('transfer');
 
   // --- RENDER RECORD LIST (Extracted to be used in switch) ---
   const renderRecordList = () => {
@@ -1205,28 +1225,44 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             )}
 
             {/* 3 Sub-tabs cho Tab Thuế (đặt ngoài cùng bên trái trong Tab Thuế) */}
-            {currentView === "test_measurement_office" && (
-              <div className="flex bg-white rounded-md border border-indigo-200 p-1 shadow-sm">
-                <button
-                  onClick={() => setTaxSubTab("transfer")}
-                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${taxSubTab === "transfer" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
-                >
-                  Phiếu chuyển thuế
-                </button>
-                <button
-                  onClick={() => setTaxSubTab("area7")}
-                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${taxSubTab === "area7" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
-                >
-                  Thuế khu vực 7
-                </button>
-                <button
-                  onClick={() => setTaxSubTab("notice")}
-                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${taxSubTab === "notice" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
-                >
-                  Thông báo thuế
-                </button>
-              </div>
-            )}
+            {currentView === "test_measurement_office" && (() => {
+              const isDangkyRecord = (r: any) => r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+              const transferCount = records.filter((r) => isDangkyRecord(r) && r.status === RecordStatus.TAX_TRANSFER).length;
+              const area7Count = records.filter((r) => isDangkyRecord(r) && r.status === RecordStatus.PENDING_TAX_KV7).length;
+              const noticeCount = records.filter((r) => isDangkyRecord(r) && r.status === RecordStatus.PENDING_TAX_PAYMENT).length;
+
+              return (
+                <div className="flex bg-white rounded-md border border-indigo-200 p-1 shadow-sm">
+                  <button
+                    onClick={() => props.setTaxSubTab?.("transfer")}
+                    className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${props.taxSubTab === "transfer" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                  >
+                    <span>1. Chờ chuyển thuế</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${props.taxSubTab === "transfer" ? "bg-white text-indigo-700" : "bg-indigo-50 text-indigo-600"}`}>
+                      {transferCount}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => props.setTaxSubTab?.("area7")}
+                    className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${props.taxSubTab === "area7" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                  >
+                    <span>2. Chờ thuế KV7</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${props.taxSubTab === "area7" ? "bg-white text-indigo-700" : "bg-indigo-50 text-indigo-600"}`}>
+                      {area7Count}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => props.setTaxSubTab?.("notice")}
+                    className={`px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${props.taxSubTab === "notice" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                  >
+                    <span>3. Chờ giấy nộp tiền</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${props.taxSubTab === "notice" ? "bg-white text-indigo-700" : "bg-indigo-50 text-indigo-600"}`}>
+                      {noticeCount}
+                    </span>
+                  </button>
+                </div>
+              );
+            })()}
 
             {currentView !== "test_measurement_office" && !["handover_list", "archive_handover_list", "test_handover_list"].includes(currentView) && (
                 <div className="flex gap-2">
@@ -1441,6 +1477,206 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           <Send size={16} /> Bàn giao 1 cửa ({props.selectedRecordIds.size})
                         </button>
                       )}
+
+                    {/* --- CẤP GIẤY WORKFLOW BUTTONS THEO ĐÚNG THỦ TỤC & TRẠNG THÁI --- */}
+                    {(() => {
+                      const isCapGiay = currentView.startsWith("test_");
+                      if (!isCapGiay) return null;
+
+                      const selectedRecords = records.filter((r) => props.selectedRecordIds.has(r.id));
+                      if (selectedRecords.length === 0) return null;
+
+                      // 1. Hồ sơ thuộc thủ tục có nghĩa vụ tài chính (thuế): Chuyển nhượng, tặng cho, thừa kế, chuyển MĐSD...
+                      const taxEligibleRecords = selectedRecords.filter((r) => {
+                        const cat = getRegistrationWorkflowCategory(r.recordType);
+                        const isTaxWorkflow = cat === "tax_transfer" || cat === "lost_cert_tax";
+                        const isAppraisalPhase = !r.status || r.status === RecordStatus.APPRAISAL || r.status === RecordStatus.RECEIVED || r.status === RecordStatus.IN_PROGRESS;
+                        return isTaxWorkflow && isAppraisalPhase;
+                      });
+
+                      // 2. Hồ sơ hợp lệ giao In GCN:
+                      // - Thủ tục không thuế (fast_track, split_plot) sau thẩm định
+                      // - Thủ tục có thuế (tax_transfer, lost_cert_tax) nhưng đã hoàn tất nộp thuế vào NSNN (PENDING_PRINT_CERT hoặc đã có chứng từ GNT)
+                      // - Thủ tục mất GCN (lost_cert) sau khi hoàn tất niêm yết 30 ngày (PENDING_PRINT_CERT)
+                      // Tuyệt đối KHÔNG áp dụng cho thủ tục Thế chấp/Giải chấp (gdbd) hoặc hồ sơ có thuế chưa nộp thuế
+                      const printEligibleRecords = selectedRecords.filter((r) => {
+                        const cat = getRegistrationWorkflowCategory(r.recordType);
+                        if (cat === "gdbd" || cat === "gdbd_register" || cat === "gdbd_release") return false;
+
+                        if (cat === "fast_track" || cat === "split_plot") {
+                          return !r.status || r.status === RecordStatus.APPRAISAL || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.PENDING_PRINT_CERT;
+                        }
+                        if (cat === "tax_transfer" || cat === "lost_cert_tax") {
+                          return r.status === RecordStatus.PENDING_PRINT_CERT || (Boolean(r.taxPaymentDate || (r as any).paymentReceivedAt) && r.status !== RecordStatus.APPRAISAL);
+                        }
+                        if (cat === "lost_cert") {
+                          return r.status === RecordStatus.PENDING_PRINT_CERT;
+                        }
+                        return false;
+                      });
+
+                      // 3. Hồ sơ Cấp lại do mất GCN (Bắt buộc niêm yết 30 ngày tại UBND xã theo Điều 36 NĐ 101/2024)
+                      const postingEligibleRecords = selectedRecords.filter((r) => {
+                        const cat = getRegistrationWorkflowCategory(r.recordType);
+                        const isLostCert = cat === "lost_cert" || cat === "lost_cert_tax";
+                        const isPostingPhase = !r.status || r.status === RecordStatus.APPRAISAL || r.status === RecordStatus.RECEIVED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.PENDING_POSTING;
+                        return isLostCert && isPostingPhase;
+                      });
+
+                      // 4. Hồ sơ Thế chấp / Xóa thế chấp / Giao dịch bảo đảm:
+                      // Thẩm định xong -> Trình kiểm tra (không chuyển thuế, không in phôi GCN mới, không niêm yết)
+                      const gdbdEligibleRecords = selectedRecords.filter((r) => {
+                        const cat = getRegistrationWorkflowCategory(r.recordType);
+                        const isGdbd = cat === "gdbd" || cat === "gdbd_register" || cat === "gdbd_release";
+                        const isAppraisalPhase = !r.status || r.status === RecordStatus.APPRAISAL || r.status === RecordStatus.IN_PROGRESS;
+                        return isGdbd && isAppraisalPhase;
+                      });
+
+                      const isAppraisalOrAllView = currentView === "test_measurement_field" || currentView === "test_records";
+
+                      return (
+                        <>
+                          {/* Giao chuyển thuế: CHỈ hiện khi có hồ sơ thủ tục có thuế hợp lệ */}
+                          {isAppraisalOrAllView && taxEligibleRecords.length > 0 && (
+                            <button
+                              id="btn-bulk-handover-tax"
+                              onClick={() => {
+                                if (props.setHandoverTaxTargetRecords && props.setIsHandoverTaxModalOpen) {
+                                  props.setHandoverTaxTargetRecords(taxEligibleRecords);
+                                  props.setIsHandoverTaxModalOpen(true);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                              title={taxEligibleRecords.length < selectedRecords.length ? `Chỉ áp dụng cho ${taxEligibleRecords.length}/${selectedRecords.length} hồ sơ có nghĩa vụ tài chính` : `Giao chuyển thuế cho ${taxEligibleRecords.length} hồ sơ`}
+                            >
+                              <CreditCard size={16} /> Giao chuyển thuế ({taxEligibleRecords.length}{taxEligibleRecords.length < selectedRecords.length ? `/${selectedRecords.length}` : ""})
+                            </button>
+                          )}
+
+                          {/* Giao In GCN: CHỈ hiện khi có hồ sơ thủ tục không thuế thẩm định xong HOẶC hồ sơ thuế đã nộp tiền */}
+                          {isAppraisalOrAllView && printEligibleRecords.length > 0 && (
+                            <button
+                              id="btn-bulk-handover-print"
+                              onClick={() => {
+                                if (props.setHandoverPrintTargetRecords && props.setIsHandoverPrintModalOpen) {
+                                  props.setHandoverPrintTargetRecords(printEligibleRecords);
+                                  props.setIsHandoverPrintModalOpen(true);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 bg-cyan-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-cyan-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                              title={printEligibleRecords.length < selectedRecords.length ? `Chỉ áp dụng cho ${printEligibleRecords.length}/${selectedRecords.length} hồ sơ đủ điều kiện in GCN` : `Giao In GCN cho ${printEligibleRecords.length} hồ sơ`}
+                            >
+                              <Printer size={16} /> Giao In GCN ({printEligibleRecords.length}{printEligibleRecords.length < selectedRecords.length ? `/${selectedRecords.length}` : ""})
+                            </button>
+                          )}
+
+                          {/* Giao niêm yết: CHỈ hiện khi có hồ sơ thủ tục Cấp lại do mất GCN */}
+                          {isAppraisalOrAllView && postingEligibleRecords.length > 0 && (
+                            <button
+                              id="btn-bulk-handover-posting"
+                              onClick={() => {
+                                if (props.setHandoverPostingTargetRecords && props.setIsHandoverPostingModalOpen) {
+                                  props.setHandoverPostingTargetRecords(postingEligibleRecords);
+                                  props.setIsHandoverPostingModalOpen(true);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 bg-amber-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-amber-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                              title={postingEligibleRecords.length < selectedRecords.length ? `Chỉ áp dụng cho ${postingEligibleRecords.length}/${selectedRecords.length} hồ sơ mất GCN cần niêm yết xã` : `Giao niêm yết cho ${postingEligibleRecords.length} hồ sơ`}
+                            >
+                              <FileCheck2 size={16} /> Giao niêm yết ({postingEligibleRecords.length}{postingEligibleRecords.length < selectedRecords.length ? `/${selectedRecords.length}` : ""})
+                            </button>
+                          )}
+
+                          {/* Trình kiểm tra cho thủ tục Thế chấp / Giải chấp sau khi thẩm định */}
+                          {isAppraisalOrAllView && gdbdEligibleRecords.length > 0 && (
+                            <button
+                              id="btn-bulk-submit-check-gdbd"
+                              onClick={() => {
+                                if (props.setSubmitTargetRecords && props.setIsSubmitCheckModalOpen) {
+                                  props.setSubmitTargetRecords(gdbdEligibleRecords);
+                                  props.setIsSubmitCheckModalOpen(true);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 bg-orange-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-orange-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                              title={gdbdEligibleRecords.length < selectedRecords.length ? `Trình kiểm tra cho ${gdbdEligibleRecords.length}/${selectedRecords.length} hồ sơ thế chấp/giải chấp` : `Trình kiểm tra cho ${gdbdEligibleRecords.length} hồ sơ thế chấp`}
+                            >
+                              <ClipboardList size={16} /> Trình kiểm tra ({gdbdEligibleRecords.length}{gdbdEligibleRecords.length < selectedRecords.length ? `/${selectedRecords.length}` : ""})
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* Các nút trong Tab Thuế */}
+                    {currentView === "test_measurement_office" && (
+                      <>
+                        {/* 1. Chờ chuyển thuế -> Nút Chuyển sang Thuế KV7 */}
+                        {props.taxSubTab === "transfer" && (
+                          <button
+                            id="btn-advance-to-area7"
+                            onClick={async () => {
+                              const targets = records.filter((r) => props.selectedRecordIds.has(r.id));
+                              const fn = props.handleAdvanceTaxStatus || props.onAdvanceTaxStatus;
+                              if (fn) {
+                                await fn(targets, RecordStatus.PENDING_TAX_KV7);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                          >
+                            <ArrowRight size={16} /> Chuyển Thuế KV7 ({props.selectedRecordIds.size})
+                          </button>
+                        )}
+
+                        {/* 2. Chờ thuế KV7 -> Giao trước cán bộ In GCN & Chuyển Chờ nộp tiền */}
+                        {props.taxSubTab === "area7" && (
+                          <>
+                            <button
+                              id="btn-pre-assign-print"
+                              onClick={() => {
+                                const targets = records.filter((r) => props.selectedRecordIds.has(r.id));
+                                if (props.setPreAssignTargetRecords && props.setIsPreAssignPrintModalOpen) {
+                                  props.setPreAssignTargetRecords(targets);
+                                  props.setIsPreAssignPrintModalOpen(true);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                            >
+                              <UserCheck size={16} /> Giao trước cán bộ In GCN ({props.selectedRecordIds.size})
+                            </button>
+                            <button
+                              id="btn-advance-to-notice"
+                              onClick={async () => {
+                                const targets = records.filter((r) => props.selectedRecordIds.has(r.id));
+                                const fn = props.handleAdvanceTaxStatus || props.onAdvanceTaxStatus;
+                                if (fn) {
+                                  await fn(targets, RecordStatus.PENDING_TAX_PAYMENT);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 bg-amber-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-amber-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                            >
+                              <ArrowRight size={16} /> Chuyển Chờ nộp tiền ({props.selectedRecordIds.size})
+                            </button>
+                          </>
+                        )}
+
+                        {/* 3. Chờ giấy nộp tiền -> Xác nhận đã có GNT */}
+                        {props.taxSubTab === "notice" && (
+                          <button
+                            id="btn-confirm-payment-receipt"
+                            onClick={() => {
+                              const targets = records.filter((r) => props.selectedRecordIds.has(r.id));
+                              if (props.setConfirmPaymentTargetRecords && props.setIsConfirmPaymentModalOpen) {
+                                props.setConfirmPaymentTargetRecords(targets);
+                                props.setIsConfirmPaymentModalOpen(true);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                          >
+                            <CreditCard size={16} /> Xác nhận đã có GNT ({props.selectedRecordIds.size})
+                          </button>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -1885,6 +2121,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       );
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
+    case "vao_so":
+      return <VaoSoView currentUser={currentUser} wards={wards} />;
     case "barcode_generator":
       return <BarcodeGeneratorView />;
     case "account_settings":

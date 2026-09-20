@@ -547,17 +547,7 @@ export function processAssignmentTimelineCheck(
 
     const existingPrivate = record.privateNotes || '';
     updates.privateNotes = existingPrivate ? `${existingPrivate}\n${fullInternalNote}` : fullInternalNote;
-
-    const newLog = {
-      id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      recordId: record.id,
-      previousStatus: record.status,
-      newStatus: targetRollbackStatus,
-      changedBy: currentUser?.name || 'Hệ thống',
-      changedAt: new Date().toISOString(),
-      note: fullInternalNote
-    };
-    updates.statusLogs = [...(record.statusLogs || []), newLog];
+    // Không ghi nhật ký statusLogs cho thao tác Giao việc / Giao biên tập theo quy chuẩn hệ thống
   }
 
   if (record.data) {

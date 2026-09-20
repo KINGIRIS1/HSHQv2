@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   X,
   UserCheck,
@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
+  Loader2,
 } from 'lucide-react';
 import { RecordFile, Employee } from '../../types';
 
@@ -31,7 +32,16 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
     new Date().toISOString().substring(0, 10)
   );
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const isSubmittingRef = useRef<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+      setErrorMsg('');
+    }
+  }, [isOpen]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -53,12 +63,15 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
+
     if (!selectedEmployee) {
       setErrorMsg('Vui lòng chọn cán bộ để phân công.');
       return;
     }
 
     try {
+      isSubmittingRef.current = true;
       setIsSubmitting(true);
       setErrorMsg('');
       const ids = selectedRecords.map((r) => r.id);
@@ -68,6 +81,7 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
       setErrorMsg(err?.message || 'Có lỗi xảy ra khi phân công.');
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -163,17 +177,27 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer disabled:opacity-50"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              disabled={isSubmitting || !selectedEmployee}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <CheckCircle2 size={14} />
-              <span>{isSubmitting ? 'Đang phân công...' : 'Xác nhận phân công'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Đang giao</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={14} />
+                  <span>Đồng ý</span>
+                </>
+              )}
             </button>
           </div>
         </form>

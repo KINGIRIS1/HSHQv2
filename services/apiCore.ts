@@ -421,7 +421,11 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     
     // DateTime fields: Lưu chuẩn ISO timestamp hoặc null
     const dateTimeFields = [
-        'lastRemindedAt', 'reminderDate', 'created_at', 'updated_at', 'createdAt', 'updatedAt'
+        'lastRemindedAt', 'reminderDate', 'created_at', 'updated_at', 'createdAt', 'updatedAt',
+        'printStaffAssignedAt', 'print_staff_assigned_at', 'printDeadlineStartAt', 'print_deadline_start_at',
+        'paymentReceivedAt', 'payment_received_at',
+        'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedAt',
+        'supplementRequestDate', 'supplementReturnedDate'
     ];
 
     // Date-only fields: Đảm bảo CHỈ lưu YYYY-MM-DD hợp lệ, loại bỏ hoàn toàn các chuỗi ngày lỗi
@@ -433,8 +437,12 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         'pendingCheckDate', 'checkedDate', 'completedWorkDate',
         'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
         'officeAssignedDate', 'officeCompletedDate',
-        'archiveHandoverDate', 'returnBatchDate', 'returnBatchDate',
-        'ngay_thang', 'date', 'createdDate'
+        'archiveHandoverDate', 'returnBatchDate',
+        'ngay_thang', 'date', 'createdDate',
+        'appraisalDate', 'postingDate', 'postingEndDate',
+        'taxTransferDate', 'taxKv7Date', 'taxPaymentDate',
+        'printCertDate', 'pendingHandoverDate',
+        'paymentReceiptDate', 'payment_receipt_date'
     ];
 
     dateTimeFields.forEach(field => {
@@ -500,7 +508,11 @@ export const sanitizePayloadForDateErrors = (payload: any): any => {
         'pendingCheckDate', 'checkedDate', 'completedWorkDate',
         'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
         'officeAssignedDate', 'officeCompletedDate',
-        'archiveHandoverDate', 'returnBatchDate', 'ngay_thang', 'date', 'createdDate'
+        'archiveHandoverDate', 'returnBatchDate', 'ngay_thang', 'date', 'createdDate',
+        'appraisalDate', 'postingDate', 'postingEndDate',
+        'taxTransferDate', 'taxKv7Date', 'taxPaymentDate',
+        'printCertDate', 'pendingHandoverDate',
+        'paymentReceiptDate', 'payment_receipt_date'
     ];
     dateFields.forEach(f => {
         if (clean[f] !== undefined) {
@@ -508,7 +520,13 @@ export const sanitizePayloadForDateErrors = (payload: any): any => {
         }
     });
 
-    const dateTimeFields = ['lastRemindedAt', 'reminderDate', 'created_at', 'updated_at', 'createdAt', 'updatedAt'];
+    const dateTimeFields = [
+        'lastRemindedAt', 'reminderDate', 'created_at', 'updated_at', 'createdAt', 'updatedAt',
+        'printStaffAssignedAt', 'print_staff_assigned_at', 'printDeadlineStartAt', 'print_deadline_start_at',
+        'paymentReceivedAt', 'payment_received_at',
+        'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedAt',
+        'supplementRequestDate', 'supplementReturnedDate'
+    ];
     dateTimeFields.forEach(f => {
         if (clean[f] !== undefined) {
             clean[f] = keepOnlyDateTime(clean[f]);

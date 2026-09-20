@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile } from '../types';
 import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2 } from 'lucide-react';
 import { fetchContracts } from '../services/api';
@@ -7,7 +7,7 @@ interface ReturnResultModalProps {
   isOpen: boolean;
   onClose: () => void;
   record: RecordFile | null;
-  onConfirm: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', returnReason?: string) => void;
+  onConfirm: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', returnReason?: string) => Promise<void> | void;
 }
 
 const ReturnResultModal: React.FC<ReturnResultModalProps> = ({ 
@@ -18,10 +18,14 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   const [receiverName, setReceiverName] = useState('');
   const [returnedPrice, setReturnedPrice] = useState<string>('');
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
   
   useEffect(() => {
     if (isOpen && record) {
+        setIsSubmitting(false);
+        isSubmittingRef.current = false;
         setReceiptType((record.receiptType as 'Biên Lai' | 'Hóa Đơn') || 'Biên Lai');
         setReceiptNumber(record.receiptNumber || '');
         setReceiverName(record.receiverName || record.customerName || '');
@@ -89,8 +93,9 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
 
   if (!isOpen || !record) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (isSubmittingRef.current || isSubmitting) return;
       setErrorMsg('');
 
       if (!receiptNumber.trim()) {
@@ -114,8 +119,18 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
           return;
       }
 
-      onConfirm(receiptNumber.trim(), receiverName.trim(), priceNum, receiptType, '');
-      onClose();
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
+      try {
+          await onConfirm(receiptNumber.trim(), receiverName.trim(), priceNum, receiptType, '');
+          onClose();
+      } catch (err) {
+          console.error("Lỗi trả kết quả:", err);
+          setErrorMsg('Có lỗi xảy ra khi thực hiện trả kết quả.');
+      } finally {
+          setIsSubmitting(false);
+          isSubmittingRef.current = false;
+      }
   };
 
   return (
@@ -237,15 +252,27 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 <button 
                     type="button" 
                     onClick={onClose} 
-                    className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors cursor-pointer"
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors cursor-pointer disabled:opacity-50"
                 >
                     Hủy bỏ
                 </button>
                 <button 
                     type="submit"
-                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 cursor-pointer"
+                    disabled={isSubmitting}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                 >
-                    <CheckCircle2 size={18} /> Xác nhận
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 size={18} className="animate-spin" />
+                            <span>Đang lưu</span>
+                        </>
+                    ) : (
+                        <>
+                            <CheckCircle2 size={18} />
+                            <span>Đồng ý</span>
+                        </>
+                    )}
                 </button>
             </div>
         </form>

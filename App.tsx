@@ -15,8 +15,16 @@ import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExp
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
 import { updateRecordApi, updateRecordFieldsApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent, markRecordsRecentlyUpdated } from './services/api';
-import { createArchiveBatch, getOrGenerateDailyHighestBatch } from './services/apiArchive';
+import { createArchiveBatch, getOrGenerateDailyHighestBatch, allocateNextVaoSoNumbers, syncDangKyToVaoSo } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
+import {
+  preAssignPrintStaffInDb,
+  confirmPaymentReceiptInDb,
+  assignPrintStaffInDb,
+  handoverPostingInDb,
+  handoverTaxInDb,
+  advanceTaxStatusInDb,
+} from './services/apiRegistration';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -209,6 +217,18 @@ function App() {
   const [bulkSignPendingRecords, setBulkSignPendingRecords] = useState<RecordFile[]>([]);
   const [isSignApprovalModalOpen, setIsSignApprovalModalOpen] = useState(false);
   const [signApprovalTargetRecords, setSignApprovalTargetRecords] = useState<RecordFile[]>([]);
+
+  // Modals Quy trình Cấp giấy
+  const [isPreAssignPrintModalOpen, setIsPreAssignPrintModalOpen] = useState(false);
+  const [preAssignTargetRecords, setPreAssignTargetRecords] = useState<RecordFile[]>([]);
+  const [isConfirmPaymentModalOpen, setIsConfirmPaymentModalOpen] = useState(false);
+  const [confirmPaymentTargetRecords, setConfirmPaymentTargetRecords] = useState<RecordFile[]>([]);
+  const [isHandoverTaxModalOpen, setIsHandoverTaxModalOpen] = useState(false);
+  const [handoverTaxTargetRecords, setHandoverTaxTargetRecords] = useState<RecordFile[]>([]);
+  const [isHandoverPostingModalOpen, setIsHandoverPostingModalOpen] = useState(false);
+  const [handoverPostingTargetRecords, setHandoverPostingTargetRecords] = useState<RecordFile[]>([]);
+  const [isHandoverPrintModalOpen, setIsHandoverPrintModalOpen] = useState(false);
+  const [handoverPrintTargetRecords, setHandoverPrintTargetRecords] = useState<RecordFile[]>([]);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -1519,16 +1539,42 @@ function App() {
 
   const handleExecuteSignApproval = async (targetRecords: RecordFile[], newComponents?: DossierComponentItem[]) => {
       const nowStr = new Date().toISOString();
+      
+      // Phân tách các hồ sơ Đăng ký/Cấp giấy cần cấp số mới
+      const capGiayRecordsToAllocate = targetRecords.filter(r => {
+          const isCapGiay = isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+          return isCapGiay && !r.entryNumber;
+      });
+
+      let allocatedNumbers: string[] = [];
+      if (capGiayRecordsToAllocate.length > 0) {
+          try {
+              allocatedNumbers = await allocateNextVaoSoNumbers("CN", capGiayRecordsToAllocate.length);
+          } catch (errAlloc: any) {
+              console.error("Lỗi cấp số tự động:", errAlloc);
+              setToast({ type: 'error', message: `Lỗi cấp số vào sổ tự động: ${errAlloc?.message || 'Vui lòng kiểm tra cấu hình database'}` });
+              return;
+          }
+      }
+
+      let allocIndex = 0;
       const updatedTargets = targetRecords.map(r => {
           const isCapGiay = isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
           const nextStatus = isCapGiay ? RecordStatus.PENDING_HANDOVER : RecordStatus.SIGNED;
           const statusNote = isCapGiay ? 'Ký duyệt - Chờ bàn giao' : 'Ký duyệt';
+          
+          let finalEntryNum = r.entryNumber;
+          if (isCapGiay && !finalEntryNum) {
+              finalEntryNum = allocatedNumbers[allocIndex++];
+          }
+
           return {
               ...r,
               status: nextStatus,
               approvalDate: nowStr,
               pendingHandoverDate: isCapGiay ? nowStr : r.pendingHandoverDate,
               completedDate: null,
+              entryNumber: finalEntryNum,
               ...(newComponents ? { dossierComponents: newComponents } : {}),
               statusLogs: createStatusLog(r, nextStatus, statusNote)
           };
@@ -1537,6 +1583,22 @@ function App() {
       try {
           const res = await updateRecordsBatchById(updatedTargets);
           if (!res.success) throw new Error("Lỗi lưu ký duyệt vào CSDL");
+
+          // Ánh xạ tự động sang Module Vào Sổ GCN (luutru_records type = 'vaoso')
+          const capGiayUpdated = updatedTargets.filter(r => {
+              return isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+          });
+          if (capGiayUpdated.length > 0) {
+              const syncSuccess = await syncDangKyToVaoSo(capGiayUpdated);
+              if (!syncSuccess) {
+                  console.warn("[VaoSo Sync] Đồng bộ sang module Vào sổ GCN gặp lỗi nhỏ nhưng dữ liệu đăng ký vẫn được bảo lưu.");
+              } else {
+                  // Ghi log kiểm toán an toàn
+                  capGiayUpdated.forEach(rec => {
+                      logSystemEvent(currentUser?.username || 'system', 'LOGIN', `Cấp số vào sổ thành công cho hồ sơ ${rec.code}: ${rec.entryNumber}`).catch(e => console.error(e));
+                  });
+              }
+          }
 
           const updateMap = new Map<string, RecordFile>();
           updatedTargets.forEach(u => updateMap.set(u.id, u));
@@ -1555,16 +1617,42 @@ function App() {
 
   const handleExecuteSignBatch = async () => {
       const nowStr = new Date().toISOString();
+      
+      // Phân tách các hồ sơ Đăng ký/Cấp giấy cần cấp số mới trong lô ký duyệt đợt
+      const capGiayRecordsToAllocate = bulkSignPendingRecords.filter(r => {
+          const isCapGiay = isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+          return isCapGiay && !r.entryNumber;
+      });
+
+      let allocatedNumbers: string[] = [];
+      if (capGiayRecordsToAllocate.length > 0) {
+          try {
+              allocatedNumbers = await allocateNextVaoSoNumbers("CN", capGiayRecordsToAllocate.length);
+          } catch (errAlloc: any) {
+              console.error("Lỗi cấp số tự động đợt:", errAlloc);
+              setToast({ type: 'error', message: `Lỗi cấp số vào sổ tự động: ${errAlloc?.message || 'Vui lòng kiểm tra cấu hình database'}` });
+              return;
+          }
+      }
+
+      let allocIndex = 0;
       const updatedTargets = bulkSignPendingRecords.map(r => {
           const isCapGiay = isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
           const nextStatus = isCapGiay ? RecordStatus.PENDING_HANDOVER : RecordStatus.SIGNED;
           const statusNote = isCapGiay ? 'Ký duyệt đợt - Chờ bàn giao' : 'Ký duyệt đợt';
+          
+          let finalEntryNum = r.entryNumber;
+          if (isCapGiay && !finalEntryNum) {
+              finalEntryNum = allocatedNumbers[allocIndex++];
+          }
+
           return {
               ...r,
               status: nextStatus,
               approvalDate: nowStr,
               pendingHandoverDate: isCapGiay ? nowStr : r.pendingHandoverDate,
               completedDate: null,
+              entryNumber: finalEntryNum,
               statusLogs: createStatusLog(r, nextStatus, statusNote)
           };
       });
@@ -1573,12 +1661,28 @@ function App() {
           const res = await updateRecordsBatchById(updatedTargets);
           if (!res.success) throw new Error("Lỗi lưu ký duyệt vào CSDL");
 
+          // Ánh xạ tự động sang Module Vào Sổ GCN (luutru_records type = 'vaoso')
+          const capGiayUpdated = updatedTargets.filter(r => {
+              return isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+          });
+          if (capGiayUpdated.length > 0) {
+              const syncSuccess = await syncDangKyToVaoSo(capGiayUpdated);
+              if (!syncSuccess) {
+                  console.warn("[VaoSo Sync Batch] Đồng bộ sang module Vào sổ GCN gặp lỗi nhỏ.");
+              } else {
+                  // Ghi log kiểm toán an toàn
+                  capGiayUpdated.forEach(rec => {
+                      logSystemEvent(currentUser?.username || 'system', 'LOGIN', `Cấp số vào sổ hàng loạt thành công cho hồ sơ ${rec.code}: ${rec.entryNumber}`).catch(e => console.error(e));
+                  });
+              }
+          }
+
           const updateMap = new Map<string, RecordFile>();
           updatedTargets.forEach(u => updateMap.set(u.id, u));
           setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
           setSelectedRecordIds(new Set());
-          setToast({ type: 'success', message: `Đã chuyển ${bulkSignPendingRecords.length} hồ sơ sang "Đã ký".` });
+          setToast({ type: 'success', message: `Đã chuyển ${bulkSignPendingRecords.length} hồ sơ sang "Chờ bàn giao" và hoàn tất cấp số/vào sổ.` });
           setIsBulkSignModalOpen(false);
       } catch (err: any) {
           console.error("Batch sign batch error:", err);
@@ -1801,6 +1905,108 @@ function App() {
           setToast({ type: 'error', message: `Trả hồ sơ thất bại: ${err?.message || 'Lỗi Supabase'}` });
       }
   }, [rejectReturnTargetRecords, currentUser]);
+
+  // --- HANDLERS CHO QUY TRÌNH CẤP GIẤY ---
+  const handleConfirmPreAssign = useCallback(async (recordIds: string[], printStaffId: string) => {
+    try {
+      const res = await preAssignPrintStaffInDb(recordIds, printStaffId, currentUser?.username || '');
+      if (!res.success) throw new Error(res.error || "Giao trước cán bộ in thất bại");
+      setToast({ type: 'success', message: `Đã giao trước cán bộ In GCN cho ${res.updatedCount} hồ sơ!` });
+      setIsPreAssignPrintModalOpen(false);
+      setPreAssignTargetRecords([]);
+      setSelectedRecordIds(new Set());
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setToast({ type: 'error', message: err?.message || 'Lỗi khi giao trước cán bộ in' });
+    }
+  }, [currentUser, loadData]);
+
+  const handleConfirmPaymentReceipt = useCallback(async (
+    targetRecords: RecordFile[],
+    receiptData: { receiptDate: string; receiptNumber: string; note: string }
+  ) => {
+    try {
+      const recordIds = targetRecords.map(r => r.id);
+      const res = await confirmPaymentReceiptInDb(recordIds, receiptData, currentUser?.username || '');
+      if (!res.success) throw new Error(res.error || "Xác nhận Giấy nộp tiền thất bại");
+      setToast({ type: 'success', message: `Đã xác nhận Giấy nộp tiền cho ${res.updatedCount} hồ sơ!` });
+      setIsConfirmPaymentModalOpen(false);
+      setConfirmPaymentTargetRecords([]);
+      setSelectedRecordIds(new Set());
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setToast({ type: 'error', message: err?.message || 'Lỗi khi xác nhận Giấy nộp tiền' });
+    }
+  }, [currentUser, loadData]);
+
+  const handleConfirmHandoverTax = useCallback(async (recordIds: string[], assignedTo: string) => {
+    try {
+      const res = await handoverTaxInDb(recordIds, assignedTo, currentUser?.username || '');
+      if (!res.success) throw new Error(res.error || "Giao chuyển thuế thất bại");
+      setToast({ type: 'success', message: `Đã chuyển ${res.updatedCount} hồ sơ sang Chờ chuyển thuế!` });
+      setIsHandoverTaxModalOpen(false);
+      setHandoverTaxTargetRecords([]);
+      setSelectedRecordIds(new Set());
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setToast({ type: 'error', message: err?.message || 'Lỗi khi giao chuyển thuế' });
+    }
+  }, [currentUser, loadData]);
+
+  const handleConfirmHandoverPosting = useCallback(async (recordIds: string[], assignedTo: string) => {
+    try {
+      const res = await handoverPostingInDb(recordIds, assignedTo, currentUser?.username || '');
+      if (!res.success) throw new Error(res.error || "Giao niêm yết thất bại");
+      setToast({ type: 'success', message: `Đã giao niêm yết ${res.updatedCount} hồ sơ!` });
+      setIsHandoverPostingModalOpen(false);
+      setHandoverPostingTargetRecords([]);
+      setSelectedRecordIds(new Set());
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setToast({ type: 'error', message: err?.message || 'Lỗi khi giao niêm yết' });
+    }
+  }, [currentUser, loadData]);
+
+  const handleConfirmHandoverPrint = useCallback(async (recordIds: string[], assignedTo: string) => {
+    try {
+      const res = await assignPrintStaffInDb(recordIds, assignedTo, currentUser?.username || '');
+      if (!res.success) throw new Error(res.error || "Giao In GCN thất bại");
+      setToast({ type: 'success', message: `Đã giao In GCN cho ${res.updatedCount} hồ sơ!` });
+      setIsHandoverPrintModalOpen(false);
+      setHandoverPrintTargetRecords([]);
+      setSelectedRecordIds(new Set());
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setToast({ type: 'error', message: err?.message || 'Lỗi khi giao In GCN' });
+    }
+  }, [currentUser, loadData]);
+
+  const handleAdvanceTaxStatus = useCallback(async (
+    targetRecords: RecordFile[],
+    targetStatus: RecordStatus.PENDING_TAX_KV7 | RecordStatus.PENDING_TAX_PAYMENT
+  ) => {
+    try {
+      const recordIds = targetRecords.map(r => r.id);
+      const res = await advanceTaxStatusInDb(recordIds, targetStatus, currentUser?.username || '');
+      if (!res.success) throw new Error(res.error || "Chuyển trạng thái thuế thất bại");
+      setToast({ type: 'success', message: `Đã chuyển ${res.updatedCount} hồ sơ sang trạng thái mới!` });
+      setSelectedRecordIds(new Set());
+      if (targetStatus === RecordStatus.PENDING_TAX_KV7) {
+        recordFilterProps.setTaxSubTab('area7');
+      } else if (targetStatus === RecordStatus.PENDING_TAX_PAYMENT) {
+        recordFilterProps.setTaxSubTab('notice');
+      }
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setToast({ type: 'error', message: err?.message || 'Lỗi khi chuyển trạng thái thuế' });
+    }
+  }, [currentUser, loadData, recordFilterProps]);
 
   if (!currentUser) return (
     <>
@@ -2140,6 +2346,18 @@ function App() {
             handleSyncPendingRecords={handleSyncPendingRecords}
             handleBatchUpdateRecords={handleBatchUpdateRecords}
             handleBatchDeleteRecords={handleBatchDeleteRecords}
+
+            setIsPreAssignPrintModalOpen={setIsPreAssignPrintModalOpen}
+            setPreAssignTargetRecords={setPreAssignTargetRecords}
+            setIsConfirmPaymentModalOpen={setIsConfirmPaymentModalOpen}
+            setConfirmPaymentTargetRecords={setConfirmPaymentTargetRecords}
+            setIsHandoverTaxModalOpen={setIsHandoverTaxModalOpen}
+            setHandoverTaxTargetRecords={setHandoverTaxTargetRecords}
+            setIsHandoverPostingModalOpen={setIsHandoverPostingModalOpen}
+            setHandoverPostingTargetRecords={setHandoverPostingTargetRecords}
+            setIsHandoverPrintModalOpen={setIsHandoverPrintModalOpen}
+            setHandoverPrintTargetRecords={setHandoverPrintTargetRecords}
+            onAdvanceTaxStatus={handleAdvanceTaxStatus}
         />
 
         <AppModals 
@@ -2159,6 +2377,22 @@ function App() {
             isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
             isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
             
+            isPreAssignPrintModalOpen={isPreAssignPrintModalOpen} setIsPreAssignPrintModalOpen={setIsPreAssignPrintModalOpen}
+            preAssignTargetRecords={preAssignTargetRecords}
+            onConfirmPreAssign={handleConfirmPreAssign}
+            isConfirmPaymentModalOpen={isConfirmPaymentModalOpen} setIsConfirmPaymentModalOpen={setIsConfirmPaymentModalOpen}
+            confirmPaymentTargetRecords={confirmPaymentTargetRecords}
+            onConfirmPaymentReceipt={handleConfirmPaymentReceipt}
+            isHandoverTaxModalOpen={isHandoverTaxModalOpen} setIsHandoverTaxModalOpen={setIsHandoverTaxModalOpen}
+            handoverTaxTargetRecords={handoverTaxTargetRecords}
+            onConfirmHandoverTax={handleConfirmHandoverTax}
+            isHandoverPostingModalOpen={isHandoverPostingModalOpen} setIsHandoverPostingModalOpen={setIsHandoverPostingModalOpen}
+            handoverPostingTargetRecords={handoverPostingTargetRecords}
+            onConfirmHandoverPosting={handleConfirmHandoverPosting}
+            isHandoverPrintModalOpen={isHandoverPrintModalOpen} setIsHandoverPrintModalOpen={setIsHandoverPrintModalOpen}
+            handoverPrintTargetRecords={handoverPrintTargetRecords}
+            onConfirmHandoverPrint={handleConfirmHandoverPrint}
+
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
             deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}

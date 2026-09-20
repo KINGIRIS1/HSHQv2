@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import AutoResizeTextarea from './AutoResizeTextarea';
-import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare } from 'lucide-react';
+import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare, Loader2 } from 'lucide-react';
 import { RecordFile, User, Employee, RecordStatus } from '../types';
 
 export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler' | 'withdraw_citizen';
@@ -28,7 +28,16 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
   const [reason, setReason] = useState('');
   const [returnDate, setReturnDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+      setErrorMsg('');
+    }
+  }, [isOpen]);
 
   if (!isOpen || records.length === 0) return null;
 
@@ -45,11 +54,13 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
     if (!reason.trim()) {
       setErrorMsg('Vui lòng nhập lý do giải trình trả hồ sơ!');
       return;
     }
     setErrorMsg('');
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       await onConfirm(returnOption, reason.trim(), returnDate);
@@ -60,6 +71,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
       setErrorMsg('Có lỗi xảy ra khi thực hiện thao tác. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -241,17 +253,26 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-colors active:scale-95"
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-colors active:scale-95 disabled:opacity-50"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !reason.trim()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-40 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
+              className="flex items-center gap-2 px-6 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-40 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95 disabled:cursor-not-allowed"
             >
-              <Undo2 size={16} />
-              {isSubmitting ? 'Đang xử lý...' : 'Đồng ý'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Đang trả</span>
+                </>
+              ) : (
+                <>
+                  <Undo2 size={16} />
+                  <span>Đồng ý</span>
+                </>
+              )}
             </button>
           </div>
         </form>

@@ -16,6 +16,11 @@ import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal, { ReturnOptionType } from './RejectReturnStepModal';
 import ExtendDeadlineModal from './ExtendDeadlineModal';
+import { PreAssignPrintStaffModal } from './registration/PreAssignPrintStaffModal';
+import { ConfirmPaymentReceiptModal } from './registration/ConfirmPaymentReceiptModal';
+import { HandoverTaxModal } from './registration/HandoverTaxModal';
+import { HandoverPostingModal } from './registration/HandoverPostingModal';
+import { HandoverPrintModal } from './registration/HandoverPrintModal';
 import * as XLSX from 'xlsx-js-style';
 import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
 
@@ -36,6 +41,32 @@ interface AppModalsProps {
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
     isExtendModalOpen?: boolean;
+
+    // Modals Cấp giấy
+    isPreAssignPrintModalOpen?: boolean;
+    setIsPreAssignPrintModalOpen?: (v: boolean) => void;
+    preAssignTargetRecords?: RecordFile[];
+    onConfirmPreAssign?: (recordIds: string[], printStaffId: string) => Promise<void>;
+
+    isConfirmPaymentModalOpen?: boolean;
+    setIsConfirmPaymentModalOpen?: (v: boolean) => void;
+    confirmPaymentTargetRecords?: RecordFile[];
+    onConfirmPaymentReceipt?: (records: RecordFile[], receiptData: { receiptDate: string; receiptNumber: string; note: string }) => Promise<void>;
+
+    isHandoverTaxModalOpen?: boolean;
+    setIsHandoverTaxModalOpen?: (v: boolean) => void;
+    handoverTaxTargetRecords?: RecordFile[];
+    onConfirmHandoverTax?: (recordIds: string[], assignedTo: string) => Promise<void>;
+
+    isHandoverPostingModalOpen?: boolean;
+    setIsHandoverPostingModalOpen?: (v: boolean) => void;
+    handoverPostingTargetRecords?: RecordFile[];
+    onConfirmHandoverPosting?: (recordIds: string[], assignedTo: string) => Promise<void>;
+
+    isHandoverPrintModalOpen?: boolean;
+    setIsHandoverPrintModalOpen?: (v: boolean) => void;
+    handoverPrintTargetRecords?: RecordFile[];
+    onConfirmHandoverPrint?: (recordIds: string[], assignedTo: string) => Promise<void>;
     
     // Data States
     editingRecord: RecordFile | null;
@@ -348,6 +379,46 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees}
                 users={props.users}
                 onConfirm={props.onConfirmExtendDeadline || (async () => {})}
+            />
+
+            {/* Modals Quy trình Cấp giấy */}
+            <PreAssignPrintStaffModal
+                isOpen={!!props.isPreAssignPrintModalOpen}
+                onClose={() => props.setIsPreAssignPrintModalOpen && props.setIsPreAssignPrintModalOpen(false)}
+                selectedRecords={props.preAssignTargetRecords || []}
+                employees={props.employees}
+                onConfirmPreAssign={props.onConfirmPreAssign || (async () => {})}
+            />
+
+            <ConfirmPaymentReceiptModal
+                isOpen={!!props.isConfirmPaymentModalOpen}
+                onClose={() => props.setIsConfirmPaymentModalOpen && props.setIsConfirmPaymentModalOpen(false)}
+                selectedRecords={props.confirmPaymentTargetRecords || []}
+                onConfirmPayment={props.onConfirmPaymentReceipt || (async () => {})}
+            />
+
+            <HandoverTaxModal
+                isOpen={!!props.isHandoverTaxModalOpen}
+                onClose={() => props.setIsHandoverTaxModalOpen && props.setIsHandoverTaxModalOpen(false)}
+                selectedRecords={props.handoverTaxTargetRecords || []}
+                employees={props.employees}
+                onConfirmHandoverTax={props.onConfirmHandoverTax || (async () => {})}
+            />
+
+            <HandoverPostingModal
+                isOpen={!!props.isHandoverPostingModalOpen}
+                onClose={() => props.setIsHandoverPostingModalOpen && props.setIsHandoverPostingModalOpen(false)}
+                selectedRecords={props.handoverPostingTargetRecords || []}
+                employees={props.employees}
+                onConfirmHandoverPosting={props.onConfirmHandoverPosting || (async () => {})}
+            />
+
+            <HandoverPrintModal
+                isOpen={!!props.isHandoverPrintModalOpen}
+                onClose={() => props.setIsHandoverPrintModalOpen && props.setIsHandoverPrintModalOpen(false)}
+                selectedRecords={props.handoverPrintTargetRecords || []}
+                employees={props.employees}
+                onConfirmHandoverPrint={props.onConfirmHandoverPrint || (async () => {})}
             />
         </>
     );

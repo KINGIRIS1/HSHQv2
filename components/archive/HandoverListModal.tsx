@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { X, ListPlus, List } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, ListPlus, List, Loader2 } from 'lucide-react';
 import { fetchListsByDate } from '../../services/apiArchive';
 
 interface HandoverListModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (listName: string, handoverDate: string) => void;
+    onConfirm: (listName: string, handoverDate: string) => Promise<void> | void;
     type: 'saoluc' | 'congvan';
 }
 
@@ -15,9 +15,13 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
     const [newListName, setNewListName] = useState('');
     const [selectedList, setSelectedList] = useState('');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = useRef(false);
 
     useEffect(() => {
         if (isOpen) {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
             loadLists(selectedDate);
         }
     }, [isOpen, selectedDate]);
@@ -44,18 +48,31 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
         }
     };
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
+        if (isSubmittingRef.current || isSubmitting) return;
+        
+        let finalName = '';
         if (mode === 'new') {
-            const finalName = newListName.trim() || `Đợt 1`;
-            onConfirm(finalName, selectedDate);
+            finalName = newListName.trim() || `Đợt 1`;
         } else {
             if (!selectedList) {
                 alert('Vui lòng chọn danh sách');
                 return;
             }
-            onConfirm(selectedList, selectedDate);
+            finalName = selectedList;
         }
-        onClose();
+
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+        try {
+            await onConfirm(finalName, selectedDate);
+            onClose();
+        } catch (err) {
+            console.error("Lỗi tạo danh sách bàn giao:", err);
+        } finally {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+        }
     };
 
     if (!isOpen) return null;
@@ -67,7 +84,7 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
                     <h3 className="font-bold text-lg flex items-center gap-2">
                         <ListPlus size={20}/> Tạo danh sách bàn giao
                     </h3>
-                    <button onClick={onClose} className="hover:bg-blue-700 p-1 rounded-full transition-colors">
+                    <button onClick={onClose} disabled={isSubmitting} className="hover:bg-blue-700 p-1 rounded-full transition-colors disabled:opacity-50">
                         <X size={20} />
                     </button>
                 </div>
@@ -120,9 +137,31 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
-                        <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium">Hủy</button>
-                        <button onClick={handleConfirm} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 shadow-sm flex items-center gap-2">
-                            <List size={16}/> Xác nhận
+                        <button 
+                            type="button"
+                            onClick={onClose} 
+                            disabled={isSubmitting}
+                            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium disabled:opacity-50"
+                        >
+                            Hủy
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={handleConfirm} 
+                            disabled={isSubmitting}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    <span>Đang chốt</span>
+                                </>
+                            ) : (
+                                <>
+                                    <List size={16}/>
+                                    <span>Đồng ý</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>

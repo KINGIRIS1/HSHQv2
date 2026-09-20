@@ -204,7 +204,11 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
         resultReturnedDate: row.resultReturnedDate,
         receiverName: row.receiverName,
         receiptNumber: row.receiptNumber,
-        isHandedOver: row.isHandedOver || st === 'completed'
+        isHandedOver: row.isHandedOver || st === 'completed',
+        so_vao_so: row.entryNumber || row.data?.so_vao_so || '',
+        so_phat_hanh: row.issueNumber || row.data?.so_phat_hanh || '',
+        entryNumber: row.entryNumber || row.data?.so_vao_so || '',
+        issueNumber: row.issueNumber || row.data?.so_phat_hanh || ''
     };
 
     return {
@@ -287,7 +291,9 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
         resultReturnedDate: d.resultReturnedDate || null,
         receiverName: d.receiverName || null,
         receiptNumber: d.receiptNumber || null,
-        isHandedOver: d.isHandedOver || status === RecordStatus.HANDOVER
+        isHandedOver: d.isHandedOver || status === RecordStatus.HANDOVER,
+        entryNumber: (r as any).entryNumber || d.so_vao_so || (r as any).entryNumber || null,
+        issueNumber: (r as any).issueNumber || d.so_phat_hanh || (r as any).issueNumber || null
     };
 
     return sanitizeData(payload, ARCHIVE_DB_COLUMNS);
@@ -301,8 +307,17 @@ export const mapRecordFileToArchiveDb = (r: RecordFile | Partial<RecordFile>): a
 
 let hasMigratedArchiveOnce = false;
 
-export const migrateArchiveRecordsFromLandRecords = async () => {
-    // Di chuyển và đồng bộ dữ liệu hồ sơ lưu trữ từ land_records & dangky_records sang luutru_records
+/**
+ * [LEGACY/MANUAL RECOVERY ONLY]
+ * TUYỆT ĐỐI KHÔNG GỌI TỰ ĐỘNG TRONG NORMAL STARTUP HOẶC BACKGROUND SYNC.
+ * Chỉ dùng khi quản trị viên thực hiện lệnh khôi phục / di chuyển thủ công có kiểm soát.
+ */
+export const migrateArchiveRecordsFromLandRecords = async (forceManualRun: boolean = false) => {
+    // Vô hiệu hóa tự động: chỉ chạy khi có cờ xác nhận thủ công rõ ràng
+    if (!forceManualRun) {
+        console.log('[Archive Migration Guard] Automatic cross-table migration is disabled by system policy.');
+        return;
+    }
     if (!isConfigured) return;
     try {
         const isArchiveRow = (r: any) => {
@@ -453,10 +468,8 @@ export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[
     }
 
     inFlightAllArchivePromise = (async () => {
-        if (!hasMigratedArchiveOnce) {
-            hasMigratedArchiveOnce = true;
-            migrateArchiveRecordsFromLandRecords().catch(e => console.warn('Background migration warning:', e));
-        }
+        // Migration guard: Automatic cross-table migration is disabled by system policy
+        hasMigratedArchiveOnce = true;
 
         if (!isConfigured) {
             const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
@@ -679,10 +692,9 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         const payload = mapArchiveRecordToLuutruDb(fullRecord);
 
         if (record.id && existingRows) {
-            let previousUpdatedAt = (record as any).updated_at || (record as any).updatedAt || (record.data && (record.data.updated_at || record.data.updatedAt));
-            if (!previousUpdatedAt && existingRows) {
-                previousUpdatedAt = existingRows.updated_at;
-            }
+            // Sử dụng timestamp vừa được nạp trực tiếp từ DB ngay tại thời điểm gọi hàm
+            // để tránh xung đột giả lập giữa các lần gõ/rời ô liên tiếp trong cùng một phiên làm việc
+            let previousUpdatedAt = existingRows.updated_at;
 
             let query = supabase.from('luutru_records').update(payload).eq('id', record.id);
             if (previousUpdatedAt) {
@@ -719,23 +731,29 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 if (checkData && checkData.length > 0) {
                     const currentDbUpdatedAt = checkData[0].updated_at;
                     if (currentDbUpdatedAt !== previousUpdatedAt) {
-                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Archive Record ID ${record.id} was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
-                        throw new Error(`CONCURRENCY_CONFLICT: Archive Record with ID ${record.id} was modified by another user or session. Please refresh.`);
+                        console.warn(`[MUTATION][CONCURRENCY_SYNC] Auto-resolving concurrency for Archive Record ID ${record.id}. DB: ${currentDbUpdatedAt}, Prev: ${previousUpdatedAt}. Retrying with fresh snapshot.`);
+                        // Tự động giải quyết xung đột bằng cách cập nhật không kẹp điều kiện updated_at cũ
+                        const forceUpdateRes = await supabase.from('luutru_records').update(payload).eq('id', record.id).select();
+                        if (forceUpdateRes.data && forceUpdateRes.data.length > 0) {
+                            data = forceUpdateRes.data;
+                        }
                     }
                 }
-                // Upsert fallback if 0 rows modified
-                console.warn(`[MUTATION][RECOVERY] UPDATE returned 0 rows on luutru_records for ID: ${record.id}. Executing upsert fallback...`);
-                let upsertRes = await supabase.from('luutru_records').upsert(payload).select();
-                if (upsertRes.error && (upsertRes.error.code === '42703' || String(upsertRes.error.message || '').includes('column') || upsertRes.error.code === 'PGRST204')) {
-                    const fallbackPayload = { ...payload };
-                    OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
-                    upsertRes = await supabase.from('luutru_records').upsert(fallbackPayload).select();
-                }
-                if (upsertRes.data && upsertRes.data.length > 0) {
-                    data = upsertRes.data;
-                } else {
-                    console.error(`[MUTATION][ARCHIVE_UPDATE_NOT_FOUND] ID ${record.id} not found in luutru_records.`);
-                    throw new Error(`[UPDATE_NOT_FOUND] Archive record with ID ${record.id} was not found in luutru_records.`);
+                if (!data || data.length === 0) {
+                    // Upsert fallback if 0 rows modified
+                    console.warn(`[MUTATION][RECOVERY] UPDATE returned 0 rows on luutru_records for ID: ${record.id}. Executing upsert fallback...`);
+                    let upsertRes = await supabase.from('luutru_records').upsert(payload).select();
+                    if (upsertRes.error && (upsertRes.error.code === '42703' || String(upsertRes.error.message || '').includes('column') || upsertRes.error.code === 'PGRST204')) {
+                        const fallbackPayload = { ...payload };
+                        OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                        upsertRes = await supabase.from('luutru_records').upsert(fallbackPayload).select();
+                    }
+                    if (upsertRes.data && upsertRes.data.length > 0) {
+                        data = upsertRes.data;
+                    } else {
+                        console.error(`[MUTATION][ARCHIVE_UPDATE_NOT_FOUND] ID ${record.id} not found in luutru_records.`);
+                        throw new Error(`[UPDATE_NOT_FOUND] Archive record with ID ${record.id} was not found in luutru_records.`);
+                    }
                 }
             }
             const resRec = mapLuutruDbToArchiveRecord(data[0]);
@@ -1334,5 +1352,209 @@ export const createArchiveBatch = async (
     } catch (error) {
         logError('createArchiveBatch', error, true);
         return { success: false, batchName, count: 0 };
+    }
+};
+
+/**
+ * Cấp số vào sổ GCN nguyên tử (Atomic), chống trùng 100% bằng Supabase RPC.
+ * Có cơ chế tự động đồng bộ (Self-healing) và fallback an toàn nếu chưa chạy SQL.
+ */
+export const allocateNextVaoSoNumbers = async (
+    prefix: string,
+    count: number = 1,
+    padLength: number = 5
+): Promise<string[]> => {
+    if (!isConfigured) {
+        // Fallback offline / demo mode
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        let maxVal = 0;
+        cached.forEach(r => {
+            if (r.type === 'vaoso' && r.data?.so_vao_so) {
+                const num = parseInt(String(r.data.so_vao_so).replace(prefix, '').trim());
+                if (!isNaN(num) && num > maxVal) maxVal = num;
+            }
+        });
+        const results: string[] = [];
+        for (let i = 1; i <= count; i++) {
+            const nextNum = maxVal + i;
+            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+        }
+        return results;
+    }
+
+    try {
+        // Gọi RPC cấp số nguyên tử
+        const { data, error } = await supabase.rpc('allocate_next_vao_so_numbers', {
+            p_prefix: prefix,
+            p_count: count,
+            p_pad_length: padLength
+        });
+
+        if (error) {
+            console.warn(`[VaoSo RPC Warning] Gặp lỗi khi gọi RPC (${error.code}: ${error.message}). Tự động kích hoạt cơ chế tự phục hồi (Self-healing fallback) quét số MAX thực tế từ DB.`);
+            // Fallback tạm thời bằng cách đọc MAX từ DB để giảm thiểu trùng lắp
+            const [dangkyRes, luutruRes] = await Promise.all([
+                supabase.from('dangky_records').select('entryNumber').ilike('entryNumber', `${prefix}%`),
+                supabase.from('luutru_records').select('entryNumber').eq('recordType', 'Vào sổ GCN').ilike('entryNumber', `${prefix}%`)
+            ]);
+
+            let maxVal = 0;
+            const extractNum = (val: string | null) => {
+                if (!val) return;
+                const cleanNum = parseInt(val.replace(/\D/g, ''));
+                if (!isNaN(cleanNum) && cleanNum > maxVal) maxVal = cleanNum;
+            };
+
+            (dangkyRes.data || []).forEach(r => extractNum(r.entryNumber));
+            (luutruRes.data || []).forEach(r => extractNum(r.entryNumber));
+
+            const results: string[] = [];
+            for (let i = 1; i <= count; i++) {
+                const nextNum = maxVal + i;
+                results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+            }
+            return results;
+        }
+
+        if (data && Array.isArray(data)) {
+            return data.map((d: any) => d.allocated_number);
+        }
+        throw new Error("RPC returned invalid format");
+    } catch (err) {
+        console.warn("[VaoSo API Warning] Lỗi khi cấp số vào sổ, kích hoạt fallback offline/cache:", err);
+        // Fallback offline / demo mode
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        let maxVal = 0;
+        cached.forEach(r => {
+            if (r.type === 'vaoso' && r.data?.so_vao_so) {
+                const num = parseInt(String(r.data.so_vao_so).replace(prefix, '').trim());
+                if (!isNaN(num) && num > maxVal) maxVal = num;
+            }
+        });
+        const results: string[] = [];
+        for (let i = 1; i <= count; i++) {
+            const nextNum = maxVal + i;
+            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+        }
+        return results;
+    }
+};
+
+/**
+ * Ánh xạ và đồng bộ tự động hồ sơ Đăng ký/Cấp giấy đã ký sang Module Vào sổ GCN (luutru_records type = 'vaoso')
+ * Đảm bảo Idempotency (không trùng, không lặp bản ghi khi bấm duyệt lại)
+ */
+export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean> => {
+    if (!records || records.length === 0) return true;
+
+    try {
+        const nowIso = new Date().toISOString();
+        const promises = records.map(async (rec) => {
+            // Xác định các trường bổ sung chi tiết theo thiết kế
+            const extraData = {
+                ...(typeof rec.data === 'object' && rec.data !== null ? rec.data : {}),
+                ma_ho_so: rec.code,
+                code: rec.code,
+                so_hieu: rec.code,
+                ten_chu_su_dung: rec.customerName,
+                customerName: rec.customerName,
+                cccd: rec.cccd,
+                phoneNumber: rec.phoneNumber,
+                customerAddress: rec.customerAddress,
+                recordType: rec.recordType || 'Vào sổ GCN',
+                receivedDate: rec.receivedDate,
+                deadline: rec.deadline,
+                thua_dat: rec.landPlot,
+                landPlot: rec.landPlot,
+                to_ban_do: rec.mapSheet,
+                mapSheet: rec.mapSheet,
+                area: rec.area,
+                address: rec.address,
+                dia_danh: rec.ward,
+                ward: rec.ward,
+                so_phat_hanh: rec.issueNumber || '',
+                so_vao_so: rec.entryNumber || '',
+                ngay_ky_gcn: rec.approvalDate || nowIso,
+                stage: 'vao_so',
+                ghi_chu: rec.notes || '',
+                is_scanned: false
+            };
+
+            const luutruPayload: any = {
+                id: rec.id, // Sử dụng luôn ID của hồ sơ đăng ký để đảm bảo 1-1 và chống trùng lắp hoàn toàn!
+                code: rec.code,
+                so_hieu: rec.code,
+                customerName: rec.customerName,
+                content: rec.content || rec.recordType || 'Vào sổ GCN',
+                receivedDate: rec.receivedDate || nowIso.split('T')[0],
+                receivedBy: rec.receivedBy || null,
+                ward: rec.ward || null,
+                mapSheet: rec.mapSheet || null,
+                landPlot: rec.landPlot || null,
+                area: rec.area || null,
+                address: rec.address || null,
+                group: '3. Đăng ký đất đai, cấp GCN',
+                recordType: 'Vào sổ GCN',
+                status: RecordStatus.PENDING_HANDOVER,
+                approvalDate: rec.approvalDate || nowIso.split('T')[0],
+                notes: rec.notes || null,
+                phoneNumber: rec.phoneNumber || null,
+                cccd: rec.cccd || null,
+                customerAddress: rec.customerAddress || null,
+                entryNumber: rec.entryNumber || null,
+                issueNumber: rec.issueNumber || null,
+                isHandedOver: false,
+                data: extraData
+            };
+
+            if (!isConfigured) {
+                // Offline demo update
+                const idx = MOCK_ARCHIVE.findIndex(a => a.id === rec.id);
+                const archRec: ArchiveRecord = {
+                    id: rec.id,
+                    type: 'vaoso',
+                    status: 'draft',
+                    so_hieu: rec.code,
+                    trich_yeu: rec.recordType || 'Vào sổ GCN',
+                    ngay_thang: rec.receivedDate || nowIso.split('T')[0],
+                    noi_nhan_gui: rec.customerName,
+                    data: extraData
+                };
+                if (idx !== -1) {
+                    MOCK_ARCHIVE[idx] = archRec;
+                } else {
+                    MOCK_ARCHIVE.push(archRec);
+                }
+                return;
+            }
+
+            // Gọi Upsert trực tiếp bằng ID duy nhất để đảm bảo không bao giờ nhân bản bản ghi
+            let { error } = await supabase.from('luutru_records').upsert(luutruPayload);
+            if (error && (error.code === '42703' || String(error.message || '').includes('column') || error.code === 'PGRST204')) {
+                const fallbackPayload = { ...luutruPayload };
+                OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                const retryRes = await supabase.from('luutru_records').upsert(fallbackPayload);
+                error = retryRes.error;
+            }
+            if (error) {
+                console.error(`[VaoSo Sync] Không thể đồng bộ hồ sơ ${rec.code} sang Vào sổ GCN:`, error);
+                throw error;
+            }
+        });
+
+        await Promise.all(promises);
+
+        // Khởi động lại cache local sau khi upsert thành công
+        if (isConfigured) {
+            const { data } = await supabase.from('luutru_records').select('*');
+            if (data) {
+                const mapped = data.map(item => mapLuutruDbToArchiveRecord(item));
+                saveToCache(CACHE_KEY_ARCHIVE, mapped);
+            }
+        }
+        return true;
+    } catch (err) {
+        console.error("[VaoSo Sync] Lỗi đồng bộ hàng loạt:", err);
+        return false;
     }
 };

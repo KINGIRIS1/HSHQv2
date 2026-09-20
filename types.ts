@@ -45,6 +45,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
     'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
     'test_records', 'test_sub_all', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office', 'test_print_cert', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed',
+    'vao_so', 'VIEW_VAOSO', 'MANAGE_VAOSO',
     'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE', 'MANAGE_SCHEDULE',
@@ -62,6 +63,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
     'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
     'test_records', 'test_sub_all', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office', 'test_print_cert', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed',
+    'vao_so', 'VIEW_VAOSO', 'MANAGE_VAOSO',
     'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
@@ -304,6 +306,21 @@ export interface RecordFile {
   taxPaymentDate?: string | null;
   printCertDate?: string | null;
   pendingHandoverDate?: string | null;
+
+  // Giao trước In GCN & Xác nhận GNT (Module Cấp giấy)
+  printStaffId?: string | null;
+  print_staff_id?: string | null;
+  printStaffAssignedAt?: string | null;
+  print_staff_assigned_at?: string | null;
+  printAssignmentStatus?: 'PRE_ASSIGNED' | 'WAITING_ASSIGNMENT' | 'READY_FOR_PRINT' | string | null;
+  print_assignment_status?: string | null;
+  printDeadlineStartAt?: string | null;
+  print_deadline_start_at?: string | null;
+  paymentReceivedAt?: string | null;
+  payment_received_at?: string | null;
+  paymentReceiptDate?: string | null;
+  payment_receipt_date?: string | null;
+
   updated_at?: string | null;
   updatedAt?: string | null;
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, FileDown, Calendar, MapPin, List } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, FileDown, Calendar, MapPin, List, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { ArchiveRecord } from '../../services/apiArchive';
 import { toTitleCase } from '../../utils/appHelpers';
@@ -18,6 +18,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
     const [selectedBatch, setSelectedBatch] = useState<string>('all');
     const [availableBatches, setAvailableBatches] = useState<string[]>([]);
     const [isExporting, setIsExporting] = useState<boolean>(false);
+    const isExportingRef = useRef<boolean>(false);
     const [exportProgress, setExportProgress] = useState<number>(0);
     const [exportStatusText, setExportStatusText] = useState<string>('');
 
@@ -28,6 +29,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             setSelectedWard('all');
             setSelectedBatch('all');
             setIsExporting(false);
+            isExportingRef.current = false;
             setExportProgress(0);
             setExportStatusText('');
         }
@@ -76,6 +78,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
     }, [selectedDate, selectedWard, records]);
 
     const handleExport = async () => {
+        if (isExportingRef.current || isExporting) return;
         // Filter records to export across all modules
         const exportData = records.filter(r => {
             const bName = getRecordBatch(r);
@@ -98,22 +101,31 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             return;
         }
 
+        isExportingRef.current = true;
         setIsExporting(true);
-        setExportProgress(15);
-        setExportStatusText('Đang lọc và chuẩn bị dữ liệu liên module...');
-        await new Promise(resolve => setTimeout(resolve, 40));
+        try {
+            setExportProgress(15);
+            setExportStatusText('Đang lọc và chuẩn bị dữ liệu liên module...');
+            await new Promise(resolve => setTimeout(resolve, 40));
 
-        // Sort by Batch then by ID (or custom order)
-        exportData.sort((a, b) => {
-            const bA = getRecordBatch(a);
-            const bB = getRecordBatch(b);
-            if (bA !== bB) {
-                return bA.localeCompare(bB);
-            }
-            return 0;
-        });
+            // Sort by Batch then by ID (or custom order)
+            exportData.sort((a, b) => {
+                const bA = getRecordBatch(a);
+                const bB = getRecordBatch(b);
+                if (bA !== bB) {
+                    return bA.localeCompare(bB);
+                }
+                return 0;
+            });
 
-        await generateExcel(exportData);
+            await generateExcel(exportData);
+        } catch (err) {
+            console.error("Lỗi xuất Excel:", err);
+            alert("Đã xảy ra lỗi khi xuất file Excel.");
+        } finally {
+            setIsExporting(false);
+            isExportingRef.current = false;
+        }
     };
 
     const generateExcel = async (data: any[]) => {
@@ -404,6 +416,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
                     <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
                         <button 
+                            type="button"
                             onClick={onClose} 
                             disabled={isExporting}
                             className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium disabled:opacity-50"
@@ -411,13 +424,22 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                             Hủy
                         </button>
                         <button 
+                            type="button"
                             onClick={handleExport} 
                             disabled={isExporting || (availableBatches.length === 0 && selectedBatch !== 'all')}
-                            className="p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold hover:bg-emerald-50 shadow-xs flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95"
-                            title={isExporting ? 'Đang xuất...' : 'Xuất file Excel'}
-                            aria-label="Xuất file Excel"
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95"
                         >
-                            <FileDown size={18} className="text-emerald-600"/>
+                            {isExporting ? (
+                                <>
+                                    <Loader2 size={18} className="animate-spin text-white" />
+                                    <span>Đang xuất</span>
+                                </>
+                            ) : (
+                                <>
+                                    <FileDown size={18} />
+                                    <span>Đồng ý</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>

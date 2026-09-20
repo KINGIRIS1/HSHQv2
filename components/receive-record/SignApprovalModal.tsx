@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { X, FileCheck, CheckCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { X, FileCheck, CheckCircle, Loader2 } from 'lucide-react';
 import { RecordFile, DossierComponentItem } from '../../types';
 import DossierComponentSection from './DossierComponentSection';
 
@@ -19,6 +19,14 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
   onConfirm,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  }, [isOpen]);
   
   const effectiveRecords = useMemo(() => {
     if (records && records.length > 0) return records;
@@ -53,6 +61,8 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
   if (!isOpen || effectiveRecords.length === 0) return null;
 
   const handleConfirmSign = async () => {
+    if (isSubmittingRef.current || isSubmitting) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       await onConfirm(effectiveRecords, isMultiple ? undefined : components);
@@ -62,6 +72,7 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
       alert('Đã xảy ra lỗi trong quá trình ký duyệt hồ sơ. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -124,7 +135,7 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs"
+            className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs disabled:opacity-50"
           >
             Hủy bỏ
           </button>
@@ -134,8 +145,17 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
             disabled={isSubmitting}
             className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
           >
-            <CheckCircle size={15} />
-            {isSubmitting ? 'Đang ký duyệt...' : `Xác nhận Ký duyệt${isMultiple ? ` (${effectiveRecords.length})` : ''}`}
+            {isSubmitting ? (
+              <>
+                <Loader2 size={15} className="animate-spin" />
+                <span>Đang duyệt</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle size={15} />
+                <span>Đồng ý</span>
+              </>
+            )}
           </button>
         </div>
       </div>

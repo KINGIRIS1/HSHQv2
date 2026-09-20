@@ -242,38 +242,47 @@ export const markRecordsRecentlyUpdated = (records: (RecordFile | Partial<Record
 
 /**
  * Kiểm tra mã/nhóm/loại có tiền tố rõ ràng (1.x, 2.x, 3.x, LT-):
- * - Nhóm 1.x / LT- -> luutru_records
- * - Nhóm 2.x -> land_records
- * - Nhóm 3.x -> dangky_records
+ * THỨ TỰ ƯU TIÊN:
+ * ƯU TIÊN 1: recordType rõ ràng (nhóm 1.x -> luutru, nhóm 2.x -> land_records, nhóm 3.x -> dangky_records)
+ * ƯU TIÊN 2: Tiền tố mã CODE rõ ràng (1.xx, LT- -> luutru; 2.xx -> land; 3.xx -> dangky; phân biệt với mã ngày tháng 6 số như 260919-7806)
+ * ƯU TIÊN 3: Tiền tố group rõ ràng (1.x -> luutru; 2.x -> land; 3.x -> dangky)
  */
 export const getExplicitGroup = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' | null => {
     const rawType = String(record.recordType || record.content || '').trim();
     const code = String(record.code || '').trim();
     const groupStr = String(record.group || '').trim();
 
-    // Đối với mã một cửa chuẩn (như H19...), hệ thống không ép định tuyến cứng dựa trên recordType/group
-    // trừ khi chính CODE có tiền tố chỉ định rõ ràng (1.x, 2.x, 3.x, LT-)
-    const isOneStopCode = code.toUpperCase().startsWith('H') || /^H\d+/i.test(code);
-
-    if (
-        code.startsWith('1.') ||
-        code.toUpperCase().startsWith('LT-') ||
-        (!isOneStopCode && (rawType.startsWith('1.') || groupStr.startsWith('1.')))
-    ) {
+    // 1. ƯU TIÊN 1: recordType hoặc content có tiền tố nhóm rõ ràng (1.x, 2.x, 3.x) hoặc tên loại trích lục/đo đạc/cấp giấy
+    if (/^1\.\d+/i.test(rawType) || isArchiveRecordType(rawType)) {
         return 'luutru_records';
     }
-
-    if (
-        code.startsWith('2.') ||
-        (!isOneStopCode && (rawType.startsWith('2.') || groupStr.startsWith('2.')))
-    ) {
+    if (/^2\.\d+/i.test(rawType) || isSurveyRecordType(rawType)) {
         return 'land_records';
     }
+    if (/^3\.\d+/i.test(rawType) || isCertificateRecordType(rawType)) {
+        return 'dangky_records';
+    }
 
-    if (
-        code.startsWith('3.') ||
-        (!isOneStopCode && (rawType.startsWith('3.') || groupStr.startsWith('3.')))
-    ) {
+    // 2. ƯU TIÊN 2: Tiền tố mã CODE rõ ràng (1.x, 2.x, 3.x, LT-)
+    // Lưu ý: code phải có tiền tố dạng 1.xx, 2.xx, 3.xx hoặc LT- để không nhầm với mã ngày tháng (như 260919-7806)
+    if (/^1\.\d+/i.test(code) || code.toUpperCase().startsWith('LT-')) {
+        return 'luutru_records';
+    }
+    if (/^2\.\d+/i.test(code)) {
+        return 'land_records';
+    }
+    if (/^3\.\d+/i.test(code)) {
+        return 'dangky_records';
+    }
+
+    // 3. ƯU TIÊN 3: Tiền tố group rõ ràng
+    if (/^1\./i.test(groupStr)) {
+        return 'luutru_records';
+    }
+    if (/^2\./i.test(groupStr) || groupStr.includes('Đo đạc')) {
+        return 'land_records';
+    }
+    if (/^3\./i.test(groupStr) || groupStr.includes('Đăng ký') || groupStr.includes('Cấp GCN') || groupStr.includes('Cấp giấy')) {
         return 'dangky_records';
     }
 
@@ -282,8 +291,9 @@ export const getExplicitGroup = (record: Partial<RecordFile>): 'dangky_records' 
 
 /**
  * Định tuyến bảng dữ liệu suy đoán:
- * - Ưu tiên kiểm tra tiền tố 1.x, 2.x, 3.x, LT-
- * - Sau đó kiểm tra nhóm, phòng ban, từ khóa
+ * - Ưu tiên kiểm tra explicit group
+ * - Sau đó kiểm tra isSurveyRecordType / isArchiveRecordType / isCertificateRecordType
+ * - Sau đó kiểm tra nhóm, phòng ban, từ khóa và cache
  */
 export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' | null => {
     const explicit = getExplicitGroup(record);
@@ -295,18 +305,28 @@ export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' 
     // 1. Nhóm Lưu trữ
     if (
         isArchiveRecordType(record.recordType) ||
-        isArchiveRecordType(record.content)
+        isArchiveRecordType(record.content) ||
+        rawType.toLowerCase().includes('sao lục') ||
+        rawType.toLowerCase().includes('công văn')
     ) {
         return 'luutru_records';
     }
 
     // 2. Nhóm Đo đạc (2.x)
-    if (groupStr.includes('Đo đạc')) {
+    if (
+        isSurveyRecordType(record.recordType) ||
+        isSurveyRecordType(record.content) ||
+        groupStr.includes('Đo đạc') ||
+        rawType.toLowerCase().includes('trích lục') ||
+        rawType.toLowerCase().includes('trích đo') ||
+        rawType.toLowerCase().includes('cắm mốc')
+    ) {
         return 'land_records';
     }
 
     // 3. Nhóm Đăng ký / Cấp giấy (3.x)
     if (
+        isCertificateRecordType(record) ||
         groupStr.includes('Đăng ký') ||
         groupStr.includes('Cấp GCN') ||
         groupStr.includes('Cấp giấy')
@@ -323,11 +343,6 @@ export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' 
         return 'land_records';
     }
     if (deptStr.includes('đăng ký') || deptStr.includes('cấp giấy') || deptStr.includes('dang ky') || deptStr.includes('cap giay')) {
-        return 'dangky_records';
-    }
-
-    // 5. Kiểm tra từ khóa loại hồ sơ cấp giấy
-    if (isCertificateRecordType(record)) {
         return 'dangky_records';
     }
 
@@ -355,26 +370,19 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
 
     const validSource = normalizeSource(record.sourceTable);
     const explicitGroup = getExplicitGroup(record);
+    const inferredGroup = explicitGroup || getInferredTable(record);
 
-    // RULE 1: Nếu record có tiền tố chỉ định rõ ràng (1.x, 2.x, 3.x, LT-) thì KIỂM TRA XUNG ĐỘT VỚI SOURCETABLE
-    if (explicitGroup) {
-        if (validSource && validSource !== explicitGroup) {
-            console.error(`[ROUTING_GUARD][BLOCK] Record ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}: sourceTable (${validSource}) conflicts with inferred group table (${explicitGroup}).`);
-            throw new Error(`ROUTING_CONFLICT: Record code/group/type indicates '${explicitGroup}' but sourceTable is specified as '${validSource}'. Mutation blocked.`);
-        }
-        return explicitGroup;
+    // ƯU TIÊN 1-3: Phân loại theo recordType, tiền tố mã hoặc nhóm nghiệp vụ
+    if (inferredGroup) {
+        return inferredGroup;
     }
 
-    // RULE 2: Nếu không có tiền tố 1.x, 2.x, 3.x, LT- nhưng có sourceTable hợp lệ -> Tin tưởng sourceTable!
+    // ƯU TIÊN 4: Nếu không có dấu hiệu phân loại rõ ràng nhưng có sourceTable hợp lệ -> Sử dụng sourceTable
     if (validSource) {
         return validSource;
     }
 
-    // RULE 3: Nếu không có sourceTable -> Suy đoán theo getInferredTable
-    const inferredTable = getInferredTable(record);
-    if (inferredTable) return inferredTable;
-
-    // RULE 4: BẮT BUỘC BLOCK ROUTING_UNRESOLVED
+    // BẮT BUỘC BLOCK ROUTING_UNRESOLVED khi không thể xác định
     console.error(`[ROUTING_GUARD][UNRESOLVED] Unable to resolve target table for record:`, record);
     throw new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for record (ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}). Mutation blocked.`);
 };
@@ -505,8 +513,17 @@ export interface RoutingValidationResult {
  * - 2.x -> land_records
  * - 3.x -> dangky_records
  */
-export const validateRecordRouting = (record: Partial<RecordFile>): RoutingValidationResult => {
+export const validateRecordRouting = (
+    record: Partial<RecordFile>,
+    targetTableToMutate?: 'dangky_records' | 'land_records' | 'luutru_records'
+): RoutingValidationResult => {
     const targetTable = getTargetTable(record);
+
+    if (targetTableToMutate && targetTableToMutate !== targetTable) {
+        console.error(`[ROUTING_GUARD][CONFLICT] Record ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}: target table '${targetTableToMutate}' conflicts with resolved target table '${targetTable}'`);
+        throw new Error(`ROUTING_CONFLICT: Record code/group/type indicates '${targetTable}' but target table is specified as '${targetTableToMutate}'. Mutation blocked.`);
+    }
+
     return {
         valid: true,
         targetTable,
@@ -1781,9 +1798,27 @@ export const deleteRecordApi = async (id: string, record?: Partial<RecordFile>):
     }
 
     if (!targetTable) {
-        const unresolvedErr = new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for record ID: ${id}. Delete blocked.`);
-        console.error(`[ROUTING_GUARD][UNRESOLVED]`, unresolvedErr);
-        throw unresolvedErr;
+        const rawSource = mergedRecord.sourceTable || found?.sourceTable || (record as any)?.sourceTable;
+        const normalized = (rawSource === 'archive_records' || rawSource === 'luutru_records') ? 'luutru_records' : (rawSource === 'land_records' ? 'land_records' : (rawSource === 'dangky_records' ? 'dangky_records' : null));
+        if (normalized) {
+            targetTable = normalized;
+        }
+    }
+
+    if (!targetTable) {
+        if (isOnline()) {
+            console.warn(`[deleteRecordApi] Record ID ${id} target table unresolved. Purging across all tables and cleaning cache.`);
+            await Promise.allSettled([
+                supabase.from('land_records').delete().eq('id', id),
+                supabase.from('dangky_records').delete().eq('id', id),
+                supabase.from('luutru_records').delete().eq('id', id)
+            ]);
+            syncCacheOnDelete(id);
+            return true;
+        } else {
+            syncCacheOnDelete(id);
+            return true;
+        }
     }
 
     if (!isOnline()) {
@@ -1929,9 +1964,17 @@ export const deleteRecordsBatchApi = async (
     }
 
     if (unresolvedIds.length > 0) {
-        const unresolvedErr = new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for IDs: ${unresolvedIds.join(', ')}. Batch delete blocked.`);
-        console.error(`[ROUTING_GUARD][UNRESOLVED]`, unresolvedErr);
-        throw unresolvedErr;
+        if (isOnline()) {
+            console.warn(`[MUTATION][DELETE_BATCH] Purging unresolved IDs across tables:`, unresolvedIds);
+            await Promise.allSettled([
+                supabase.from('land_records').delete().in('id', unresolvedIds),
+                supabase.from('dangky_records').delete().in('id', unresolvedIds),
+                supabase.from('luutru_records').delete().in('id', unresolvedIds)
+            ]);
+            await syncCacheOnBatchDelete(unresolvedIds);
+        } else {
+            await syncCacheOnBatchDelete(unresolvedIds);
+        }
     }
 
     if (!isOnline()) {

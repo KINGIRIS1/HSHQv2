@@ -85,6 +85,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
         { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
         { id: 'test_records', label: 'Cấp giấy', icon: FileSignature, visible: true },
+        { id: 'vao_so', label: 'Vào sổ GCN', icon: BookOpen, visible: true },
       ]
     },
 

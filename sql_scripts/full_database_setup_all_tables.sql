@@ -445,9 +445,30 @@ ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "printCertDate" DATE;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "pendingHandoverDate" DATE;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "sourceTable" TEXT;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "previousStatus" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementReturnStatus" TEXT;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementReason" TEXT;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementRequestDate" DATE;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementReturnedDate" DATE;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementRequestedBy" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementRequestedAt" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementStartedAt" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementCompletedBy" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "supplementCompletedAt" TIMESTAMPTZ;
+
+-- Phân công In GCN & Giấy nộp tiền (GNT)
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "printStaffId" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "print_staff_id" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "printStaffAssignedAt" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "print_staff_assigned_at" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "printAssignmentStatus" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "print_assignment_status" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "printDeadlineStartAt" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "print_deadline_start_at" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "paymentReceivedAt" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "payment_received_at" TIMESTAMPTZ;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "paymentReceiptDate" DATE;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "payment_receipt_date" DATE;
+
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
