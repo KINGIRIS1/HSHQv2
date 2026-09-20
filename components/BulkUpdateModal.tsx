@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
-import { STATUS_LABELS, SURVEY_SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, isArchiveRecordType, isArchiveRecord } from '../constants';
+import { STATUS_LABELS, SURVEY_SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, CAP_GIAY_SELECTABLE_STATUSES, isArchiveRecordType, isArchiveRecord } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar, History, User, Building2, Clock, Info, Loader2 } from 'lucide-react';
 import { getDepartmentForRecord, getPureBatchNumber, groupEmployeesByDepartment } from '../utils/appHelpers';
 
@@ -45,7 +45,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   const getDepartmentFromView = (view?: string) => {
     if (!view) return '';
     const v = view.toLowerCase();
-    if (v.startsWith('other_')) {
+    if (v.startsWith('other_') || v.startsWith('test_') || v.startsWith('dangky_') || v === 'registration_records' || v === 'cap_giay') {
       return 'Tổ Cấp giấy';
     }
     if (v.startsWith('archive_') || ['vao_so', 'sao_luc', 'cong_van'].includes(v)) {
@@ -59,23 +59,47 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
 
   const deptFromView = getDepartmentFromView(currentView);
 
+  // Check if Cấp giấy context
+  const isCapGiayFromView = currentView?.startsWith('test_') || currentView?.startsWith('other_') || currentView?.startsWith('dangky_') || currentView === 'registration_records' || deptFromView === 'Tổ Cấp giấy';
+  const allSelectedAreCapGiay = activeRecordsToUpdate.length > 0 && activeRecordsToUpdate.every(r => (r.recordType || '').toLowerCase().includes('cấp giấy') || (r.recordType || '').toLowerCase().includes('đăng ký'));
+  const isCapGiayContext = isCapGiayFromView || allSelectedAreCapGiay;
+
   // Determine Archive context vs Survey context accurately
-  const allSelectedAreArchive = activeRecordsToUpdate.length > 0 && activeRecordsToUpdate.every(r => isArchiveRecord(r) || isArchiveRecordType(r.recordType));
-  const isArchiveFromView = currentView?.startsWith('archive_') || ['vao_so', 'sao_luc', 'cong_van'].includes(currentView?.toLowerCase() || '') || deptFromView === 'Tổ Lưu trữ';
-  const isArchiveContext = isArchiveFromView || (activeRecordsToUpdate.length > 0 ? allSelectedAreArchive : false);
-  const isSurveyContext = !isArchiveContext && deptFromView !== 'Tổ Cấp giấy';
+  const allSelectedAreArchive = !isCapGiayContext && activeRecordsToUpdate.length > 0 && activeRecordsToUpdate.every(r => isArchiveRecord(r) || isArchiveRecordType(r.recordType));
+  const isArchiveFromView = !isCapGiayContext && (currentView?.startsWith('archive_') || ['vao_so', 'sao_luc', 'cong_van'].includes(currentView?.toLowerCase() || '') || deptFromView === 'Tổ Lưu trữ');
+  const isArchiveContext = isArchiveFromView || allSelectedAreArchive;
+  const isSurveyContext = !isCapGiayContext && !isArchiveContext;
 
-  const detectedDept = isArchiveContext 
-    ? 'Tổ Lưu trữ' 
-    : (deptFromView || (activeRecordsToUpdate.length > 0 ? getDepartmentForRecord(activeRecordsToUpdate[0]) : 'Tổ Đo đạc'));
+  const detectedDept = isCapGiayContext 
+    ? 'Tổ Cấp giấy' 
+    : isArchiveContext 
+      ? 'Tổ Lưu trữ' 
+      : (deptFromView || (activeRecordsToUpdate.length > 0 ? getDepartmentForRecord(activeRecordsToUpdate[0]) : 'Tổ Đo đạc'));
 
-  // Quy trình trạng thái hồ sơ (Quy trình làm việc)
-  const selectableStatusList = isSurveyContext 
-    ? SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS)
-    : ARCHIVE_SELECTABLE_STATUSES;
+  // Quy trình trạng thái hồ sơ (Quy trình làm việc) theo từng tổ
+  const selectableStatusList = isCapGiayContext
+    ? CAP_GIAY_SELECTABLE_STATUSES
+    : isSurveyContext 
+      ? SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS)
+      : ARCHIVE_SELECTABLE_STATUSES;
 
   // Định nghĩa các bước lịch sử đồng nhất với quy trình của từng tổ chuyên môn
-  // 1. Tổ Đo đạc: 7 bước đầy đủ từ Tiếp nhận đến Trả kết quả
+  // 1. Tổ Cấp giấy: 11 bước quy trình đầy đủ từ Tiếp nhận đến Trả kết quả
+  const capGiayHistorySteps = [
+    { key: 'RECEIVED', label: 'Bước 1: Tiếp nhận hồ sơ', staffLabel: 'Cán bộ tiếp nhận', dateLabel: 'Ngày nhận hồ sơ' },
+    { key: 'APPRAISAL', label: 'Bước 2: Chờ thẩm định / Thẩm định hồ sơ', staffLabel: 'Cán bộ thẩm định', dateLabel: 'Ngày thẩm định' },
+    { key: 'TAX_TRANSFER', label: 'Bước 3: Chờ chuyển thuế / Chuyển thông tin thuế', staffLabel: 'Cán bộ chuyển thuế', dateLabel: 'Ngày chuyển thuế' },
+    { key: 'PENDING_TAX_KV7', label: 'Bước 4: Chờ thuế KV7 / Xác nhận thuế KV7', staffLabel: 'Cán bộ phụ trách thuế', dateLabel: 'Ngày xác nhận thuế KV7' },
+    { key: 'PENDING_TAX_PAYMENT', label: 'Bước 5: Chờ Giấy nộp tiền', staffLabel: 'Cán bộ thuế', dateLabel: 'Ngày thông báo nộp tiền' },
+    { key: 'PENDING_PRINT_CERT', label: 'Bước 6: Chờ in Giấy chứng nhận (GCN)', staffLabel: 'Cán bộ in GCN', dateLabel: 'Ngày in GCN' },
+    { key: 'PENDING_CHECK', label: 'Bước 7: Chờ kiểm tra hồ sơ & GCN', staffLabel: 'Cán bộ kiểm tra', dateLabel: 'Ngày kiểm tra' },
+    { key: 'PENDING_SIGN', label: 'Bước 8: Chờ ký duyệt GCN', staffLabel: 'Lãnh đạo ký duyệt', dateLabel: 'Ngày trình ký / Ký duyệt' },
+    { key: 'PENDING_HANDOVER', label: 'Bước 9: Chờ bàn giao (Cấp giấy)', staffLabel: 'Cán bộ bàn giao (Tùy chọn)', dateLabel: 'Ngày hoàn thành / Chờ bàn giao' },
+    { key: 'HANDOVER', label: 'Bước 10: Đã giao 1 cửa', staffLabel: 'Cán bộ một cửa', dateLabel: 'Ngày giao 1 cửa' },
+    { key: 'RETURNED', label: 'Bước 11: Đã trả kết quả', staffLabel: 'Cán bộ trả kết quả', dateLabel: 'Ngày trả kết quả' }
+  ];
+
+  // 2. Tổ Đo đạc: 7 bước đầy đủ từ Tiếp nhận đến Trả kết quả
   const surveyHistorySteps = [
     { key: 'RECEIVED', label: 'Bước 1: Tiếp nhận hồ sơ', staffLabel: 'Cán bộ tiếp nhận', dateLabel: 'Ngày nhận hồ sơ' },
     { key: 'FIELD_WORK', label: 'Bước 2: Đo đạc thực địa (Ngoại nghiệp)', staffLabel: 'Cán bộ đo đạc thực địa', dateLabel: 'Ngày đo đạc / Giao việc' },
@@ -86,7 +110,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     { key: 'RETURNED', label: 'Bước 7: Đã trả kết quả', staffLabel: 'Cán bộ trả kết quả', dateLabel: 'Ngày trả kết quả' }
   ];
 
-  // 2. Tổ Lưu trữ: 5 bước quy trình lưu trữ, không có đo đạc thực địa hay biên tập bản đồ
+  // 3. Tổ Lưu trữ: 5 bước quy trình lưu trữ
   const archiveHistorySteps = [
     { key: 'RECEIVED', label: 'Bước 1: Tiếp nhận hồ sơ', staffLabel: 'Cán bộ tiếp nhận', dateLabel: 'Ngày nhận hồ sơ' },
     { key: 'IN_PROGRESS', label: 'Bước 2: Đang thực hiện / Xử lý lưu trữ', staffLabel: 'Cán bộ xử lý lưu trữ', dateLabel: 'Ngày giao / Xử lý' },
@@ -95,7 +119,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     { key: 'RETURNED', label: 'Bước 5: Đã trả kết quả', staffLabel: 'Cán bộ trả kết quả', dateLabel: 'Ngày trả kết quả' }
   ];
 
-  const historySteps = isSurveyContext ? surveyHistorySteps : archiveHistorySteps;
+  const historySteps = isCapGiayContext ? capGiayHistorySteps : (isSurveyContext ? surveyHistorySteps : archiveHistorySteps);
 
   // Lấy thông tin về vai trò cán bộ và mốc ngày tương ứng với từng trạng thái/bước được chọn
   const currentStageInfo = (() => {
@@ -103,6 +127,16 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
       switch (targetValue) {
         case RecordStatus.RECEIVED:
           return { title: 'Tiếp nhận hồ sơ', staffLabel: 'Cán bộ tiếp nhận', dateLabel: 'Ngày nhận hồ sơ', requiresStaff: true };
+        case RecordStatus.APPRAISAL:
+          return { title: 'Thẩm định hồ sơ', staffLabel: 'Cán bộ thẩm định', dateLabel: 'Ngày thẩm định', requiresStaff: true };
+        case RecordStatus.TAX_TRANSFER:
+          return { title: 'Chuyển thông tin thuế', staffLabel: 'Cán bộ chuyển thuế', dateLabel: 'Ngày chuyển thuế', requiresStaff: true };
+        case RecordStatus.PENDING_TAX_KV7:
+          return { title: 'Thuế khu vực 7', staffLabel: 'Cán bộ phụ trách thuế', dateLabel: 'Ngày xử lý thuế KV7', requiresStaff: true };
+        case RecordStatus.PENDING_TAX_PAYMENT:
+          return { title: 'Giấy nộp tiền', staffLabel: 'Cán bộ thuế', dateLabel: 'Ngày thông báo nộp tiền', requiresStaff: true };
+        case RecordStatus.PENDING_PRINT_CERT:
+          return { title: 'In Giấy chứng nhận', staffLabel: 'Cán bộ in GCN', dateLabel: 'Ngày in GCN', requiresStaff: true };
         case RecordStatus.FIELD_WORK:
           return { title: 'Đo đạc thực địa (Ngoại nghiệp)', staffLabel: 'Cán bộ đo đạc thực địa', dateLabel: 'Ngày đo đạc / Giao việc', requiresStaff: true };
         case RecordStatus.OFFICE_WORK:
@@ -117,10 +151,12 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
             requiresStaff: true 
           };
         case RecordStatus.PENDING_CHECK:
-          return { title: 'Kiểm tra nội nghiệp', staffLabel: 'Cán bộ kiểm tra kỹ thuật', dateLabel: 'Ngày chuyển kiểm tra', requiresStaff: true };
+          return { title: isCapGiayContext ? 'Kiểm tra hồ sơ & GCN' : 'Kiểm tra nội nghiệp', staffLabel: 'Cán bộ kiểm tra', dateLabel: 'Ngày chuyển kiểm tra', requiresStaff: true };
         case RecordStatus.PENDING_SIGN:
         case RecordStatus.SIGNED:
           return { title: targetValue === RecordStatus.SIGNED ? 'Đã ký duyệt' : 'Chờ ký duyệt', staffLabel: 'Lãnh đạo ký duyệt', dateLabel: 'Ngày trình ký / Ký duyệt', requiresStaff: true };
+        case RecordStatus.PENDING_HANDOVER:
+          return { title: 'Chờ bàn giao (Cấp giấy)', staffLabel: 'Cán bộ bàn giao (Tùy chọn)', dateLabel: 'Ngày hoàn tất / Chờ bàn giao', requiresStaff: true };
         case RecordStatus.HANDOVER:
           return { title: 'Bàn giao 1 cửa', staffLabel: 'Cán bộ bàn giao (Tùy chọn)', dateLabel: 'Ngày xuất bàn giao', requiresStaff: true };
         case RecordStatus.RETURNED:
@@ -130,7 +166,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         case RecordStatus.WITHDRAWN:
           return { title: 'CSD rút hồ sơ', staffLabel: '', dateLabel: 'Ngày rút hồ sơ', requiresStaff: false };
         case RecordStatus.REJECTED:
-          return { title: 'Trả hồ sơ', staffLabel: '', dateLabel: 'Ngày trả hồ sơ', requiresStaff: false };
+          return { title: isCapGiayContext ? 'Huỷ hồ sơ' : 'Trả hồ sơ', staffLabel: '', dateLabel: 'Ngày huỷ / trả hồ sơ', requiresStaff: false };
         default:
           return { title: '', staffLabel: '', dateLabel: 'Ngày thực hiện', requiresStaff: false };
       }
@@ -158,6 +194,32 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
       if (targetField === 'historyStatus') return keys.includes(targetValue);
       return false;
     };
+
+    // 0. Ngữ cảnh Tổ Cấp giấy
+    if (isCapGiayContext) {
+      if (isStep([RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 'SIGNING'])) {
+        const leaders = employees.filter(emp => {
+          const dept = (emp.department || '').toLowerCase();
+          const pos = (emp.position || '').toLowerCase();
+          return dept.includes('giám đốc') || pos.includes('giám đốc') || pos.includes('lãnh đạo');
+        });
+        return leaders.length > 0 ? leaders : employees;
+      }
+      if (isStep([RecordStatus.PENDING_CHECK, 'CHECKING'])) {
+        const checkers = employees.filter(emp => {
+          const dept = (emp.department || '').toLowerCase();
+          const pos = (emp.position || '').toLowerCase();
+          return (dept.includes('cấp giấy') || dept.includes('đăng ký')) && (pos.includes('trưởng') || pos.includes('phó') || pos.includes('kiểm tra'));
+        });
+        if (checkers.length > 0) return checkers;
+      }
+      const capGiayStaff = employees.filter(emp => {
+        const dept = (emp.department || '').toLowerCase();
+        return dept.includes('cấp giấy') || dept.includes('đăng ký');
+      });
+      if (capGiayStaff.length > 0) return capGiayStaff;
+      return employees;
+    }
 
     // 1. Lãnh đạo ký duyệt (Ban Giám đốc)
     if (isStep([RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 'SIGNING'])) {
@@ -195,7 +257,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     }
 
     // 4. Cán bộ Trả kết quả / Bàn giao 1 cửa
-    if (isStep([RecordStatus.RETURNED, RecordStatus.HANDOVER, 'RETURNED', 'COMPLETED'])) {
+    if (isStep([RecordStatus.RETURNED, RecordStatus.HANDOVER, 'RETURNED', 'COMPLETED', RecordStatus.PENDING_HANDOVER])) {
       const returnStaff = employees.filter(emp => {
         const dept = (emp.department || '').toLowerCase();
         const pos = (emp.position || '').toLowerCase();
@@ -301,7 +363,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                 <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
                     Số lượng hồ sơ: <strong className="font-bold text-orange-600">{activeRecordsToUpdate.length}</strong> hồ sơ
                     {detectedDept && (
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${isArchiveContext ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${isCapGiayContext ? 'bg-emerald-100 text-emerald-800' : (isArchiveContext ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800')}`}>
                         Tổ: {detectedDept}
                       </span>
                     )}
@@ -330,8 +392,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 setStatusEmployee('');
                             }}
                         >
-                            <option value="status">Trang thái Quy trình</option>
-                            <option value="historyStatus">Cập nhập Trang thái lịch sử</option>
+                            <option value="status">Trạng thái Quy trình</option>
+                            <option value="historyStatus">Cập nhật Trạng thái lịch sử</option>
                             <option value="exportDate">Ngày xuất (Bàn giao)</option>
                             <option value="exportBatch">Đợt xuất (Bàn giao)</option>
                             <option value="deadline">Ngày hẹn trả (Gia hạn)</option>
@@ -504,7 +566,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 Cấu hình thông tin lịch sử: <span className="underline">{currentStageInfo.title}</span>
                             </span>
                             <span className="text-[11px] text-amber-700 font-semibold px-2 py-0.5 bg-amber-100 rounded">
-                                {isSurveyContext ? 'Tổ Đo đạc' : 'Tổ Lưu trữ'}
+                                {isCapGiayContext ? 'Tổ Cấp giấy' : (isSurveyContext ? 'Tổ Đo đạc' : 'Tổ Lưu trữ')}
                             </span>
                         </div>
 

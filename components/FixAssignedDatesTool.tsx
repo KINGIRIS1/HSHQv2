@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { RecordFile, RecordStatus } from '../types';
 import { getShortRecordType } from '../constants';
-import { isFieldWorkProcedure, isOfficeOnlySurveyProcedure, parseSafeDate } from '../utils/appHelpers';
+import { isFieldWorkProcedure, isOfficeOnlySurveyProcedure, parseSafeDate, confirmAction } from '../utils/appHelpers';
 import { keepOnlyDate } from '../services/apiCore';
 import { updateRecordsBatchById, fetchRecords } from '../services/apiRecords';
 
@@ -337,7 +337,7 @@ const FixAssignedDatesTool: React.FC<FixAssignedDatesToolProps> = ({ records = [
             `- Ngày biên tập bản đồ (2.1, 2.3) và ngày giao thực địa (2.2, 2.4, 2.5) sẽ được chỉnh về cùng Ngày tiếp nhận.\n` +
             `- Cập nhật trực tiếp lên Cloud Supabase và đồng bộ IndexedDB tự động.`;
 
-        if (!window.confirm(confirmMsg)) return;
+        if (!(await confirmAction(confirmMsg, 'Xác nhận sửa dữ liệu ngày'))) return;
 
         setIsProcessing(true);
         setIsPaused(false);
@@ -457,9 +457,9 @@ const FixAssignedDatesTool: React.FC<FixAssignedDatesToolProps> = ({ records = [
     };
 
     // Hủy bỏ tiến trình
-    const handleStopProcessing = () => {
+    const handleStopProcessing = async () => {
         if (!isProcessing) return;
-        if (window.confirm('Bạn có chắc chắn muốn dừng quá trình sửa hồ sơ? Các mảng đã hoàn thành trước đó vẫn được lưu an toàn.')) {
+        if (await confirmAction('Bạn có chắc chắn muốn dừng quá trình sửa hồ sơ? Các mảng đã hoàn thành trước đó vẫn được lưu an toàn.', 'Xác nhận dừng tiến trình')) {
             cancelRef.current = true;
             setIsProcessing(false);
             setIsPaused(false);

@@ -10,6 +10,7 @@ import { exportSoDiaChinh, generateSoDiaChinhBlob } from '../../utils/exportSoDi
 import { exportSoMucKe } from '../../utils/exportSoMucKe';
 import { getSystemSetting, saveSystemSetting } from '../../services/apiSystem';
 import { fetchEmployees } from '../../services/apiPeople';
+import DeleteConfirmModal from '../DeleteConfirmModal';
 
 // Định nghĩa các cột
 const COLUMNS = [
@@ -71,6 +72,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Settings Modal State
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
+
+    // State for Delete Confirmation Modal (UI chuyên nghiệp thay window.confirm)
+    const [recordToDelete, setRecordToDelete] = useState<ArchiveRecord | null>(null);
 
     // Custom Button Permissions States
     const [rolePermissions, setRolePermissions] = useState<any>(null);
@@ -359,11 +363,19 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         }
     };
 
-    const handleDelete = async (r: ArchiveRecord) => {
-        const codeNumber = r.so_hieu || r.id;
-        if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${codeNumber} không?`, 'Xác nhận xóa hồ sơ')) {
-            await deleteArchiveRecord(r.id);
-            loadData();
+    const handleDelete = (r: ArchiveRecord) => {
+        setRecordToDelete(r);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!recordToDelete) return;
+        try {
+            await deleteArchiveRecord(recordToDelete.id);
+            await loadData();
+        } catch (err) {
+            console.error("Lỗi khi xóa hồ sơ:", err);
+        } finally {
+            setRecordToDelete(null);
         }
     };
 
@@ -414,11 +426,29 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     const handleGetBookNumber = async (record: ArchiveRecord) => {
         try {
-            // Sử dụng hàm cấp số nguyên tử chống trùng từ DB
-            const nextNums = await allocateNextVaoSoNumbers("CN", 1);
+            // Tính toán số lớn nhất hiện tại từ màn hình và cài đặt hệ thống để đảm bảo tăng dần tịnh tiến
+            let currentScreenMax = 0;
+            const settingVal = parseInt(String(currentBookNumber).replace(/\D/g, ''), 10);
+            if (!isNaN(settingVal)) currentScreenMax = Math.max(currentScreenMax, settingVal);
+
+            records.forEach(r => {
+                const soVaoSo = r.data?.so_vao_so;
+                if (soVaoSo) {
+                    const matches = String(soVaoSo).match(/\d+/g);
+                    if (matches) {
+                        matches.forEach(m => {
+                            const n = parseInt(m, 10);
+                            if (!isNaN(n) && n > currentScreenMax) currentScreenMax = n;
+                        });
+                    }
+                }
+            });
+
+            // Sử dụng hàm cấp số nguyên tử chống trùng từ DB kết hợp số lớn nhất trên màn hình
+            const nextNums = await allocateNextVaoSoNumbers("CN", 1, 5, currentScreenMax);
             const formattedNum = nextNums[0]; // Trả về dạng "CN 00123"
 
-            // Trích xuất số thô để đồng bộ UI phụ nếu cần
+            // Trích xuất số thô để đồng bộ UI phụ và cài đặt
             const nextNumStr = formattedNum.replace(/\D/g, '');
             
             const updatedRecord = {
@@ -2061,6 +2091,20 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                     </div>
                 </div>
             )}
+
+            {/* Modal xác nhận xóa hồ sơ chuyên nghiệp (thay thế window.confirm) */}
+            <DeleteConfirmModal
+                isOpen={!!recordToDelete}
+                onClose={() => setRecordToDelete(null)}
+                onConfirm={handleConfirmDelete}
+                title="Xác nhận xóa hồ sơ Vào sổ GCN"
+                record={recordToDelete ? {
+                    code: recordToDelete.data?.ma_ho_so || recordToDelete.data?.so_vao_so || recordToDelete.so_hieu || recordToDelete.id,
+                    customerName: recordToDelete.data?.chu_su_dung || recordToDelete.trich_yeu || '',
+                    receivedDate: recordToDelete.data?.ngay_ky_gcn || recordToDelete.ngay_thang || null,
+                    deadline: recordToDelete.data?.ngay_ky_phieu_tk || null
+                } : null}
+            />
         </div>
     );
 };

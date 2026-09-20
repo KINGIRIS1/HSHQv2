@@ -12,6 +12,7 @@ import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
 import StatusBadge from '../StatusBadge';
+import DeleteConfirmModal from '../DeleteConfirmModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface CongVanViewProps {
@@ -43,6 +44,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
 
     // Export Modal State
     const [showExportModal, setShowExportModal] = useState(false);
+
+    // Delete Confirmation Modal State
+    const [recordToDelete, setRecordToDelete] = useState<ArchiveRecord | null>(null);
 
     const [formData, setFormData] = useState<Partial<ArchiveRecord>>({
         type: 'congvan',
@@ -528,11 +532,19 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         }
     };
 
-    const handleDelete = async (r: ArchiveRecord) => {
-        const codeNumber = r.so_hieu || r.id;
-        if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${codeNumber} không?`, 'Xác nhận xóa hồ sơ')) {
-            await deleteArchiveRecord(r.id);
-            loadData();
+    const handleDelete = (r: ArchiveRecord) => {
+        setRecordToDelete(r);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!recordToDelete) return;
+        try {
+            await deleteArchiveRecord(recordToDelete.id);
+            await loadData();
+        } catch (err) {
+            console.error("Lỗi khi xóa hồ sơ:", err);
+        } finally {
+            setRecordToDelete(null);
         }
     };
 
@@ -888,6 +900,20 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     </div>
                 )}
             </div>
+
+            {/* Modal xác nhận xóa văn bản Công văn */}
+            <DeleteConfirmModal
+                isOpen={!!recordToDelete}
+                onClose={() => setRecordToDelete(null)}
+                onConfirm={handleConfirmDelete}
+                title="Xác nhận xóa văn bản Công văn"
+                record={recordToDelete ? {
+                    code: recordToDelete.so_hieu || recordToDelete.id,
+                    customerName: recordToDelete.noi_nhan_gui || recordToDelete.trich_yeu || '',
+                    receivedDate: recordToDelete.ngay_thang || null,
+                    deadline: null
+                } : null}
+            />
         </div>
     );
 };

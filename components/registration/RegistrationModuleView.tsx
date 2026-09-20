@@ -19,6 +19,8 @@ import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
 import { RegistrationRecordRow } from './RegistrationRecordRow';
 import { RegistrationDetailModal } from './RegistrationDetailModal';
 import { RegistrationAssignModal } from './RegistrationAssignModal';
+import DeleteConfirmModal from '../DeleteConfirmModal';
+import { confirmAction } from '../../utils/appHelpers';
 import {
   fetchDangkyRecords,
   updateDangkyRecord,
@@ -45,6 +47,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   const [viewingRecord, setViewingRecord] = useState<RecordFile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
   const [isAssignOpen, setIsAssignOpen] = useState<boolean>(false);
+  const [recordToDelete, setRecordToDelete] = useState<RecordFile | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null
   );
@@ -139,14 +142,20 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   };
 
   // Xóa 1 hồ sơ
-  const handleDeleteRecord = async (record: RecordFile) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa hồ sơ ${record.code}?`)) return;
+  const handleDeleteRecord = (record: RecordFile) => {
+    setRecordToDelete(record);
+  };
+
+  const handleConfirmDeleteRecord = async () => {
+    if (!recordToDelete) return;
     try {
-      await deleteDangkyRecord(record.id);
-      setRecords((prev) => prev.filter((r) => r.id !== record.id));
-      showFeedback('success', `Đã xóa hồ sơ ${record.code}`);
+      await deleteDangkyRecord(recordToDelete.id);
+      setRecords((prev) => prev.filter((r) => r.id !== recordToDelete.id));
+      showFeedback('success', `Đã xóa hồ sơ ${recordToDelete.code}`);
     } catch (err: any) {
       showFeedback('error', err?.message || 'Không thể xóa hồ sơ.');
+    } finally {
+      setRecordToDelete(null);
     }
   };
 
@@ -154,7 +163,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${ids.length} hồ sơ đã chọn?`)) return;
+    if (!(await confirmAction(`Bạn có chắc chắn muốn xóa ${ids.length} hồ sơ đã chọn khỏi hệ thống Cấp giấy?`, 'Xác nhận xóa hàng loạt'))) return;
 
     try {
       await deleteBulkDangkyRecords(ids);
@@ -656,6 +665,20 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         selectedRecords={selectedRecordsList}
         employees={employees}
         onConfirmAssign={handleConfirmAssign}
+      />
+
+      {/* Modal xác nhận xóa hồ sơ Cấp giấy */}
+      <DeleteConfirmModal
+        isOpen={!!recordToDelete}
+        onClose={() => setRecordToDelete(null)}
+        onConfirm={handleConfirmDeleteRecord}
+        title="Xác nhận xóa hồ sơ Cấp giấy"
+        record={recordToDelete ? {
+          code: recordToDelete.code,
+          customerName: recordToDelete.customerName,
+          receivedDate: recordToDelete.receivedDate || null,
+          deadline: recordToDelete.deadline || null
+        } : null}
       />
     </div>
   );

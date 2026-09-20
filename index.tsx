@@ -45,10 +45,8 @@ if (typeof window !== 'undefined') {
         return false;
       },
 
-      // Dialog xác nhận (đơn giản)
-      showConfirmDialog: async (message: string, title?: string) => {
-        return window.confirm(message);
-      },
+      // Dialog xác nhận native chỉ dùng trên Electron, trên Web sẽ do React Modal quản lý
+      showConfirmDialog: undefined,
 
       // Tất cả các API native khác được đặt thành undefined để các kiểm tra `if (window.electronAPI && window.electronAPI.foo)` vẫn hoạt động
       captureScreenshot: undefined,

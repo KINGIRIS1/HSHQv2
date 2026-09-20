@@ -12,6 +12,7 @@ import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
 import StatusBadge from '../StatusBadge';
+import DeleteConfirmModal from '../DeleteConfirmModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface SaoLucViewProps {
@@ -63,6 +64,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
 
     // Export Modal State
     const [showExportModal, setShowExportModal] = useState(false);
+
+    // Delete Confirmation Modal State
+    const [recordToDelete, setRecordToDelete] = useState<ArchiveRecord | null>(null);
 
     // Form State
     const [formData, setFormData] = useState<SaoLucFormData>({
@@ -439,11 +443,19 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         }
     };
 
-    const handleDelete = async (r: ArchiveRecord) => {
-        const codeNumber = r.so_hieu || r.id;
-        if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${codeNumber} không?`, 'Xác nhận xóa hồ sơ')) {
-            await deleteArchiveRecord(r.id);
-            loadData();
+    const handleDelete = (r: ArchiveRecord) => {
+        setRecordToDelete(r);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!recordToDelete) return;
+        try {
+            await deleteArchiveRecord(recordToDelete.id);
+            await loadData();
+        } catch (err) {
+            console.error("Lỗi khi xóa hồ sơ:", err);
+        } finally {
+            setRecordToDelete(null);
         }
     };
 
@@ -1086,6 +1098,20 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                     )}
                 </div>
             </div>
+
+            {/* Modal xác nhận xóa hồ sơ Sao lục */}
+            <DeleteConfirmModal
+                isOpen={!!recordToDelete}
+                onClose={() => setRecordToDelete(null)}
+                onConfirm={handleConfirmDelete}
+                title="Xác nhận xóa hồ sơ Sao lục"
+                record={recordToDelete ? {
+                    code: recordToDelete.so_hieu || recordToDelete.id,
+                    customerName: recordToDelete.noi_nhan_gui || recordToDelete.trich_yeu || '',
+                    receivedDate: recordToDelete.ngay_thang || null,
+                    deadline: recordToDelete.data?.hen_tra || null
+                } : null}
+            />
         </div>
     );
 };

@@ -53,10 +53,10 @@ export const setGlobalConfirmCallback = (cb: (message: string, title: string) =>
     globalConfirmCallback = cb;
 };
 
-// Sử dụng Native Dialog của Electron nếu có, hoặc Global Modal, hoặc fallback dùng window.confirm
+// Sử dụng Native Dialog của Electron nếu chạy ứng dụng desktop, hoặc Global Modal UI chuyên nghiệp
 export const confirmAction = async (message: string, title: string = 'Xác nhận'): Promise<boolean> => {
-    if ((window as any).electronAPI && (window as any).electronAPI.showConfirmDialog) {
-        // Chờ kết quả từ Main Process (không block renderer)
+    if ((window as any).electronAPI && (window as any).electronAPI.isElectron && (window as any).electronAPI.showConfirmDialog) {
+        // Chờ kết quả từ Main Process của Electron
         return await (window as any).electronAPI.showConfirmDialog(message, title);
     }
     
@@ -65,7 +65,7 @@ export const confirmAction = async (message: string, title: string = 'Xác nhậ
     }
     
     try {
-        // Fallback cho trình duyệt web (có thể lỗi nếu sandboxed)
+        // Fallback an toàn nếu chưa mount modal
         return window.confirm(message);
     } catch {
         // Nếu không cho confirm (Iframe sandbox preview) -> Auto true

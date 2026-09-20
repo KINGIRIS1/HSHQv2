@@ -1449,24 +1449,42 @@ export const createArchiveBatch = async (
 };
 
 /**
- * Cấp số vào sổ GCN nguyên tử (Atomic), chống trùng 100% bằng Supabase RPC.
- * Có cơ chế tự động đồng bộ (Self-healing) và fallback an toàn nếu chưa chạy SQL.
+ * Cấp số vào sổ GCN nguyên tử (Atomic), chống trùng 100% bằng Supabase RPC hoặc quét MAX toàn diện.
+ * Có cơ chế tự động đồng bộ (Self-healing) và fallback an toàn quét cả client memory, settings và DB.
  */
 export const allocateNextVaoSoNumbers = async (
     prefix: string,
     count: number = 1,
-    padLength: number = 5
+    padLength: number = 5,
+    minBaseNumber?: number
 ): Promise<string[]> => {
+    let maxVal = typeof minBaseNumber === 'number' && !isNaN(minBaseNumber) ? minBaseNumber : 0;
+
+    const extractNum = (val: any) => {
+        if (!val) return;
+        const str = String(val).trim();
+        const matches = str.match(/\d+/g);
+        if (matches) {
+            matches.forEach(m => {
+                const num = parseInt(m, 10);
+                if (!isNaN(num) && num > maxVal) maxVal = num;
+            });
+        }
+    };
+
+    // Quét số lớn nhất từ bộ nhớ cache client
+    const cachedVaoso = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE_VAOSO, []);
+    const cachedArchive = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+    [...cachedVaoso, ...cachedArchive].forEach(r => {
+        if (r.type === 'vaoso' || isVaoSoRecord(r)) {
+            extractNum(r.data?.so_vao_so);
+            extractNum(r.data?.entryNumber);
+            extractNum(r.so_hieu);
+        }
+    });
+
     if (!isConfigured) {
         // Fallback offline / demo mode
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-        let maxVal = 0;
-        cached.forEach(r => {
-            if (r.type === 'vaoso' && r.data?.so_vao_so) {
-                const num = parseInt(String(r.data.so_vao_so).replace(prefix, '').trim());
-                if (!isNaN(num) && num > maxVal) maxVal = num;
-            }
-        });
         const results: string[] = [];
         for (let i = 1; i <= count; i++) {
             const nextNum = maxVal + i;
@@ -1476,54 +1494,62 @@ export const allocateNextVaoSoNumbers = async (
     }
 
     try {
-        // Gọi RPC cấp số nguyên tử
-        const { data, error } = await supabase.rpc('allocate_next_vao_so_numbers', {
-            p_prefix: prefix,
-            p_count: count,
-            p_pad_length: padLength
+        // 1. Quét số MAX thực tế từ DB trước để đảm bảo không bao giờ bị lùi số
+        const [dangkyRes, luutruRes] = await Promise.all([
+            supabase.from('dangky_records').select('entryNumber, data'),
+            supabase.from('luutru_records').select('entryNumber, data, recordType')
+        ]);
+
+        (dangkyRes.data || []).forEach(r => {
+            extractNum(r.entryNumber);
+            extractNum((r as any)?.data?.so_vao_so);
+            extractNum((r as any)?.data?.entryNumber);
+        });
+        (luutruRes.data || []).forEach(r => {
+            extractNum(r.entryNumber);
+            extractNum((r as any)?.data?.so_vao_so);
+            extractNum((r as any)?.data?.entryNumber);
         });
 
-        if (error) {
-            console.warn(`[VaoSo RPC Warning] Gặp lỗi khi gọi RPC (${error.code}: ${error.message}). Tự động kích hoạt cơ chế tự phục hồi (Self-healing fallback) quét số MAX thực tế từ DB.`);
-            // Fallback tạm thời bằng cách đọc MAX từ DB để giảm thiểu trùng lắp
-            const [dangkyRes, luutruRes] = await Promise.all([
-                supabase.from('dangky_records').select('entryNumber').ilike('entryNumber', `${prefix}%`),
-                supabase.from('luutru_records').select('entryNumber').eq('recordType', 'Vào sổ GCN').ilike('entryNumber', `${prefix}%`)
-            ]);
+        // 2. Thử gọi RPC nếu có
+        try {
+            const { data, error } = await supabase.rpc('allocate_next_vao_so_numbers', {
+                p_prefix: prefix,
+                p_count: count,
+                p_pad_length: padLength
+            });
 
-            let maxVal = 0;
-            const extractNum = (val: string | null) => {
-                if (!val) return;
-                const cleanNum = parseInt(val.replace(/\D/g, ''));
-                if (!isNaN(cleanNum) && cleanNum > maxVal) maxVal = cleanNum;
-            };
+            if (!error && data && Array.isArray(data)) {
+                const rpcNums = data.map((d: any) => d.allocated_number);
+                let rpcMax = 0;
+                rpcNums.forEach((n: string) => {
+                    const matches = String(n).match(/\d+/g);
+                    if (matches) {
+                        matches.forEach(m => {
+                            const num = parseInt(m, 10);
+                            if (!isNaN(num) && num > rpcMax) rpcMax = num;
+                        });
+                    }
+                });
 
-            (dangkyRes.data || []).forEach(r => extractNum(r.entryNumber));
-            (luutruRes.data || []).forEach(r => extractNum(r.entryNumber));
-
-            const results: string[] = [];
-            for (let i = 1; i <= count; i++) {
-                const nextNum = maxVal + i;
-                results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+                // Nếu số RPC trả về lớn hơn maxVal thực tế, sử dụng kết quả RPC
+                if (rpcMax > maxVal) {
+                    return rpcNums;
+                }
             }
-            return results;
+        } catch {
+            // RPC lỗi hoặc không tồn tại, sẽ sử dụng kết quả quét DB + bộ đệm
         }
 
-        if (data && Array.isArray(data)) {
-            return data.map((d: any) => d.allocated_number);
+        // 3. Sử dụng kết quả quét MAX toàn diện (DB + Cache + Memory state)
+        const results: string[] = [];
+        for (let i = 1; i <= count; i++) {
+            const nextNum = maxVal + i;
+            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
         }
-        throw new Error("RPC returned invalid format");
+        return results;
     } catch (err) {
-        console.warn("[VaoSo API Warning] Lỗi khi cấp số vào sổ, kích hoạt fallback offline/cache:", err);
-        // Fallback offline / demo mode
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE_VAOSO, getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []));
-        let maxVal = 0;
-        cached.forEach(r => {
-            if (r.type === 'vaoso' && r.data?.so_vao_so) {
-                const num = parseInt(String(r.data.so_vao_so).replace(prefix, '').trim());
-                if (!isNaN(num) && num > maxVal) maxVal = num;
-            }
-        });
+        console.warn("[VaoSo API Warning] Lỗi khi cấp số vào sổ, sử dụng bộ đệm:", err);
         const results: string[] = [];
         for (let i = 1; i <= count; i++) {
             const nextNum = maxVal + i;

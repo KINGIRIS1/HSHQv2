@@ -13,6 +13,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { RecordFile, RecordStatus, RecordStatusLog } from '../../types';
+import { confirmAction } from '../../utils/appHelpers';
 import { isCapGiayStatus } from '../../utils/capGiayStateMachine';
 import {
   getRegistrationWorkflow,
@@ -87,12 +88,13 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
   };
 
   // Nút lùi về bước trước
-  const handleStepBack = () => {
+  const handleStepBack = async () => {
     if (!prevStep) return;
     if (
-      !window.confirm(
-        `Bạn có chắc chắn muốn chuyển lùi hồ sơ về bước "${prevStep.label}"?`
-      )
+      !(await confirmAction(
+        `Bạn có chắc chắn muốn chuyển lùi hồ sơ về bước "${prevStep.label}"?`,
+        'Xác nhận lùi bước'
+      ))
     ) {
       return;
     }
