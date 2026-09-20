@@ -26,6 +26,7 @@ import {
   deleteBulkDangkyRecords,
   assignDangkyRecordsBatch,
 } from '../../services/apiRegistration';
+import { syncDangKyToVaoSo } from '../../services/apiArchive';
 
 interface RegistrationModuleViewProps {
   currentUser?: User | null;
@@ -120,6 +121,20 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   const handleSaveRecord = async (updated: RecordFile) => {
     const saved = await updateDangkyRecord(updated);
     setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
+
+    // Tự động đồng bộ sang module Vào sổ GCN nếu hồ sơ đã ký, duyệt, chuyển bàn giao hoặc có số vào sổ
+    if (
+      saved.status === RecordStatus.SIGNED ||
+      saved.status === RecordStatus.PENDING_HANDOVER ||
+      saved.status === RecordStatus.HANDOVER ||
+      Boolean(saved.approvalDate) ||
+      Boolean(saved.entryNumber)
+    ) {
+      syncDangKyToVaoSo([saved]).catch((err) => {
+        console.warn('[VaoSo AutoSync Error in RegistrationModuleView]:', err);
+      });
+    }
+
     showFeedback('success', `Đã cập nhật thành công hồ sơ ${saved.code}`);
   };
 

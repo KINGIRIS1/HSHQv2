@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, allocateNextVaoSoNumbers } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, allocateNextVaoSoNumbers, isVaoSoRecord } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { User } from '../../types';
 import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, ChevronDown, ChevronUp, Clock, AlertTriangle, Eye, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
@@ -258,11 +258,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         // 1. Phân loại theo Trạng thái Scan (activeTab)
         const isVaoSoBase = (r: ArchiveRecord) => (
             r.type === 'vaoso' || 
-            r.data?.stage === 'vao_so' || 
-            r.status === 'signed' || 
-            !!r.data?.so_vao_so || 
-            (r.data?.status || '').toLowerCase().includes('vào sổ') || 
-            (r.data?.status || '').toLowerCase().includes('vào so')
+            isVaoSoRecord(r)
         );
 
         if (activeTab === 'all') {

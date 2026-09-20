@@ -34,11 +34,31 @@ export interface ArchiveRecord {
 // Mock Data Stores
 let MOCK_ARCHIVE: ArchiveRecord[] = [];
 
-const CACHE_KEY_ARCHIVE = 'offline_archive_records';
+export const CACHE_KEY_ARCHIVE = 'offline_archive_records';
+export const CACHE_KEY_ARCHIVE_VAOSO = 'offline_archive_records_vaoso';
+export const CACHE_KEY_ARCHIVE_SAOLUC = 'offline_archive_records_saoluc';
+export const CACHE_KEY_ARCHIVE_CONGVAN = 'offline_archive_records_congvan';
 export const CACHE_KEY_LUUTRU_RECORDS = 'offline_luutru_records';
+
+export const getArchiveCacheKey = (type: 'saoluc' | 'vaoso' | 'congvan' | string): string => {
+    if (type === 'vaoso') return CACHE_KEY_ARCHIVE_VAOSO;
+    if (type === 'congvan') return CACHE_KEY_ARCHIVE_CONGVAN;
+    if (type === 'saoluc') return CACHE_KEY_ARCHIVE_SAOLUC;
+    return `offline_archive_records_${type}`;
+};
 
 // In-memory cache for instant 0ms access
 let memoryArchiveRecordsCache: RecordFile[] | null = null;
+const memoryArchiveTypeCaches = new Map<string, ArchiveRecord[]>();
+
+export const clearArchiveMemoryCaches = (type?: string) => {
+    if (type) {
+        memoryArchiveTypeCaches.delete(type);
+    } else {
+        memoryArchiveTypeCaches.clear();
+    }
+    memoryArchiveRecordsCache = null;
+};
 
 const ARCHIVE_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -143,14 +163,53 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
     };
 };
 
-export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
-    let type: 'saoluc' | 'vaoso' | 'congvan' = 'saoluc';
+export const isVaoSoRecord = (row: any): boolean => {
+    if (!row) return false;
+    const rowType = String(row.type || '').toLowerCase();
+    const dataType = String(row.data?.type || '').toLowerCase();
     const recType = String(row.recordType || row.content || '').toLowerCase();
-    if (recType.includes('công văn') || recType === '1.2 công văn') {
-        type = 'congvan';
-    } else if (recType.includes('vào sổ') || recType === 'vaoso') {
-        type = 'vaoso';
-    }
+    const dataStage = String(row.data?.stage || '').toLowerCase();
+    const entryNum = String(row.entryNumber || row.data?.so_vao_so || row.data?.entryNumber || '').trim();
+    const dataStatus = String(row.data?.status || '').toLowerCase();
+    const group = String(row.group || '').toLowerCase();
+
+    return (
+        rowType === 'vaoso' ||
+        dataType === 'vaoso' ||
+        recType.includes('vào sổ') ||
+        recType.includes('vao so') ||
+        recType.includes('vaoso') ||
+        dataStage === 'vao_so' ||
+        entryNum.length > 0 ||
+        dataStatus.includes('vào sổ') ||
+        dataStatus.includes('vao so') ||
+        group.includes('cấp gcn') ||
+        group.includes('đăng ký đất đai')
+    );
+};
+
+export const isCongVanRecord = (row: any): boolean => {
+    if (!row) return false;
+    const rowType = String(row.type || '').toLowerCase();
+    const recType = String(row.recordType || row.content || '').toLowerCase();
+    const group = String(row.group || '').toLowerCase();
+    return (
+        rowType === 'congvan' ||
+        recType.includes('công văn') ||
+        recType.includes('cong van') ||
+        group === '1.2' ||
+        recType === '1.2 công văn'
+    );
+};
+
+export const identifyArchiveRecordType = (row: any): 'saoluc' | 'vaoso' | 'congvan' => {
+    if (isCongVanRecord(row)) return 'congvan';
+    if (isVaoSoRecord(row)) return 'vaoso';
+    return 'saoluc';
+};
+
+export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
+    const type: 'saoluc' | 'vaoso' | 'congvan' = identifyArchiveRecordType(row);
 
     let st: ArchiveRecord['status'] = 'draft';
     const rawSt = String(row.status || '').toLowerCase();
@@ -420,7 +479,12 @@ export const getCachedArchiveRecords = async (): Promise<RecordFile[]> => {
 let inFlightAllArchivePromise: Promise<RecordFile[]> | null = null;
 const inFlightTypePromises = new Map<string, Promise<ArchiveRecord[]>>();
 
-const fetchLuutruBatchWithRetry = async (page: number, pageSize: number, maxRetries = 3): Promise<{ data: any[] | null; error: any }> => {
+const fetchLuutruBatchWithRetry = async (
+    page: number, 
+    pageSize: number, 
+    maxRetries = 3,
+    typeFilter?: 'saoluc' | 'vaoso' | 'congvan'
+): Promise<{ data: any[] | null; error: any }> => {
     let lastError: any = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -428,6 +492,12 @@ const fetchLuutruBatchWithRetry = async (page: number, pageSize: number, maxRetr
                 .from('luutru_records')
                 .select('*')
                 .range(page * pageSize, (page + 1) * pageSize - 1);
+
+            if (typeFilter === 'vaoso') {
+                query = query.or('recordType.ilike.%vào sổ%,recordType.ilike.%vaoso%,recordType.ilike.%vao so%,entryNumber.not.is.null,content.ilike.%vào sổ%,content.ilike.%vaoso%,group.ilike.%cấp gcn%,group.ilike.%đăng ký%');
+            } else if (typeFilter === 'congvan') {
+                query = query.or('recordType.ilike.%công văn%,recordType.ilike.%cong van%,content.ilike.%công văn%,content.ilike.%cong van%,group.eq.1.2');
+            }
 
             try {
                 query = query.order('receivedDate', { ascending: false, nullsFirst: false });
@@ -441,7 +511,14 @@ const fetchLuutruBatchWithRetry = async (page: number, pageSize: number, maxRetr
             }
 
             lastError = res.error;
-            // Nếu không phải lỗi tạm thời (ví dụ bảng không tồn tại, lỗi cú pháp), không retry vô ích
+            // Nếu lỗi do filter .or không tương thích trên phiên bản database, fallback không filter
+            if (typeFilter && attempt === 1) {
+                console.warn(`[fetchLuutruBatchWithRetry] Filter query returned error (${res.error?.message}). Retrying fallback without DB filter.`);
+                typeFilter = undefined;
+                continue;
+            }
+
+            // Nếu không phải lỗi tạm thời, không retry vô ích
             if (!isTransientError(res.error)) {
                 break;
             }
@@ -561,10 +638,14 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
         return inFlight;
     }
 
+    const cacheKey = getArchiveCacheKey(type);
+
     const promise = (async () => {
         if (!isConfigured) {
-            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+            const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
+            if (cached.length > 0) return cached.filter(r => r.type === type);
+            const legacyCached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            if (MOCK_ARCHIVE.length === 0 && legacyCached.length > 0) MOCK_ARCHIVE = legacyCached;
             return MOCK_ARCHIVE.filter(r => r.type === type);
         }
         try {
@@ -574,7 +655,7 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             let hasMore = true;
 
             while (hasMore) {
-                const { data, error } = await fetchLuutruBatchWithRetry(page, pageSize, 3);
+                const { data, error } = await fetchLuutruBatchWithRetry(page, pageSize, 3, type);
 
                 if (error) {
                     console.warn(`Lỗi khi fetch luutru_records (${type}) sau khi thử lại:`, error);
@@ -603,19 +684,31 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                 });
                 const result = Array.from(uniqueMap.values());
 
-                saveToCache(CACHE_KEY_ARCHIVE, result);
+                // Lưu vào cache riêng độc lập theo từng loại hồ sơ (không đè lẫn nhau)
+                saveToCache(cacheKey, result);
+                memoryArchiveTypeCaches.set(type, result);
                 return result;
             }
 
-            // Fallback an toàn về cache cũ (không ghi đè rỗng)
-            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
-            return (cached.length > 0 ? cached : MOCK_ARCHIVE).filter(r => r.type === type);
+            // Fallback an toàn về cache riêng cũ (không ghi đè rỗng)
+            const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
+            if (cached.length > 0) {
+                memoryArchiveTypeCaches.set(type, cached);
+                return cached.filter(r => r.type === type);
+            }
+            const legacyCached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            if (legacyCached.length > 0) return legacyCached.filter(r => r.type === type);
+            if (MOCK_ARCHIVE.length === 0 && legacyCached.length > 0) MOCK_ARCHIVE = legacyCached;
+            return MOCK_ARCHIVE.filter(r => r.type === type);
         } catch (error: any) {
             logError(`fetchArchiveRecords-${type}`, error, true);
-            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
-            return (cached.length > 0 ? cached : MOCK_ARCHIVE).filter(r => r.type === type);
+            const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
+            if (cached.length > 0) {
+                memoryArchiveTypeCaches.set(type, cached);
+                return cached.filter(r => r.type === type);
+            }
+            const legacyCached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            return (legacyCached.length > 0 ? legacyCached : MOCK_ARCHIVE).filter(r => r.type === type);
         } finally {
             inFlightTypePromises.delete(type);
         }
@@ -1423,7 +1516,7 @@ export const allocateNextVaoSoNumbers = async (
     } catch (err) {
         console.warn("[VaoSo API Warning] Lỗi khi cấp số vào sổ, kích hoạt fallback offline/cache:", err);
         // Fallback offline / demo mode
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE_VAOSO, getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []));
         let maxVal = 0;
         cached.forEach(r => {
             if (r.type === 'vaoso' && r.data?.so_vao_so) {
@@ -1525,6 +1618,9 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
                 } else {
                     MOCK_ARCHIVE.push(archRec);
                 }
+                const vaosoList = MOCK_ARCHIVE.filter(a => a.type === 'vaoso');
+                saveToCache(CACHE_KEY_ARCHIVE_VAOSO, vaosoList);
+                memoryArchiveTypeCaches.set('vaoso', vaosoList);
                 return;
             }
 
@@ -1545,11 +1641,14 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
         await Promise.all(promises);
 
         // Khởi động lại cache local sau khi upsert thành công
+        clearArchiveMemoryCaches('vaoso');
         if (isConfigured) {
             const { data } = await supabase.from('luutru_records').select('*');
             if (data) {
                 const mapped = data.map(item => mapLuutruDbToArchiveRecord(item));
-                saveToCache(CACHE_KEY_ARCHIVE, mapped);
+                const vaosoRecords = mapped.filter(r => r.type === 'vaoso');
+                saveToCache(CACHE_KEY_ARCHIVE_VAOSO, vaosoRecords);
+                memoryArchiveTypeCaches.set('vaoso', vaosoRecords);
             }
         }
         return true;

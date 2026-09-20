@@ -28,6 +28,10 @@ export const useArchiveRealtime = (type: string, setRecords: React.Dispatch<Reac
                         if (mapped.type !== type) {
                             return prev.filter(r => r.id !== mapped.id);
                         }
+                        const exists = prev.some(r => r.id === mapped.id);
+                        if (!exists) {
+                            return [mapped, ...prev];
+                        }
                         return prev.map(r => r.id === mapped.id ? mapped : r);
                     });
                 }
