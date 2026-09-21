@@ -140,7 +140,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                 <div className={`bg-white p-4 rounded-xl border transition-all shadow-xs ${tableStats.dangky.error ? 'border-red-200 bg-red-50/30' : 'border-purple-200 hover:border-purple-300'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> Tab Đăng ký
+                      <FileText className="w-3 h-3" /> Module Cấp giấy (3.x)
                     </span>
                     {tableStats.dangky.error ? (
                       <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -151,7 +151,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                   <div className="text-2xl font-black text-gray-800 mb-1">
                     {loading ? '...' : tableStats.dangky.count} <span className="text-xs font-normal text-gray-500">bản ghi</span>
                   </div>
-                  <div className="text-xs text-purple-700 font-mono font-medium">dangky_records</div>
+                  <div className="text-xs text-purple-700 font-mono font-medium">dangky_records (Mã H19.151.11.22-*)</div>
                   {tableStats.dangky.error && (
                     <div className="mt-2 text-[11px] text-red-600 bg-red-100/60 p-1.5 rounded">{tableStats.dangky.error}</div>
                   )}
@@ -161,7 +161,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                 <div className={`bg-white p-4 rounded-xl border transition-all shadow-xs ${tableStats.land.error ? 'border-red-200 bg-red-50/30' : 'border-blue-200 hover:border-blue-300'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 flex items-center gap-1">
-                      <Layers className="w-3 h-3" /> Tab Đo đạc
+                      <Layers className="w-3 h-3" /> Module Đo đạc (2.x)
                     </span>
                     {tableStats.land.error ? (
                       <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -172,7 +172,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                   <div className="text-2xl font-black text-gray-800 mb-1">
                     {loading ? '...' : tableStats.land.count} <span className="text-xs font-normal text-gray-500">bản ghi</span>
                   </div>
-                  <div className="text-xs text-blue-700 font-mono font-medium">land_records</div>
+                  <div className="text-xs text-blue-700 font-mono font-medium">land_records (Mã TK-*, TQ-*, TH-*, MD-*)</div>
                   {tableStats.land.error && (
                     <div className="mt-2 text-[11px] text-red-600 bg-red-100/60 p-1.5 rounded">{tableStats.land.error}</div>
                   )}
@@ -182,7 +182,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                 <div className={`bg-white p-4 rounded-xl border transition-all shadow-xs ${tableStats.luutru.error ? 'border-red-200 bg-red-50/30' : 'border-amber-200 hover:border-amber-300'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 flex items-center gap-1">
-                      <FolderArchive className="w-3 h-3" /> Tab Lưu trữ
+                      <FolderArchive className="w-3 h-3" /> Module Lưu trữ (1.x)
                     </span>
                     {tableStats.luutru.error ? (
                       <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -193,7 +193,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                   <div className="text-2xl font-black text-gray-800 mb-1">
                     {loading ? '...' : tableStats.luutru.count} <span className="text-xs font-normal text-gray-500">bản ghi</span>
                   </div>
-                  <div className="text-xs text-amber-700 font-mono font-medium">luutru_records</div>
+                  <div className="text-xs text-amber-700 font-mono font-medium">luutru_records (Mã LT-*, CV-*)</div>
                   {tableStats.luutru.error && (
                     <div className="mt-2 text-[11px] text-red-600 bg-red-100/60 p-1.5 rounded">{tableStats.luutru.error}</div>
                   )}
