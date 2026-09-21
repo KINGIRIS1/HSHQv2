@@ -72,6 +72,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     // Settings Modal State
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [currentBookNumber, setCurrentBookNumber] = useState<string>('000000');
+    const [settingPrefix, setSettingPrefix] = useState<string>('CN');
+    const [settingInputNumber, setSettingInputNumber] = useState<string>('000001');
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [settingFeedback, setSettingFeedback] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     // State for Delete Confirmation Modal (UI chuyên nghiệp thay window.confirm)
     const [recordToDelete, setRecordToDelete] = useState<ArchiveRecord | null>(null);
@@ -214,7 +218,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             getSystemSetting('department_permissions'),
             fetchEmployees()
         ]);
-        setRecords(data || []);
+        const cleanData = (data || []).filter(r => {
+            const code = String(r.so_hieu || r.id || '').toUpperCase();
+            return !code.startsWith('LT-') && (r as any).sourceTable !== 'luutru_records';
+        });
+        setRecords(cleanData);
         
         if (savedPerms) {
             try { setRolePermissions(JSON.parse(savedPerms)); } catch(e) {}
@@ -228,7 +236,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         
         // Calculate max book number from existing records
         let maxNum = 0;
-        (data || []).forEach(r => {
+        cleanData.forEach(r => {
             const val = r.data?.so_vao_so || '';
             if (val.startsWith('CN ')) {
                 const numPart = val.replace('CN ', '');
@@ -245,12 +253,20 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             }
         });
         
-        // If local storage has a higher number, use it
-        const stored = await getSystemSetting('vaoso_current_book_number');
-        if (stored) {
-            setCurrentBookNumber(stored);
+        // Lấy cấu hình số vào sổ và tiền tố hiện tại
+        const [stored, storedPrefix] = await Promise.all([
+            getSystemSetting('vaoso_current_book_number'),
+            getSystemSetting('vaoso_prefix')
+        ]);
+        if (storedPrefix && storedPrefix.trim() !== '') {
+            setSettingPrefix(storedPrefix.trim());
+        }
+        if (stored && stored.trim() !== '') {
+            setCurrentBookNumber(stored.trim());
+        } else if (maxNum > 0) {
+            setCurrentBookNumber((maxNum + 1).toString().padStart(5, '0'));
         } else {
-            setCurrentBookNumber(maxNum.toString().padStart(6, '0'));
+            setCurrentBookNumber('00001');
         }
         
         setLoading(false);
@@ -260,10 +276,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         let filtered = records;
 
         // 1. Phân loại theo Trạng thái Scan (activeTab)
-        const isVaoSoBase = (r: ArchiveRecord) => (
-            r.type === 'vaoso' || 
-            isVaoSoRecord(r)
-        );
+        const isVaoSoBase = (r: ArchiveRecord) => {
+            const code = String(r.so_hieu || r.id || '').toUpperCase();
+            if (code.startsWith('LT-')) return false;
+            if ((r as any).sourceTable === 'luutru_records') return false;
+            return r.type === 'vaoso' || isVaoSoRecord(r);
+        };
 
         if (activeTab === 'all') {
             // Tất cả hồ sơ: hiển thị trọn vẹn toàn bộ hồ sơ thuộc cả 3 tab (Chờ Vô Số + Chờ Scan + Đã Scan)
@@ -329,6 +347,37 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     }, [filteredRecords, currentPage, itemsPerPage]);
 
     const handleAddNew = async () => {
+        // Tự động tính số vào sổ tiến tiếp theo (dạng CN 00123)
+        let generatedSoVaoSo = '';
+        try {
+            let prefix = 'CN';
+            try {
+                const p = await getSystemSetting('vaoso_prefix');
+                if (p && p.trim()) prefix = p.trim();
+            } catch {}
+
+            let startNum = 1;
+            const settingDigits = String(currentBookNumber).replace(/\D/g, '');
+            if (settingDigits) {
+                const parsed = parseInt(settingDigits, 10);
+                if (!isNaN(parsed) && parsed > 0) startNum = parsed;
+            }
+
+            const padLen = Math.max(5, settingDigits.length || 5);
+            const nextNums = await allocateNextVaoSoNumbers(prefix, 1, padLen, undefined, startNum);
+            if (nextNums && nextNums.length > 0) {
+                generatedSoVaoSo = nextNums[0];
+                const allocatedDigits = generatedSoVaoSo.replace(/\D/g, '');
+                const nextSeqNum = (parseInt(allocatedDigits, 10) || startNum) + 1;
+                const nextSeqStr = String(nextSeqNum).padStart(padLen, '0');
+
+                setCurrentBookNumber(nextSeqStr);
+                saveSystemSetting('vaoso_current_book_number', nextSeqStr).catch(console.error);
+            }
+        } catch (autoNumErr) {
+            console.warn("Không thể tự động sinh số vào sổ khi thêm mới:", autoNumErr);
+        }
+
         const newRecord: Partial<ArchiveRecord> = {
             type: 'vaoso',
             status: 'completed',
@@ -338,7 +387,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             noi_nhan_gui: '',
             created_by: currentUser.username,
             data: {
-                so_vao_so: '',
+                so_vao_so: generatedSoVaoSo,
                 ma_ho_so: '',
                 ten_chu_su_dung: '',
                 loai_bien_dong: '',
@@ -424,32 +473,98 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         return nextNum.toString();
     };
 
-    const handleGetBookNumber = async (record: ArchiveRecord) => {
+    const handleOpenSettings = async () => {
         try {
-            // Tính toán số lớn nhất hiện tại từ màn hình và cài đặt hệ thống để đảm bảo tăng dần tịnh tiến
-            let currentScreenMax = 0;
-            const settingVal = parseInt(String(currentBookNumber).replace(/\D/g, ''), 10);
-            if (!isNaN(settingVal)) currentScreenMax = Math.max(currentScreenMax, settingVal);
+            const [savedNum, savedPrefix] = await Promise.all([
+                getSystemSetting('vaoso_current_book_number'),
+                getSystemSetting('vaoso_prefix')
+            ]);
+            if (savedPrefix && savedPrefix.trim() !== '') {
+                setSettingPrefix(savedPrefix.trim());
+            } else {
+                setSettingPrefix('CN');
+            }
+            if (savedNum && savedNum.trim() !== '') {
+                const cleaned = savedNum.replace(/\D/g, '');
+                setSettingInputNumber(cleaned || savedNum.trim());
+            } else {
+                setSettingInputNumber(currentBookNumber ? currentBookNumber.replace(/\D/g, '') : '00001');
+            }
+        } catch {
+            setSettingInputNumber(currentBookNumber ? currentBookNumber.replace(/\D/g, '') : '00001');
+        }
+        setSettingFeedback(null);
+        setShowSettingsModal(true);
+    };
 
-            records.forEach(r => {
-                const soVaoSo = r.data?.so_vao_so;
-                if (soVaoSo) {
-                    const matches = String(soVaoSo).match(/\d+/g);
-                    if (matches) {
-                        matches.forEach(m => {
-                            const n = parseInt(m, 10);
-                            if (!isNaN(n) && n > currentScreenMax) currentScreenMax = n;
-                        });
-                    }
-                }
+    const handleSaveBookNumberSettings = async () => {
+        const rawDigits = settingInputNumber.replace(/\D/g, '');
+        if (!rawDigits) {
+            setSettingFeedback({ type: 'error', text: 'Vui lòng nhập phần số bắt đầu hợp lệ (ví dụ: 1 hoặc 00001).' });
+            return;
+        }
+
+        setIsSavingSettings(true);
+        setSettingFeedback(null);
+        try {
+            const padLen = Math.max(5, rawDigits.length);
+            const formattedSeq = rawDigits.padStart(padLen, '0');
+            const cleanPrefix = (settingPrefix || 'CN').trim();
+
+            await Promise.all([
+                saveSystemSetting('vaoso_current_book_number', formattedSeq),
+                saveSystemSetting('vaoso_prefix', cleanPrefix)
+            ]);
+
+            setCurrentBookNumber(formattedSeq);
+            setSettingFeedback({ 
+                type: 'success', 
+                text: `Đã lưu thành công! Số tiếp theo được cấp sẽ là: ${cleanPrefix} ${formattedSeq}` 
             });
 
-            // Sử dụng hàm cấp số nguyên tử chống trùng từ DB kết hợp số lớn nhất trên màn hình
-            const nextNums = await allocateNextVaoSoNumbers("CN", 1, 5, currentScreenMax);
-            const formattedNum = nextNums[0]; // Trả về dạng "CN 00123"
+            setTimeout(() => {
+                setShowSettingsModal(false);
+                setSettingFeedback(null);
+            }, 1200);
+        } catch (err: any) {
+            setSettingFeedback({ type: 'error', text: 'Lỗi khi lưu cài đặt: ' + (err?.message || 'Vui lòng thử lại') });
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
 
-            // Trích xuất số thô để đồng bộ UI phụ và cài đặt
-            const nextNumStr = formattedNum.replace(/\D/g, '');
+    const previewNextFormattedNumber = useMemo(() => {
+        const cleanPrefix = (settingPrefix || 'CN').trim();
+        const rawDigits = settingInputNumber.replace(/\D/g, '');
+        if (!rawDigits) return `${cleanPrefix} ...`;
+        const padLen = Math.max(5, rawDigits.length);
+        return `${cleanPrefix} ${rawDigits.padStart(padLen, '0')}`;
+    }, [settingPrefix, settingInputNumber]);
+
+    const handleGetBookNumber = async (record: ArchiveRecord) => {
+        try {
+            let prefix = 'CN';
+            try {
+                const p = await getSystemSetting('vaoso_prefix');
+                if (p && p.trim()) prefix = p.trim();
+            } catch {}
+
+            let startNum = 1;
+            const settingDigits = String(currentBookNumber).replace(/\D/g, '');
+            if (settingDigits) {
+                const parsed = parseInt(settingDigits, 10);
+                if (!isNaN(parsed) && parsed > 0) startNum = parsed;
+            }
+
+            const padLen = Math.max(5, settingDigits.length || 5);
+            // Cấp số dựa trên số bắt đầu được cài đặt, chống trùng với các hồ sơ hiện hữu
+            const nextNums = await allocateNextVaoSoNumbers(prefix, 1, padLen, undefined, startNum);
+            const formattedNum = nextNums[0]; // Dạng "CN 00001"
+
+            // Trích xuất số thực tế vừa cấp và tịnh tiến lên +1 cho lần cấp tiếp theo
+            const allocatedDigits = formattedNum.replace(/\D/g, '');
+            const nextSeqNum = (parseInt(allocatedDigits, 10) || startNum) + 1;
+            const nextSeqStr = String(nextSeqNum).padStart(padLen, '0');
             
             const updatedRecord = {
                 ...record,
@@ -458,8 +573,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             
             // Optimistic update
             setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
-            setCurrentBookNumber(nextNumStr);
-            await saveSystemSetting('vaoso_current_book_number', nextNumStr);
+            setCurrentBookNumber(nextSeqStr);
+            await saveSystemSetting('vaoso_current_book_number', nextSeqStr);
 
             setSavingId(record.id);
             const res = await saveArchiveRecord(updatedRecord);
@@ -884,57 +999,108 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         );
     };
 
-    const renderOwnerInput = (value: string, onChange: (val: string) => void, onBlur: () => void) => {
-        const parseOwners = (val: string) => {
-            if (!val) return [{ name: '', cccd: '', address: '' }];
-            
-            if (val.includes('\n\n') || val.includes('Địa chỉ:')) {
-                return val.split('\n\n').map(block => {
-                    const lines = block.split('\n');
-                    let name = lines[0] || '';
-                    let cccd = '';
-                    let address = '';
-                    
-                    const cccdMatch = name.match(/^(.*?)\s+CCCD:\s*(.*)$/);
+    const parseOwners = (val: string) => {
+        if (!val || typeof val !== 'string' || !val.trim()) {
+            return [{ name: '', cccd: '', address: '' }];
+        }
+
+        // Tách các chủ sở hữu: nếu có dấu phân cách chuẩn '\n\n'
+        if (val.includes('\n\n')) {
+            const blocks = val.split(/\n\s*\n/);
+            return blocks.map(block => {
+                const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+                let name = '';
+                let cccd = '';
+                let address = '';
+
+                lines.forEach((line, idx) => {
+                    const cccdMatch = line.match(/^CCCD:\s*(.*)$/i);
+                    const addrMatch = line.match(/^Địa chỉ:\s*(.*)$/i);
                     if (cccdMatch) {
-                        name = cccdMatch[1];
-                        cccd = cccdMatch[2];
-                    }
-                    
-                    for (let i = 1; i < lines.length; i++) {
-                        if (lines[i].startsWith('CCCD: ')) {
-                            cccd = lines[i].substring(6);
-                        } else if (lines[i].startsWith('Địa chỉ: ')) {
-                            address = lines[i].substring(9);
+                        cccd = cccdMatch[1].trim();
+                    } else if (addrMatch) {
+                        address = addrMatch[1].trim();
+                    } else if (idx === 0) {
+                        // Dòng đầu tiên là tên (có thể kèm CCCD inline)
+                        const inlineMatch = line.match(/^(.*?)\s+CCCD:\s*(.*)$/i);
+                        if (inlineMatch) {
+                            name = inlineMatch[1].trim();
+                            if (!cccd) cccd = inlineMatch[2].trim();
+                        } else {
+                            name = line;
                         }
+                    } else {
+                        // Nếu là dòng phụ không có tiền tố, ghép vào địa chỉ
+                        address = address ? `${address}, ${line}` : line;
                     }
-                    return { name, cccd, address };
                 });
+
+                return { name, cccd, address };
+            });
+        }
+
+        // Trường hợp chuỗi đơn (hoặc chỉ xuống dòng đơn '\n')
+        const lines = val.split('\n').map(l => l.trim()).filter(Boolean);
+        let name = '';
+        let cccd = '';
+        let address = '';
+
+        lines.forEach((line, idx) => {
+            const cccdMatch = line.match(/^CCCD:\s*(.*)$/i);
+            const addrMatch = line.match(/^Địa chỉ:\s*(.*)$/i);
+            if (cccdMatch) {
+                cccd = cccdMatch[1].trim();
+            } else if (addrMatch) {
+                address = addrMatch[1].trim();
+            } else if (idx === 0) {
+                const inlineMatch = line.match(/^(.*?)\s+CCCD:\s*(.*)$/i);
+                if (inlineMatch) {
+                    name = inlineMatch[1].trim();
+                    if (!cccd) cccd = inlineMatch[2].trim();
+                } else {
+                    name = line;
+                }
             } else {
-                return val.split('\n').map(line => {
-                    let name = line;
-                    let cccd = '';
-                    let address = '';
-                    const cccdMatch = line.match(/^(.*?)\s+CCCD:\s*(.*)$/);
-                    if (cccdMatch) {
-                        name = cccdMatch[1];
-                        cccd = cccdMatch[2];
-                    }
-                    return { name, cccd, address };
-                });
+                address = address ? `${address}, ${line}` : line;
             }
-        };
+        });
 
-        const serializeOwners = (owners: any[]) => {
-            return owners.map(o => {
-                let str = o.name;
-                if (o.cccd) str += `\nCCCD: ${o.cccd}`;
-                if (o.address) str += `\nĐịa chỉ: ${o.address}`;
-                return str;
-            }).join('\n\n');
-        };
+        return [{ name: name || val.trim(), cccd, address }];
+    };
 
+    const serializeOwners = (owners: { name: string; cccd: string; address: string }[]) => {
+        return owners.map(o => {
+            let str = (o.name || '').trim();
+            if (o.cccd && o.cccd.trim()) str += `\nCCCD: ${o.cccd.trim()}`;
+            if (o.address && o.address.trim()) str += `\nĐịa chỉ: ${o.address.trim()}`;
+            return str;
+        }).filter(Boolean).join('\n\n');
+    };
+
+    const renderOwnerInput = (value: string, onChange: (val: string) => void, onBlur: () => void) => {
         const owners = parseOwners(value);
+
+        const updateOwnerField = (index: number, field: 'name' | 'cccd' | 'address', newVal: string) => {
+            const newOwners = owners.map((item, i) => {
+                if (i === index) {
+                    return { ...item, [field]: newVal };
+                }
+                return item;
+            });
+            onChange(serializeOwners(newOwners));
+        };
+
+        const removeOwner = (index: number) => {
+            const newOwners = owners.filter((_, i) => i !== index);
+            onChange(serializeOwners(newOwners.length > 0 ? newOwners : [{ name: '', cccd: '', address: '' }]));
+            setTimeout(onBlur, 0);
+        };
+
+        const addOwner = () => {
+            const newOwners = [...owners, { name: '', cccd: '', address: '' }];
+            onChange(serializeOwners(newOwners));
+            setTimeout(onBlur, 0);
+        };
 
         return (
             <div className="flex flex-col gap-2 w-full">
@@ -946,21 +1112,14 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none font-bold"
                                 value={owner.name}
                                 placeholder="Tên chủ sử dụng (VD: Bà Hà Thị Vân)"
-                                onChange={(e) => {
-                                    const newOwners = [...owners];
-                                    newOwners[index].name = e.target.value;
-                                    onChange(serializeOwners(newOwners));
-                                }}
+                                onChange={(e) => updateOwnerField(index, 'name', e.target.value)}
                                 onBlur={onBlur}
                             />
                             {owners.length > 1 && (
                                 <button
-                                    onClick={() => {
-                                        const newOwners = owners.filter((_, i) => i !== index);
-                                        onChange(serializeOwners(newOwners));
-                                        setTimeout(onBlur, 0);
-                                    }}
+                                    onClick={() => removeOwner(index)}
                                     className="text-red-500 hover:text-red-700 p-1"
+                                    title="Xóa chủ này"
                                 >
                                     <X size={14} />
                                 </button>
@@ -972,11 +1131,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
                                 value={owner.cccd}
                                 placeholder="Số CCCD"
-                                onChange={(e) => {
-                                    const newOwners = [...owners];
-                                    newOwners[index].cccd = e.target.value;
-                                    onChange(serializeOwners(newOwners));
-                                }}
+                                onChange={(e) => updateOwnerField(index, 'cccd', e.target.value)}
                                 onBlur={onBlur}
                             />
                         </div>
@@ -986,22 +1141,14 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
                                 value={owner.address}
                                 placeholder="Địa chỉ thường trú"
-                                onChange={(e) => {
-                                    const newOwners = [...owners];
-                                    newOwners[index].address = e.target.value;
-                                    onChange(serializeOwners(newOwners));
-                                }}
+                                onChange={(e) => updateOwnerField(index, 'address', e.target.value)}
                                 onBlur={onBlur}
                             />
                         </div>
                     </div>
                 ))}
                 <button
-                    onClick={() => {
-                        const newOwners = [...owners, { name: '', cccd: '', address: '' }];
-                        onChange(serializeOwners(newOwners));
-                        setTimeout(onBlur, 0);
-                    }}
+                    onClick={addOwner}
                     className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1 self-start mt-1 bg-teal-50 px-2 py-1 rounded"
                 >
                     <Plus size={12} /> Thêm chủ sử dụng
@@ -1332,9 +1479,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
                     {/* Cài đặt kho số - Chỉ hiển thị icon bánh răng */}
                     <button
-                        onClick={() => setShowSettingsModal(true)}
+                        onClick={handleOpenSettings}
                         className="p-1.5 bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 hover:text-teal-700 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
-                        title="Cài đặt kho số"
+                        title="Cài đặt kho số vào sổ"
                     >
                         <Settings size={16} />
                     </button>
@@ -1530,7 +1677,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                             </select>
                                                         ) : col.key === 'so_phat_hanh' ? (
                                                             <div className="flex flex-col p-1 gap-1 min-w-[80px]">
-                                                                {(r.data?.[col.key] || '').split('\n').map((val: string, idx: number, arr: string[]) => (
+                                                                {((r.data?.[col.key] !== undefined && r.data?.[col.key] !== null) ? String(r.data[col.key]).split('\n') : ['']).map((val: string, idx: number, arr: string[]) => (
                                                                     <div key={idx} className="flex items-center gap-1 group/input">
                                                                         <input 
                                                                             type="text"
@@ -1544,17 +1691,19 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                                             onBlur={() => handleBlur(r)}
                                                                             placeholder="Số phát hành..."
                                                                         />
-                                                                        {arr.length > 1 && (
+                                                                        {(val || arr.length > 1) && (
                                                                             <button 
                                                                                 onClick={() => {
-                                                                                    const newArr = arr.filter((_, i) => i !== idx);
-                                                                                    const newVal = newArr.join('\n');
+                                                                                    let newVal = '';
+                                                                                    if (arr.length > 1) {
+                                                                                        newVal = arr.filter((_, i) => i !== idx).join('\n');
+                                                                                    }
                                                                                     handleCellChange(r.id, col.key, newVal);
                                                                                     handleBlur({ ...r, data: { ...r.data, [col.key]: newVal } });
                                                                                 }}
-                                                                                className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover/input:opacity-100 transition-opacity"
+                                                                                className="text-gray-400 hover:text-red-500 p-1 opacity-60 group-hover/input:opacity-100 transition-opacity"
                                                                                 tabIndex={-1}
-                                                                                title="Xóa dòng này"
+                                                                                title="Xóa số phát hành này"
                                                                             >
                                                                                 <X size={12} />
                                                                             </button>
@@ -2058,34 +2207,105 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
             {/* Settings Modal */}
             {showSettingsModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm animate-fade-in-up">
-                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h3 className="font-bold text-gray-800 text-lg">Cài đặt số vào sổ</h3>
-                            <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
-                        </div>
-                        <div className="p-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Số vào sổ hiện tại (phần số)</label>
-                            <input 
-                                type="text" 
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-                                value={currentBookNumber}
-                                onChange={(e) => setCurrentBookNumber(e.target.value)}
-                            />
-                            <p className="text-xs text-gray-500 mt-2">
-                                Hệ thống sẽ tự động tăng số này và thêm tiền tố "CN".<br/>
-                                Ví dụ: Nếu nhập <strong>{currentBookNumber}</strong>, số tiếp theo sẽ là <strong>CN {incrementString(currentBookNumber)}</strong>.
-                            </p>
-                        </div>
-                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in-up border border-slate-200 overflow-hidden">
+                        <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
+                                    <Settings size={18} />
+                                </div>
+                                <h3 className="font-bold text-slate-800 text-base">Cài đặt số vào sổ GCN</h3>
+                            </div>
                             <button 
-                                onClick={async () => {
-                                    await saveSystemSetting('vaoso_current_book_number', currentBookNumber);
-                                    setShowSettingsModal(false);
+                                onClick={() => {
+                                    if (!isSavingSettings) {
+                                        setShowSettingsModal(false);
+                                        setSettingFeedback(null);
+                                    }
                                 }} 
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm"
+                                className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md"
                             >
-                                Lưu cài đặt
+                                <X size={20}/>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền tố</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                                        value={settingPrefix}
+                                        onChange={(e) => setSettingPrefix(e.target.value)}
+                                        placeholder="CN"
+                                        disabled={isSavingSettings}
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Số bắt đầu cấp tiếp theo</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={settingInputNumber}
+                                        onChange={(e) => setSettingInputNumber(e.target.value)}
+                                        placeholder="Ví dụ: 00001 hoặc 1"
+                                        disabled={isSavingSettings}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Live Preview Box */}
+                            <div className="p-3.5 bg-blue-50/80 border border-blue-200/80 rounded-xl">
+                                <div className="text-xs font-medium text-blue-800 mb-1 flex items-center justify-between">
+                                    <span>Xem trước số cấp tiếp theo:</span>
+                                    <span className="text-[10px] bg-blue-200/70 text-blue-900 px-1.5 py-0.5 rounded font-bold">MẪU HIỂN THỊ</span>
+                                </div>
+                                <div className="text-xl font-bold text-blue-700 font-mono tracking-wide">
+                                    {previewNextFormattedNumber}
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                                    Hệ thống sẽ cấp số này cho hồ sơ tiếp theo (khi bấm Lấy số hoặc Thêm mới) và tự động tăng dần tịnh tiến (+1).
+                                </p>
+                            </div>
+
+                            {settingFeedback && (
+                                <div className={`p-3 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                                    settingFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+                                }`}>
+                                    {settingFeedback.type === 'success' ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0"/> : <AlertTriangle size={16} className="text-red-600 shrink-0"/>}
+                                    <span>{settingFeedback.text}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t bg-slate-50 flex justify-end gap-2.5">
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    setShowSettingsModal(false);
+                                    setSettingFeedback(null);
+                                }}
+                                disabled={isSavingSettings}
+                                className="px-3.5 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-bold transition-colors"
+                            >
+                                Hủy
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={handleSaveBookNumberSettings}
+                                disabled={isSavingSettings}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                                {isSavingSettings ? (
+                                    <>
+                                        <Loader2 size={14} className="animate-spin" />
+                                        <span>Đang lưu...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 size={14} />
+                                        <span>Lưu cài đặt</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

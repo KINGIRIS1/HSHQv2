@@ -476,14 +476,17 @@ export const isRecordType11 = (recordOrType: Partial<RecordFile> | string | null
 
 // Kiểm tra hồ sơ có thuộc module Đo đạc (nhóm 2.x) hay không
 export const isSurveyRecordType = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
-  if (!recordOrType) return true;
+  if (!recordOrType) return false;
   const str = typeof recordOrType === 'string' 
     ? recordOrType 
     : String(recordOrType.recordType || recordOrType.content || '');
   const t = str.trim();
+  if (!t) return false;
   if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
   if (t.startsWith('3.') || isCertificateRecordType(str)) return false;
-  return true;
+  if (t.startsWith('2.') || getShortRecordType(str).startsWith('2.')) return true;
+  const lower = str.toLowerCase();
+  return lower.includes('trích đo') || lower.includes('trích lục') || lower.includes('đo đạc');
 };
 
 // Kiểm tra hồ sơ có thuộc module Cấp giấy / Đăng ký đất đai (nhóm 3.x) hay không
@@ -556,9 +559,9 @@ export const getSurveyRecordPrefix = (
     );
 
     if (emp && emp.managedWards && emp.managedWards.length > 0) {
-      // Nếu Cán bộ phụ trách TRÊN 1 địa bàn (> 1 xã) -> BỎ MÃ ĐỊA BÀN ở đầu mã hồ sơ!
+      // Đối với cá nhân được giao nhiều địa bàn thụ lý (> 1 địa bàn) -> Lấy TK làm mã mặc định!
       if (emp.managedWards.length > 1) {
-        return '';
+        return 'TK';
       }
 
       // Nếu Cán bộ phụ trách ĐÚNG 1 địa bàn -> Lấy mã địa bàn của xã duy nhất đó
@@ -595,7 +598,8 @@ export const getSurveyRecordPrefix = (
     if (w.includes('minh hưng') || w.includes('minhhung')) return 'MH';
   }
 
-  return '';
+  // Mặc định lấy TK cho hồ sơ Đo đạc khi không xác định được địa bàn cụ thể
+  return 'TK';
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [

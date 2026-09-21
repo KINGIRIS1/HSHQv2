@@ -219,7 +219,7 @@ export function isViewAllowedForUser(
       case 'test_records':
         return activePerms.includes('test_records');
       case 'vao_so':
-        return activePerms.includes('vao_so') || activePerms.includes('archive_records') || activePerms.includes('test_records') || activePerms.includes('VIEW_ARCHIVE');
+        return activePerms.includes('vao_so') || activePerms.includes('VAO_SO_GCN') || activePerms.includes('VAO_SO_GCN_VIEW') || activePerms.includes('archive_records') || activePerms.includes('test_records') || activePerms.includes('VIEW_ARCHIVE');
       case 'receive_contract':
         return activePerms.includes('receive_contract') || activePerms.includes('VIEW_CONTRACTS') || activePerms.includes('ADD_CONTRACTS');
 

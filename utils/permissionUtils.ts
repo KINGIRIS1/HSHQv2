@@ -56,6 +56,11 @@ export function checkUserPermission(
         // Specifically asking for Luutru permission.
     } else if (permissionId.startsWith('test_')) {
         // Specifically asking for CapGiay (test_) permission.
+    } else if (permissionId.startsWith('VAO_SO_GCN')) {
+        checkIds.push('VAO_SO_GCN', 'vao_so');
+        if (permissionId === 'VAO_SO_GCN_VIEW') checkIds.push('VAO_SO_GCN_VIEW', 'vao_so');
+        if (permissionId === 'VAO_SO_GCN_EDIT') checkIds.push('VAO_SO_GCN_EDIT', 'test_EDIT_RECORDS');
+        if (permissionId === 'VAO_SO_GCN_APPROVE') checkIds.push('VAO_SO_GCN_APPROVE', 'test_BTN_APPROVE_SIGN');
     } else {
         // Generic permission requested (e.g., 'BTN_ADVANCE_STATUS', 'BTN_ASSIGN_STAFF', 'EDIT_RECORDS')
         // Resolve accurately based on the user's department context

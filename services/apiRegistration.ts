@@ -139,6 +139,7 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     statusLogs,
     dossierComponents,
     attachedFiles,
+    data: dbItem.data || {},
     sourceTable: 'dangky_records',
   };
 };
@@ -168,6 +169,7 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.issueDate !== undefined) payload.issueDate = keepOnlyDate(record.issueDate);
   if (record.residentialArea !== undefined) payload.residentialArea = record.residentialArea;
   if (record.status !== undefined) payload.status = record.status;
+  if (record.data !== undefined) payload.data = record.data;
   if (record.receivedBy !== undefined) payload.receivedBy = record.receivedBy;
   if (record.receivedDate !== undefined) payload.receivedDate = keepOnlyDate(record.receivedDate);
   if (record.deadline !== undefined) {

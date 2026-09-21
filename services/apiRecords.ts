@@ -499,6 +499,216 @@ export const mergeRecordSafely = (
     };
 };
 
+export const RECORD_CODE_ROUTING_REGISTRY = {
+    LT: {
+        prefix: "LT-",
+        module: "LUU_TRU",
+        table: "luutru_records" as const
+    },
+    TK: {
+        prefix: "TK-",
+        module: "DO_DAC",
+        table: "land_records" as const
+    },
+    TQ: {
+        prefix: "TQ-",
+        module: "DO_DAC",
+        table: "land_records" as const
+    },
+    MD: {
+        prefix: "MD-",
+        module: "DO_DAC",
+        table: "land_records" as const
+    },
+    TH: {
+        prefix: "TH-",
+        module: "DO_DAC",
+        table: "land_records" as const
+    },
+    H19: {
+        prefix: "H19.151.11.22-",
+        module: "DANG_KY",
+        table: "dangky_records" as const
+    }
+} as const;
+
+export const PROCEDURE_TABLE_REGISTRY = {
+    GROUP_1_LUU_TRU: {
+        groupPrefix: "1.",
+        module: "LUU_TRU",
+        table: "luutru_records" as const
+    },
+    GROUP_2_DO_DAC: {
+        groupPrefix: "2.",
+        module: "DO_DAC",
+        table: "land_records" as const
+    },
+    GROUP_3_CAP_GIAY: {
+        groupPrefix: "3.",
+        module: "DANG_KY",
+        table: "dangky_records" as const
+    },
+    MODULE_VAO_SO_GCN: {
+        module: "VAO_SO_GCN",
+        table: "dangky_records" as const,
+        sourceModule: "DANG_KY"
+    },
+    MODULE_HOP_DONG: {
+        module: "HOP_DONG",
+        table: "contracts" as const,
+        parentModule: "DO_DAC"
+    }
+} as const;
+
+export interface RecordRoutingResult {
+    recordId?: string;
+    code: string;
+    prefix?: string;
+    procedureCode: string;
+    module: string;
+    expectedTable: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts';
+    actualTable?: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts' | null;
+    routingStatus: 'ROUTING_VALID' | 'ROUTING_CONFLICT' | 'ROUTING_UNRESOLVED';
+    hasMissingProcedureCode: boolean;
+    routingReason?: string;
+}
+
+export const resolveRecordRouting = (
+    record: Partial<RecordFile>,
+    actualTable?: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts' | null
+): RecordRoutingResult => {
+    const recordId = record.id || (record as any)?.data?.id;
+    const code = String(record.code || (record as any)?.data?.code || '').trim();
+    const upperCode = code.toUpperCase();
+
+    const rawPCode = String(
+        (record as any)?.procedureCode ||
+        (record as any)?.data?.procedureCode ||
+        (record as any)?.data?.ma_thu_tuc ||
+        ''
+    ).trim();
+
+    let expectedTable: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts' | null = null;
+    let moduleName = '';
+    let matchedPrefix = '';
+
+    const rawType = String(record.recordType || record.content || '').trim();
+
+    // 1. Priority 1: Explicit Archive Procedure Type (1.x = LUU_TRU) or LT-/CV- prefix or keywords
+    const lowerType = rawType.toLowerCase();
+    if (
+        /^1\.\d+/i.test(rawType) || 
+        /^1\./i.test(rawPCode) || 
+        isArchiveRecordType(rawType) || 
+        upperCode.startsWith('LT-') || 
+        upperCode.startsWith('CV-') ||
+        lowerType.includes('sao lục') ||
+        lowerType.includes('công văn') ||
+        lowerType.includes('cung cấp dữ liệu') ||
+        lowerType.includes('cung cấp thông tin')
+    ) {
+        moduleName = 'LUU_TRU';
+        expectedTable = 'luutru_records';
+    } else if (
+        /^3\.\d+/i.test(rawType) || 
+        /^3\./i.test(rawPCode) || 
+        isCertificateRecordType(record) ||
+        upperCode.startsWith('H19.151.11.22-')
+    ) {
+        moduleName = 'DANG_KY';
+        expectedTable = 'dangky_records';
+    } else if (
+        /^2\.\d+/i.test(rawType) || 
+        /^2\./i.test(rawPCode) || 
+        isSurveyRecordType(rawType) || 
+        (record.content && isSurveyRecordType(record.content))
+    ) {
+        moduleName = 'DO_DAC';
+        expectedTable = 'land_records';
+    }
+
+    // 2. Priority 2: Official Record Code Prefix for Survey & Registration
+    if (!expectedTable) {
+        if (upperCode.startsWith('TK-') || upperCode.startsWith('TQ-') || upperCode.startsWith('MD-') || upperCode.startsWith('TH-')) {
+            matchedPrefix = upperCode.slice(0, 3);
+            moduleName = 'DO_DAC';
+            expectedTable = 'land_records';
+        } else if (upperCode.startsWith('H19.151.11.22-')) {
+            matchedPrefix = 'H19.151.11.22-';
+            moduleName = 'DANG_KY';
+            expectedTable = 'dangky_records';
+        }
+    }
+
+    // 4. Priority 4: Other business metadata (so_vao_so / entryNumber)
+    if (!expectedTable && ((record as any)?.data?.so_vao_so || record.entryNumber)) {
+        moduleName = 'VAO_SO_GCN';
+        expectedTable = 'dangky_records';
+    }
+
+    const hasMissingProcedureCode = !rawPCode;
+
+    if (!expectedTable) {
+        return {
+            recordId,
+            code,
+            prefix: matchedPrefix,
+            procedureCode: rawPCode,
+            module: 'UNRESOLVED',
+            expectedTable: (actualTable as any) || 'dangky_records',
+            actualTable,
+            routingStatus: 'ROUTING_UNRESOLVED',
+            hasMissingProcedureCode,
+            routingReason: 'Cannot resolve expected table from code prefix, procedureCode, or recordType'
+        };
+    }
+
+    let routingStatus: 'ROUTING_VALID' | 'ROUTING_CONFLICT' | 'ROUTING_UNRESOLVED' = 'ROUTING_VALID';
+    let routingReason = '';
+
+    if (actualTable && actualTable !== expectedTable) {
+        routingStatus = 'ROUTING_CONFLICT';
+        routingReason = `Record code '${code}' expects table '${expectedTable}' but actual table is '${actualTable}'`;
+    }
+
+    return {
+        recordId,
+        code,
+        prefix: matchedPrefix,
+        procedureCode: rawPCode,
+        module: moduleName,
+        expectedTable,
+        actualTable,
+        routingStatus,
+        hasMissingProcedureCode,
+        routingReason
+    };
+};
+
+export interface ProcedureRoutingResult {
+    procedureCode: string;
+    group: string;
+    module: string;
+    expectedTable: 'dangky_records' | 'land_records' | 'luutru_records';
+    status: 'ROUTING_VALID' | 'ROUTING_UNRESOLVED' | 'ROUTING_CONFLICT';
+    reason?: string;
+}
+
+export const resolveProcedureRouting = (
+    record: Partial<RecordFile>,
+    actualTable?: 'dangky_records' | 'land_records' | 'luutru_records' | null
+): ProcedureRoutingResult => {
+    const res = resolveRecordRouting(record, actualTable as any);
+    return {
+        procedureCode: res.procedureCode,
+        group: res.prefix || (res.module === 'LUU_TRU' ? '1' : res.module === 'DO_DAC' ? '2' : '3'),
+        module: res.module,
+        expectedTable: res.expectedTable === 'contracts' ? 'land_records' : res.expectedTable,
+        status: res.routingStatus,
+        reason: res.routingReason
+    };
+};
+
 export interface RoutingValidationResult {
     valid: boolean;
     targetTable: 'dangky_records' | 'land_records' | 'luutru_records';
@@ -517,11 +727,12 @@ export const validateRecordRouting = (
     record: Partial<RecordFile>,
     targetTableToMutate?: 'dangky_records' | 'land_records' | 'luutru_records'
 ): RoutingValidationResult => {
-    const targetTable = getTargetTable(record);
+    const routingResult = resolveProcedureRouting(record, targetTableToMutate);
+    const targetTable = routingResult.expectedTable;
 
-    if (targetTableToMutate && targetTableToMutate !== targetTable) {
-        console.error(`[ROUTING_GUARD][CONFLICT] Record ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}: target table '${targetTableToMutate}' conflicts with resolved target table '${targetTable}'`);
-        throw new Error(`ROUTING_CONFLICT: Record code/group/type indicates '${targetTable}' but target table is specified as '${targetTableToMutate}'. Mutation blocked.`);
+    if (routingResult.status === 'ROUTING_CONFLICT') {
+        console.error(`[ROUTING] recordId=${record.id || 'N/A'} procedure=${routingResult.procedureCode} expectedTable=${routingResult.expectedTable} actualTable=${targetTableToMutate} decision=BLOCK reason=${routingResult.reason}`);
+        throw new Error(`ROUTING_CONFLICT: Record procedure '${routingResult.procedureCode}' expects '${routingResult.expectedTable}' but target table is specified as '${targetTableToMutate}'. Mutation blocked.`);
     }
 
     return {

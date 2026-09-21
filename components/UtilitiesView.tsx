@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen } from 'lucide-react';
-import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User } from '../types';
+import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Database } from 'lucide-react';
+import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User, UserRole } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
@@ -10,6 +10,7 @@ import SaiSoTab from './utilities/SaiSoTab';
 import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
+import RoutingMigrationTab from './utilities/RoutingMigrationTab';
 import ExcerptManagement from './ExcerptManagement';
 
 interface UtilitiesViewProps {
@@ -46,7 +47,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     onDeleteBatchRecords,
     onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'vaoloi'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'migration'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
@@ -179,6 +180,14 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                       <BookOpen size={16} /> Số TL/TĐ
                   </button>
               )}
+              {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
+                  <button 
+                      onClick={() => setActiveTab('migration')}
+                      className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'migration' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 hover:bg-indigo-50'}`}
+                  >
+                      <Database size={16} /> Migration Định tuyến
+                  </button>
+              )}
           </div>
           
           {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && (
@@ -255,6 +264,10 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                       <p className="text-slate-600 font-medium">Đang tải cấu hình Số TL/TĐ...</p>
                   </div>
               )}
+          </div>
+          {/* TAB 9: MIGRATION ĐỊNH TUYẾN DỮ LIỆU */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] p-4 overflow-y-auto ${activeTab === 'migration' ? 'block' : 'hidden'}`}>
+              <RoutingMigrationTab notify={notify} onRefreshData={onRefreshData} />
           </div>
       </div>
     </div>
