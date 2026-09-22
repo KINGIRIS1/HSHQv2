@@ -973,7 +973,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                <>
                                  <TimelineItem 
                                     date={record.receivedDate} 
-                                    label="TIẾP NHẬN" 
+                                    label="TIẾP NHẬN HỒ SƠ" 
                                     icon={UserIcon}
                                     colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                                     subText={record.receivedBy ? (() => {

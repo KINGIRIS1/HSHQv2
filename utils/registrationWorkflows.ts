@@ -55,7 +55,7 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Chờ thẩm định',
+      label: 'THẨM ĐỊNH',
       shortLabel: 'Thẩm định',
       description: 'Kiểm tra pháp lý, xác nhận trích lục và lập Phiếu chuyển thông tin địa chính',
       dateField: 'appraisalDate',
@@ -66,7 +66,7 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.TAX_TRANSFER,
-      label: 'Chờ chuyển thuế',
+      label: 'PHIẾU CHUYỂN THUẾ',
       shortLabel: 'Chuyển thuế',
       description: 'Lập và chuyển phiếu thông tin địa chính sang cơ quan thuế',
       dateField: 'taxTransferDate',
@@ -77,7 +77,7 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_TAX_KV7,
-      label: 'Chờ thuế khu vực 7',
+      label: 'Thuế khu vực 7',
       shortLabel: 'Thuế KV7',
       description: 'Cơ quan Thuế thụ lý tính nghĩa vụ tài chính: Không tính vào thời hạn quy trình',
       dateField: 'taxKv7Date',
@@ -89,7 +89,7 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_TAX_PAYMENT,
-      label: 'Chờ Giấy nộp tiền',
+      label: 'Giấy nộp tiền',
       shortLabel: 'Chờ GNT',
       description: 'Chờ người sử dụng đất nộp tiền vào NSNN và nộp chứng từ: Không tính vào thời hạn quy trình',
       dateField: 'taxPaymentDate',
@@ -101,7 +101,7 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_PRINT_CERT,
-      label: 'Chờ in GCN / Trang 4',
+      label: 'In giấy chứng nhận',
       shortLabel: 'In GCN',
       description: 'Dành toàn bộ thời gian còn lại của Chi nhánh cho in phôi GCN mới hoặc xác nhận trang 4',
       dateField: 'printCertDate',
@@ -112,7 +112,7 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_CHECK,
-      label: 'Chờ kiểm tra',
+      label: 'Trình kiểm tra',
       shortLabel: 'Kiểm tra',
       description: 'Tổ trưởng / Phụ trách chuyên môn kiểm tra tính chuẩn xác của hồ sơ và phôi GCN',
       dateField: 'pendingCheckDate',
@@ -123,7 +123,7 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Chờ ký duyệt',
+      label: 'Trình ký duyệt',
       shortLabel: 'Ký duyệt',
       description: 'Trình Giám đốc / Phó Giám đốc Chi nhánh ký duyệt Giấy chứng nhận',
       dateField: 'submissionDate',
@@ -134,9 +134,9 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Chờ bàn giao',
-      shortLabel: 'Chờ bàn giao',
-      description: 'Lãnh đạo đã ký duyệt, vào sổ cấp GCN và chuẩn bị bàn giao Một cửa',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
+      description: 'Lãnh đạo đã ký duyệt, vào sổ cấp GCN và chuẩn bị bàn giao',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
       durationHours: 4,
@@ -144,20 +144,9 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.HANDOVER,
-      label: 'Đã giao 1 cửa',
-      shortLabel: 'Giao 1 cửa',
-      description: 'Đã bàn giao kết quả sang Bộ phận Tiếp nhận và Trả kết quả (Một cửa)',
-      dateField: 'completedDate',
-      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-      durationHours: 4,
-      durationDays: 0.5,
-      durationLabel: '4 giờ',
-    },
-    {
       key: RecordStatus.RETURNED,
-      label: 'Đã trả kết quả',
-      shortLabel: 'Đã trả',
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
       description: 'Công dân đã nhận Giấy chứng nhận và hoàn tất thủ tục',
       dateField: 'resultReturnedDate',
       badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -188,7 +177,7 @@ const FAST_TRACK_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_PRINT_CERT,
-      label: 'Chờ in GCN / Chỉnh lý trang 4',
+      label: 'In giấy chứng nhận',
       shortLabel: 'In / Chỉnh lý',
       description: 'Không qua thẩm định, chuyển thẳng in phôi GCN mới hoặc xác nhận Trang 4 với thời gian còn lại',
       dateField: 'printCertDate',
@@ -199,7 +188,7 @@ const FAST_TRACK_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_CHECK,
-      label: 'Chờ kiểm tra',
+      label: 'Trình kiểm tra',
       shortLabel: 'Kiểm tra',
       description: 'Tổ trưởng kiểm tra kỹ thuật và đối chiếu hồ sơ lưu',
       dateField: 'pendingCheckDate',
@@ -210,7 +199,7 @@ const FAST_TRACK_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Chờ ký duyệt',
+      label: 'Trình ký duyệt',
       shortLabel: 'Ký duyệt',
       description: 'Trình lãnh đạo Chi nhánh ký duyệt GCN hoặc xác nhận Trang 4',
       dateField: 'submissionDate',
@@ -221,8 +210,8 @@ const FAST_TRACK_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Chờ bàn giao',
-      shortLabel: 'Chờ bàn giao',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
       description: 'Đã ký duyệt, đóng dấu và chuyển sổ theo dõi',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -231,20 +220,9 @@ const FAST_TRACK_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.HANDOVER,
-      label: 'Đã giao 1 cửa',
-      shortLabel: 'Giao 1 cửa',
-      description: 'Bàn giao hồ sơ hoàn thành sang Bộ phận Một cửa',
-      dateField: 'completedDate',
-      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-      durationHours: 4,
-      durationDays: 0.5,
-      durationLabel: '4 giờ',
-    },
-    {
       key: RecordStatus.RETURNED,
-      label: 'Đã trả kết quả',
-      shortLabel: 'Đã trả',
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
       description: 'Người sử dụng đất đã nhận lại kết quả',
       dateField: 'resultReturnedDate',
       badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -275,7 +253,7 @@ const GDBD_REGISTER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Chờ thẩm định & Tra cứu ngăn chặn',
+      label: 'THẨM ĐỊNH',
       shortLabel: 'Tra cứu & Thẩm định',
       description: 'Tra cứu cơ sở dữ liệu ngăn chặn, cập nhật vào sổ theo dõi đăng ký biện pháp bảo đảm',
       dateField: 'appraisalDate',
@@ -286,7 +264,7 @@ const GDBD_REGISTER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Chờ ký duyệt',
+      label: 'Trình ký duyệt',
       shortLabel: 'Ký duyệt',
       description: 'Trình lãnh đạo Chi nhánh ký chứng nhận ĐKBPBĐ',
       dateField: 'submissionDate',
@@ -297,8 +275,8 @@ const GDBD_REGISTER_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Chờ bàn giao',
-      shortLabel: 'Chờ bàn giao',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
       description: 'Đã đóng dấu hoàn tất, chuẩn bị giao kết quả',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -307,20 +285,9 @@ const GDBD_REGISTER_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.HANDOVER,
-      label: 'Đã giao 1 cửa',
-      shortLabel: 'Giao 1 cửa',
-      description: 'Chuyển Bộ phận Một cửa giao trả Ngân hàng / Chủ sử dụng đất',
-      dateField: 'completedDate',
-      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-      durationHours: 4,
-      durationDays: 0.5,
-      durationLabel: '4 giờ',
-    },
-    {
       key: RecordStatus.RETURNED,
-      label: 'Đã trả kết quả',
-      shortLabel: 'Đã trả',
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
       description: 'Đã giao kết quả hoàn thành',
       dateField: 'resultReturnedDate',
       badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -351,7 +318,7 @@ const GDBD_RELEASE_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Xóa đăng ký & Cập nhật CSDL ngăn chặn',
+      label: 'THẨM ĐỊNH',
       shortLabel: 'Xác nhận xóa',
       description: 'Kiểm tra hồ sơ gốc, xóa đăng ký thế chấp trên sổ địa chính và CSDL ngăn chặn',
       dateField: 'appraisalDate',
@@ -362,7 +329,7 @@ const GDBD_RELEASE_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Chờ ký duyệt',
+      label: 'Trình ký duyệt',
       shortLabel: 'Ký duyệt',
       description: 'Lãnh đạo Chi nhánh ký duyệt xác nhận xóa thế chấp',
       dateField: 'submissionDate',
@@ -373,8 +340,8 @@ const GDBD_RELEASE_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Chờ bàn giao',
-      shortLabel: 'Chờ bàn giao',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
       description: 'Đóng dấu hoàn tất, chuyển bàn giao',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -383,20 +350,9 @@ const GDBD_RELEASE_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '1 giờ',
     },
     {
-      key: RecordStatus.HANDOVER,
-      label: 'Đã giao 1 cửa',
-      shortLabel: 'Giao 1 cửa',
-      description: 'Bàn giao Bộ phận Một cửa giao trả kết quả cho người sử dụng đất',
-      dateField: 'completedDate',
-      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-      durationHours: 1,
-      durationDays: 0.125,
-      durationLabel: '1 giờ',
-    },
-    {
       key: RecordStatus.RETURNED,
-      label: 'Đã trả kết quả',
-      shortLabel: 'Đã trả',
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
       description: 'Hoàn tất thủ tục xóa thế chấp',
       dateField: 'resultReturnedDate',
       badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -430,7 +386,7 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Thẩm định & Niêm yết 30 ngày',
+      label: 'THẨM ĐỊNH',
       shortLabel: 'Thẩm định & Niêm yết',
       description: 'Kiểm tra hồ sơ gốc, gửi công văn đề nghị UBND cấp xã niêm yết công khai mất GCN (30 ngày)',
       dateField: 'appraisalDate',
@@ -442,7 +398,7 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_PRINT_CERT,
-      label: 'Hủy GCN cũ & Chờ in GCN mới',
+      label: 'In giấy chứng nhận',
       shortLabel: 'In GCN mới',
       description: 'Hết thời hạn niêm yết, ban hành QĐ hủy GCN cũ và in phôi GCN mới với thời gian còn lại',
       dateField: 'printCertDate',
@@ -453,7 +409,7 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_CHECK,
-      label: 'Chờ kiểm tra',
+      label: 'Trình kiểm tra',
       shortLabel: 'Kiểm tra',
       description: 'Kiểm tra hồ sơ biên bản kết thúc niêm yết và nội dung in trên phôi mới',
       dateField: 'pendingCheckDate',
@@ -464,7 +420,7 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Chờ ký duyệt',
+      label: 'Trình ký duyệt',
       shortLabel: 'Ký duyệt',
       description: 'Trình lãnh đạo ký duyệt cấp Giấy chứng nhận mới',
       dateField: 'submissionDate',
@@ -475,8 +431,8 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Chờ bàn giao',
-      shortLabel: 'Chờ bàn giao',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
       description: 'Đã ký duyệt xong, vào sổ cấp GCN và đóng dấu',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -485,20 +441,9 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.HANDOVER,
-      label: 'Đã giao 1 cửa',
-      shortLabel: 'Giao 1 cửa',
-      description: 'Bàn giao Bộ phận Một cửa trả dân',
-      dateField: 'completedDate',
-      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-      durationHours: 4,
-      durationDays: 0.5,
-      durationLabel: '4 giờ',
-    },
-    {
       key: RecordStatus.RETURNED,
-      label: 'Đã trả kết quả',
-      shortLabel: 'Đã trả',
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
       description: 'Công dân đã nhận GCN mới',
       dateField: 'resultReturnedDate',
       badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -529,7 +474,7 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Thẩm định & Niêm yết 30 ngày',
+      label: 'THẨM ĐỊNH',
       shortLabel: 'Thẩm định & Niêm yết',
       description: 'Kiểm tra hồ sơ gốc, gửi công văn đề nghị UBND cấp xã niêm yết công khai mất GCN (30 ngày)',
       dateField: 'appraisalDate',
@@ -541,7 +486,7 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.TAX_TRANSFER,
-      label: 'Chờ chuyển thuế',
+      label: 'PHIẾU CHUYỂN THUẾ',
       shortLabel: 'Chuyển thuế',
       description: 'Thu nhận biên bản hết niêm yết, lập Phiếu chuyển thông tin địa chính gửi Thuế',
       dateField: 'taxTransferDate',
@@ -552,7 +497,7 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_TAX_KV7,
-      label: 'Chờ thuế khu vực 7',
+      label: 'Thuế khu vực 7',
       shortLabel: 'Thuế KV7',
       description: 'Cơ quan Thuế thụ lý tính nghĩa vụ tài chính và phát hành Thông báo nộp tiền',
       dateField: 'taxKv7Date',
@@ -564,7 +509,7 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_TAX_PAYMENT,
-      label: 'Chờ Giấy nộp tiền',
+      label: 'Giấy nộp tiền',
       shortLabel: 'Chờ GNT',
       description: 'Chờ người sử dụng đất nộp tiền vào NSNN và nộp chứng từ xác nhận hoàn thành NVTC',
       dateField: 'taxPaymentDate',
@@ -576,7 +521,7 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_PRINT_CERT,
-      label: 'Hủy GCN cũ & Chờ in GCN mới',
+      label: 'In giấy chứng nhận',
       shortLabel: 'In GCN mới',
       description: 'Dành toàn bộ thời gian còn lại của Chi nhánh để ban hành QĐ hủy GCN cũ và in phôi GCN mới',
       dateField: 'printCertDate',
@@ -587,7 +532,7 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_CHECK,
-      label: 'Chờ kiểm tra',
+      label: 'Trình kiểm tra',
       shortLabel: 'Kiểm tra',
       description: 'Kiểm tra hồ sơ biên bản niêm yết, chứng từ thuế và phôi in mới',
       dateField: 'pendingCheckDate',
@@ -598,7 +543,7 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Chờ ký duyệt',
+      label: 'Trình ký duyệt',
       shortLabel: 'Ký duyệt',
       description: 'Trình lãnh đạo Chi nhánh ký QĐ hủy GCN cũ và ký duyệt GCN mới',
       dateField: 'submissionDate',
@@ -609,8 +554,8 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Chờ bàn giao',
-      shortLabel: 'Chờ bàn giao',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
       description: 'Đã ký duyệt xong, vào sổ cấp GCN và đóng dấu',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -619,20 +564,9 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.HANDOVER,
-      label: 'Đã giao 1 cửa',
-      shortLabel: 'Giao 1 cửa',
-      description: 'Bàn giao Bộ phận Một cửa trả kết quả cho công dân',
-      dateField: 'completedDate',
-      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-      durationHours: 4,
-      durationDays: 0.5,
-      durationLabel: '4 giờ',
-    },
-    {
       key: RecordStatus.RETURNED,
-      label: 'Đã trả kết quả',
-      shortLabel: 'Đã trả',
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
       description: 'Công dân đã nhận GCN mới tại Bộ phận Một cửa',
       dateField: 'resultReturnedDate',
       badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -663,7 +597,7 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Thẩm định điều kiện tách/hợp',
+      label: 'THẨM ĐỊNH',
       shortLabel: 'Thẩm định',
       description: 'Kiểm tra diện tích tối thiểu, chỉ giới đường đỏ, quy hoạch và trích đo thửa đất',
       dateField: 'appraisalDate',
@@ -674,7 +608,7 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_PRINT_CERT,
-      label: 'Chờ in GCN các thửa mới',
+      label: 'In giấy chứng nhận',
       shortLabel: 'In GCN mới',
       description: 'In phôi Giấy chứng nhận cho các thửa đất mới hình thành với thời gian còn lại',
       dateField: 'printCertDate',
@@ -685,7 +619,7 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_CHECK,
-      label: 'Chờ kiểm tra',
+      label: 'Trình kiểm tra',
       shortLabel: 'Kiểm tra',
       description: 'Tổ trưởng kiểm tra đối soát hồ sơ địa chính và phôi in mới',
       dateField: 'pendingCheckDate',
@@ -696,7 +630,7 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Chờ ký duyệt',
+      label: 'Trình ký duyệt',
       shortLabel: 'Ký duyệt',
       description: 'Trình lãnh đạo ký duyệt bộ Giấy chứng nhận mới',
       dateField: 'submissionDate',
@@ -707,8 +641,8 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Chờ bàn giao',
-      shortLabel: 'Chờ bàn giao',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
       description: 'Đã ký duyệt xong, chuẩn bị bàn giao',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -717,20 +651,9 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.HANDOVER,
-      label: 'Đã giao 1 cửa',
-      shortLabel: 'Giao 1 cửa',
-      description: 'Bàn giao hồ sơ hoàn thành sang Bộ phận Một cửa',
-      dateField: 'completedDate',
-      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-      durationHours: 4,
-      durationDays: 0.5,
-      durationLabel: '4 giờ',
-    },
-    {
       key: RecordStatus.RETURNED,
-      label: 'Đã trả kết quả',
-      shortLabel: 'Đã trả',
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
       description: 'Đã bàn giao các GCN mới cho người sử dụng đất',
       dateField: 'resultReturnedDate',
       badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -783,6 +706,17 @@ export const getRegistrationWorkflowCategory = (type: string | undefined | null)
   }
   const short = getShortRecordType(type);
   const lower = type.toLowerCase().trim();
+
+  // Chặn tuyệt đối hồ sơ thuộc nhóm Đo đạc (2.x) hoặc Lưu trữ (1.x) không bị nhầm lẫn qua quy trình Cấp giấy (3.x)
+  if (
+    lower.startsWith('1.') || lower.startsWith('2.') ||
+    short.startsWith('1.') || short.startsWith('2.') ||
+    lower.startsWith('2.1') || lower.startsWith('2.2') || lower.startsWith('2.3') || lower.startsWith('2.4') || lower.startsWith('2.5') ||
+    lower.includes('trích đo') || lower.includes('trích lục') || lower.includes('cắm mốc') ||
+    lower.includes('sao lục') || lower.includes('công văn') || lower.includes('cung cấp dữ liệu')
+  ) {
+    return 'unclassified';
+  }
 
   // 1. Xóa đăng ký thế chấp / Giải chấp (3.8.2) - 1 ngày làm việc = 8 giờ
   if (
@@ -899,6 +833,14 @@ export const getSpecificRegistrationDuration = (type: string | undefined | null)
   if (!type || typeof type !== 'string' || !type.trim()) return 0;
   const short = getShortRecordType(type);
   const lower = type.toLowerCase().trim();
+
+  if (
+    lower.startsWith('1.') || lower.startsWith('2.') ||
+    short.startsWith('1.') || short.startsWith('2.') ||
+    lower.startsWith('2.1') || lower.startsWith('2.2') || lower.startsWith('2.3') || lower.startsWith('2.4') || lower.startsWith('2.5')
+  ) {
+    return 0;
+  }
 
   // 3.8.2 Xóa ĐK GDBD / Giải chấp: 1 ngày làm việc
   if (short === '3.8.2 Xóa ĐK GDBD' || lower.includes('3.8.2') || lower.includes('xóa đk gdbd') || lower.includes('xóa thế chấp') || lower.includes('giải chấp')) {

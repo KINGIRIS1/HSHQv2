@@ -180,7 +180,20 @@ export function validateCapGiayTransition(
     return { valid: true, targetStatus: previousStatus };
   }
 
-  // 7. Kiểm soát luồng chính tuần tự theo Workflow của loại hồ sơ (hoặc mặc định CAP_GIAY_MAIN_FLOW)
+  // 7. Kiểm soát luồng chính tuần tự theo CAP_GIAY_MAIN_FLOW và Workflow loại hồ sơ
+  const mainCurIdx = CAP_GIAY_MAIN_FLOW.indexOf(currentStatus as CapGiayStatus);
+  const mainTargetIdx = CAP_GIAY_MAIN_FLOW.indexOf(targetStatus as CapGiayStatus);
+
+  if (mainCurIdx !== -1 && mainTargetIdx !== -1) {
+    if (Math.abs(mainTargetIdx - mainCurIdx) <= 1) {
+      return { valid: true, targetStatus };
+    }
+    return {
+      valid: false,
+      reason: `Không được chuyển nhảy bước từ "${CAP_GIAY_STATUS_LABELS[currentStatus as CapGiayStatus] || currentStatus}" sang "${CAP_GIAY_STATUS_LABELS[targetStatus as CapGiayStatus] || targetStatus}". Phải tuân thủ thứ tự tuần tự của quy trình.`
+    };
+  }
+
   let flowSteps: CapGiayStatus[] = CAP_GIAY_MAIN_FLOW;
   if (recordType) {
     const wf = getRegistrationWorkflow(recordType);
@@ -190,31 +203,16 @@ export function validateCapGiayTransition(
   }
 
   const currentIdx = flowSteps.indexOf(currentStatus as CapGiayStatus);
-  const targetIdx = flowSteps.indexOf(targetStatus);
+  const targetIdx = flowSteps.indexOf(targetStatus as CapGiayStatus);
 
   if (currentIdx !== -1 && targetIdx !== -1) {
-    // Bước kế tiếp ngay sau
-    if (targetIdx === currentIdx + 1) {
+    if (Math.abs(targetIdx - currentIdx) <= 1) {
       return { valid: true, targetStatus };
     }
-    // Lùi về đúng 1 bước (cho thao tác trả hồ sơ nội bộ)
-    if (targetIdx === currentIdx - 1) {
-      return { valid: true, targetStatus };
-    }
-    // Nhảy cóc bước không hợp lệ
     return {
       valid: false,
-      reason: `Không được chuyển nhảy bước từ "${CAP_GIAY_STATUS_LABELS[currentStatus as CapGiayStatus]}" sang "${CAP_GIAY_STATUS_LABELS[targetStatus]}". Phải tuân thủ thứ tự tuần tự của quy trình.`
+      reason: `Không được chuyển nhảy bước từ "${CAP_GIAY_STATUS_LABELS[currentStatus as CapGiayStatus] || currentStatus}" sang "${CAP_GIAY_STATUS_LABELS[targetStatus as CapGiayStatus] || targetStatus}". Phải tuân thủ thứ tự tuần tự của quy trình.`
     };
-  }
-
-  // Nếu không thuộc flow cụ thể nhưng vẫn trong 14 trạng thái
-  if (currentIdx === -1 && CAP_GIAY_MAIN_FLOW.includes(currentStatus as CapGiayStatus)) {
-    const mainCurIdx = CAP_GIAY_MAIN_FLOW.indexOf(currentStatus as CapGiayStatus);
-    const mainTargetIdx = CAP_GIAY_MAIN_FLOW.indexOf(targetStatus);
-    if (mainTargetIdx === mainCurIdx + 1 || mainTargetIdx === mainCurIdx - 1) {
-      return { valid: true, targetStatus };
-    }
   }
 
   return {

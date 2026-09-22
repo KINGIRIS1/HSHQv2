@@ -74,6 +74,12 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
       updatedFields.isHandedOver = true;
     }
 
+    if (record.assignedTo) {
+      updatedFields.assignedTo = record.assignedTo;
+    } else if (currentUser?.name) {
+      updatedFields.assignedTo = currentUser.name;
+    }
+
     onChangeStatus(
       targetStep.key,
       updatedFields,

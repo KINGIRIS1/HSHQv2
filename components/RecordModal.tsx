@@ -1072,10 +1072,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
                                     // ĐIỀU KIỆN ẨN/HIỆN MỐC NGÀY CHO MODULE CẤP GIẤY
                                     const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
-                                    const hasAppraisal = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL) || cgIdx === -1 || formData.status === RecordStatus.IN_PROGRESS || formData.status === RecordStatus.ASSIGNED || !!formData.appraisalDate);
-                                    const hasPosting = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_POSTING) || !!formData.postingDate || (isLostCertType && cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL)));
+                                                                         const hasAppraisal = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL) || cgIdx === -1 || formData.status === RecordStatus.IN_PROGRESS || formData.status === RecordStatus.ASSIGNED || !!formData.appraisalDate);
+                                     const hasPosting = isCapGiay && isLostCertType && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_POSTING) || !!formData.postingDate || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL));
                                     const hasTaxTransfer = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.TAX_TRANSFER) || !!formData.taxTransferDate);
-                                    const hasTaxKv7 = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_KV7) || !!formData.taxKv7Date);
+                                     const hasTaxKv7 = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_KV7) || !!formData.taxKv7Date);
                                     const hasTaxPayment = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_PAYMENT) || !!formData.taxPaymentDate);
                                     const hasPrintCert = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_PRINT_CERT) || !!formData.printCertDate);
                                     const assignedLabel = isFieldWork ? 'Ngày đo đạc' : isOfficeOnly ? 'Ngày Biên tập' : 'Ngày giao NV';

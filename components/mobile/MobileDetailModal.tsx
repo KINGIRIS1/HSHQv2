@@ -803,6 +803,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                               if (director || emp) detailInfo = `${director?.name || emp?.name} (Lãnh đạo)`;
                           } else if (step.key === RecordStatus.RETURNED && (record.receiverName || record.returnedBy)) {
                               detailInfo = record.receiverName ? `Người nhận: ${record.receiverName}` : `Người trả: ${record.returnedBy}`;
+                          } else if (record.assignedTo && (isCurrent || step.key === record.status)) {
+                              const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                              if (emp) {
+                                  detailInfo = `${emp.name} (${emp.position || 'Chuyên viên'})`;
+                              } else {
+                                  detailInfo = record.assignedTo;
+                              }
                           }
 
                           const subText = [detailInfo, step.durationLabel ? `SLA: ${step.durationLabel}` : '']
@@ -827,7 +834,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   <>
                     <TimelineItem 
                       date={record.receivedDate} 
-                      label="TIẾP NHẬN" 
+                      label="TIẾP NHẬN HỒ SƠ" 
                       icon={UserIcon}
                       colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                       subText={record.receivedBy ? (() => {

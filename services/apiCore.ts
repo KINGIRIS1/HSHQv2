@@ -408,12 +408,24 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     const numberFields = [
         'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
         'deposit', 'quantity', 'plotCount', 'markerCount', 
-        'minArea', 'maxArea', 'price',
-        'liquidationArea', 'liquidationAmount', 'residentialArea', 'advancePayment'
+        'minArea', 'maxArea', 'price', 'advancePayment',
+        'liquidationArea', 'liquidationAmount', 'residentialArea',
+        'excerptNumber', 'measurementNumber', 'sheetNumber', 'plotNumber',
+        'issueNumber', 'receiptNumber', 'entryNumber', 'exportBatch'
     ];
     numberFields.forEach(field => {
-        if (clean[field] !== undefined) {
-            if (clean[field] === '' || (typeof clean[field] === 'number' && isNaN(clean[field]))) {
+        if (clean[field] !== undefined && clean[field] !== null) {
+            if (clean[field] === '' || clean[field] === 'null' || clean[field] === 'undefined') {
+                clean[field] = null;
+            } else if (typeof clean[field] === 'string') {
+                const cleanDigits = clean[field].replace(/[^0-9\.\-]/g, '');
+                if (cleanDigits === '' || cleanDigits === '-') {
+                    clean[field] = null;
+                } else {
+                    const num = parseFloat(cleanDigits);
+                    clean[field] = isNaN(num) ? null : num;
+                }
+            } else if (typeof clean[field] === 'number' && isNaN(clean[field])) {
                 clean[field] = null;
             }
         }

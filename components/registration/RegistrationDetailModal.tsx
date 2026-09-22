@@ -49,6 +49,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'info' | 'status' | 'milestones' | 'attachments'>('status');
+  const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
 
   React.useEffect(() => {
     setFormData({ ...record });
@@ -101,7 +102,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
       recordId: formData.id,
       previousStatus: formData.status,
       newStatus,
-      changedBy: currentUser?.name || formData.assignedTo || 'Cán bộ Cấp giấy',
+      changedBy: formData.assignedTo || currentUser?.name || 'Cán bộ Cấp giấy',
       changedAt: now,
       note: note || undefined,
     };
@@ -138,6 +139,19 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     }
 
     setFormData(updatedRecordData);
+    if ([
+      RecordStatus.TAX_TRANSFER,
+      RecordStatus.PENDING_TAX_KV7,
+      RecordStatus.PENDING_TAX_PAYMENT,
+      RecordStatus.PENDING_PRINT_CERT,
+      RecordStatus.PENDING_CHECK,
+      RecordStatus.PENDING_SIGN,
+      RecordStatus.PENDING_HANDOVER,
+      RecordStatus.HANDOVER,
+      RecordStatus.RETURNED
+    ].includes(newStatus)) {
+      setActiveTab('milestones');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -387,18 +401,20 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                 </div>
 
                 {/* 1.1 Niêm yết tại UBND xã */}
-                <div className="p-3 bg-white border border-amber-200 rounded-xl space-y-1 bg-amber-50/30">
-                  <label className="block text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                    <Building size={14} className="text-amber-600" />
-                    <span>Ngày phát hành CV niêm yết xã</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.postingDate || ''}
-                    onChange={(e) => handleChange('postingDate', e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
+                {isLostCertType && (
+                  <div className="p-3 bg-white border border-amber-200 rounded-xl space-y-1 bg-amber-50/30">
+                    <label className="block text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                      <Building size={14} className="text-amber-600" />
+                      <span>Ngày phát hành CV niêm yết xã</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.postingDate || ''}
+                      onChange={(e) => handleChange('postingDate', e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                )}
 
                 {/* 2. Chuyển thuế */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">

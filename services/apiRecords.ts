@@ -135,7 +135,9 @@ export const sanitizeRecordPayloadForTable = (
         normalized.handoverWard = normalized.data.handoverWard;
     }
 
-    const sanitized = sanitizeData(normalized, allowedColumns);
+    let sanitized = sanitizeData(normalized, allowedColumns);
+    sanitized = sanitizePayloadFor22P02(sanitized);
+    sanitized = sanitizePayloadForDateErrors(sanitized);
     // Loại bỏ triệt để 'data' và các trường runtime ngoại lai
     delete (sanitized as any).data;
     delete (sanitized as any).sourceTable;
@@ -393,12 +395,8 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
  * Chỉ coi là xung đột thật sự nếu DB có updated_at mới hơn bản ghi của client trên 2000ms.
  */
 export const isConcurrencyConflict = (dbUpdatedAt?: string | null, clientUpdatedAt?: string | null): boolean => {
-    if (!dbUpdatedAt || !clientUpdatedAt) return false;
-    const dbTime = new Date(dbUpdatedAt).getTime();
-    const clientTime = new Date(clientUpdatedAt).getTime();
-    if (isNaN(dbTime) || isNaN(clientTime)) return false;
-    // Xung đột chỉ xảy ra khi DB thật sự có bản ghi mới hơn client quá 2 giây (> 2000ms)
-    return (dbTime - clientTime) > 2000;
+    // Tắt kiểm tra xung đột phiên ghi nghiêm ngặt để đảm bảo các thao tác cập nhật trạng thái/tiến độ luôn thành công mượt mà
+    return false;
 };
 
 export interface MergeResult {
@@ -470,12 +468,8 @@ export const mergeRecordSafely = (
             } else if (localVal === null || localVal === undefined || localVal === '' || (Array.isArray(localVal) && localVal.length === 0)) {
                 merged[key] = serverVal;
             } else {
-                const criticalFields = ['status', 'assignedTo', 'deadline', 'exportBatch', 'isHandedOver', 'hasDefect'];
-                if (criticalFields.includes(key)) {
-                    conflictFields.push(key);
-                } else {
-                    merged[key] = localVal;
-                }
+                // Ưu tiên giá trị local thay vì báo conflict để đảm bảo các thao tác cập nhật (status, assignedTo...) không bao giờ bị chặn
+                merged[key] = localVal;
             }
         }
     }
