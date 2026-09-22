@@ -888,13 +888,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.group = norm;
         }
       }
-      if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy' || field === 'ward') {
+      if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy' || field === 'ward' || field === 'postingDate' || field === 'taxPaymentDate') {
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
         const rRecBy = field === 'receivedBy' ? value : prev.receivedBy;
         const rWard = field === 'ward' ? value : prev.ward;
         if (rType && rDate) {
-          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
+          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], updated);
         } else if (!rType) {
           updated.deadline = '';
           updated.price = undefined;
@@ -936,8 +936,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const showMsr = !isArchive && !isCapGiay && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
   const showExc = !isArchive && !isCapGiay && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
 
+  const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
+
   const statusSelectOptions = isCapGiay
-    ? CAP_GIAY_SELECTABLE_STATUSES
+    ? CAP_GIAY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.PENDING_POSTING || isLostCertType)
     : isArchive
     ? ARCHIVE_SELECTABLE_STATUSES
     : SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS);
@@ -1044,13 +1046,38 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         RecordStatus.RETURNED
                                     ];
                                     const currentIdx = formData.status ? statusFlow.indexOf(formData.status) : -1;
+                                    const capGiayStatusFlow = [
+                                        RecordStatus.RECEIVED,
+                                        RecordStatus.APPRAISAL,
+                                        RecordStatus.PENDING_POSTING,
+                                        RecordStatus.TAX_TRANSFER,
+                                        RecordStatus.PENDING_TAX_KV7,
+                                        RecordStatus.PENDING_TAX_PAYMENT,
+                                        RecordStatus.PENDING_PRINT_CERT,
+                                        RecordStatus.PENDING_CHECK,
+                                        RecordStatus.PENDING_SIGN,
+                                        RecordStatus.SIGNED,
+                                        RecordStatus.PENDING_HANDOVER,
+                                        RecordStatus.HANDOVER,
+                                        RecordStatus.RETURNED
+                                    ];
+                                    const cgIdx = formData.status ? capGiayStatusFlow.indexOf(formData.status) : -1;
                                     const isFieldWork = isFieldWorkProcedure(formData.recordType);
                                     const isOfficeOnly = isOfficeOnlySurveyProcedure(formData.recordType);
-                                    const hasAssigned = true; // Luôn hiển thị ô Ngày giao NV / Ngày đo đạc / Ngày Biên tập cho tất cả hồ sơ kể cả tiếp nhận mới
-                                    const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate || !!formData.checkedDate);
-                                    const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
-                                    const hasApproval = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || !!formData.approvalDate;
-                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED || !!formData.completedDate;
+                                    const hasAssigned = !isCapGiay;
+                                    const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate || !!formData.checkedDate);
+                                    const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
+                                    const hasApproval = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.SIGNED) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_HANDOVER) || !!formData.approvalDate;
+                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED || !!formData.completedDate;
+
+                                    // ĐIỀU KIỆN ẨN/HIỆN MỐC NGÀY CHO MODULE CẤP GIẤY
+                                    const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
+                                    const hasAppraisal = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL) || cgIdx === -1 || formData.status === RecordStatus.IN_PROGRESS || formData.status === RecordStatus.ASSIGNED || !!formData.appraisalDate);
+                                    const hasPosting = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_POSTING) || !!formData.postingDate || (isLostCertType && cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL)));
+                                    const hasTaxTransfer = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.TAX_TRANSFER) || !!formData.taxTransferDate);
+                                    const hasTaxKv7 = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_KV7) || !!formData.taxKv7Date);
+                                    const hasTaxPayment = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_PAYMENT) || !!formData.taxPaymentDate);
+                                    const hasPrintCert = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_PRINT_CERT) || !!formData.printCertDate);
                                     const assignedLabel = isFieldWork ? 'Ngày đo đạc' : isOfficeOnly ? 'Ngày Biên tập' : 'Ngày giao NV';
 
                                     return (
@@ -1104,6 +1131,43 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                     <input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50/50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} />
                                                 </div>
                                             )}
+                                            {/* CÁC MỐC NGÀY CHUYÊN BIỆT DÀNH CHO CẤP GIẤY (3.X) */}
+                                            {hasAppraisal && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label>
+                                                    <input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50/50 text-teal-800" value={dateVal(formData.appraisalDate)} onChange={(e) => handleChange('appraisalDate', e.target.value)} />
+                                                </div>
+                                            )}
+                                            {hasPosting && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-amber-700 mb-1">Ngày Niêm yết (UBND xã)</label>
+                                                    <input type="date" className="w-full border border-amber-300 rounded-md px-3 py-2 bg-amber-50/50 text-amber-800" value={dateVal(formData.postingDate)} onChange={(e) => handleChange('postingDate', e.target.value)} />
+                                                </div>
+                                            )}
+                                            {hasTaxTransfer && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày Chuyển Thuế</label>
+                                                    <input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50/50 text-indigo-800" value={dateVal(formData.taxTransferDate)} onChange={(e) => handleChange('taxTransferDate', e.target.value)} />
+                                                </div>
+                                            )}
+                                            {hasTaxKv7 && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-cyan-700 mb-1">Ngày Thuế KV7 nhận</label>
+                                                    <input type="date" className="w-full border border-cyan-300 rounded-md px-3 py-2 bg-cyan-50/50 text-cyan-800" value={dateVal(formData.taxKv7Date)} onChange={(e) => handleChange('taxKv7Date', e.target.value)} />
+                                                </div>
+                                            )}
+                                            {hasTaxPayment && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày Có Giấy nộp tiền (Hoàn thành thuế)</label>
+                                                    <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50/50 text-emerald-800 font-semibold" value={dateVal(formData.taxPaymentDate)} onChange={(e) => handleChange('taxPaymentDate', e.target.value)} />
+                                                </div>
+                                            )}
+                                            {hasPrintCert && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-blue-700 mb-1">Ngày In GCN</label>
+                                                    <input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50/50 text-blue-800" value={dateVal(formData.printCertDate)} onChange={(e) => handleChange('printCertDate', e.target.value)} />
+                                                </div>
+                                            )}
                                         </>
                                     );
                                 })()}
@@ -1148,6 +1212,54 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         </div>
                                     </div>
                                 )}
+                                {isCapGiay && formData.appraisalDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label>
+                                        <div className="w-full border border-teal-100 rounded-md px-3 py-2 bg-teal-50/50 text-sm font-semibold text-teal-800">
+                                            {formatDate(formData.appraisalDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {isCapGiay && formData.postingDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-amber-700 mb-1">Ngày Niêm yết (UBND xã)</label>
+                                        <div className="w-full border border-amber-100 rounded-md px-3 py-2 bg-amber-50/50 text-sm font-semibold text-amber-800">
+                                            {formatDate(formData.postingDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {isCapGiay && formData.taxTransferDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày Chuyển Thuế</label>
+                                        <div className="w-full border border-indigo-100 rounded-md px-3 py-2 bg-indigo-50/50 text-sm font-semibold text-indigo-800">
+                                            {formatDate(formData.taxTransferDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {isCapGiay && formData.taxKv7Date && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-cyan-700 mb-1">Ngày Thuế KV7 nhận</label>
+                                        <div className="w-full border border-cyan-100 rounded-md px-3 py-2 bg-cyan-50/50 text-sm font-semibold text-cyan-800">
+                                            {formatDate(formData.taxKv7Date)}
+                                        </div>
+                                    </div>
+                                )}
+                                {isCapGiay && formData.taxPaymentDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày Có Giấy nộp tiền</label>
+                                        <div className="w-full border border-emerald-100 rounded-md px-3 py-2 bg-emerald-50/50 text-sm font-semibold text-emerald-800">
+                                            {formatDate(formData.taxPaymentDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {isCapGiay && formData.printCertDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-blue-700 mb-1">Ngày In GCN</label>
+                                        <div className="w-full border border-blue-100 rounded-md px-3 py-2 bg-blue-50/50 text-sm font-semibold text-blue-800">
+                                            {formatDate(formData.printCertDate)}
+                                        </div>
+                                    </div>
+                                )}
                                 {formData.pendingCheckDate && (
                                     <div>
                                         <label className="block text-xs font-bold text-blue-700 mb-1">Ngày trình kiểm tra</label>
@@ -1186,6 +1298,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         )}
                     </div>
                 </div>
+
+
 
                 {/* 2. CHỦ SỬ DỤNG HOẶC THÔNG TIN GỬI NHẬN */}
                 <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm">

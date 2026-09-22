@@ -68,13 +68,12 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
       key: RecordStatus.TAX_TRANSFER,
       label: 'Chờ chuyển thuế',
       shortLabel: 'Chuyển thuế',
-      description: 'Giai đoạn liên thông thuế: Không tính vào thời gian giải quyết của Chi nhánh',
+      description: 'Lập và chuyển phiếu thông tin địa chính sang cơ quan thuế',
       dateField: 'taxTransferDate',
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-      durationHours: 0,
-      durationDays: 0,
-      durationLabel: 'Không tính hạn',
-      isTaxPhase: true,
+      durationHours: 16,
+      durationDays: 2,
+      durationLabel: '2 ngày',
     },
     {
       key: RecordStatus.PENDING_TAX_KV7,
@@ -107,9 +106,9 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
       description: 'Dành toàn bộ thời gian còn lại của Chi nhánh cho in phôi GCN mới hoặc xác nhận trang 4',
       dateField: 'printCertDate',
       badgeColor: 'bg-teal-100 text-teal-800 border-teal-300',
-      durationHours: 72, // 104h - (4h tiếp nhận + 8h thẩm định + 8h kiểm tra + 4h trình ký + 4h ký + 4h bàn giao) = 72h = 9 ngày
-      durationDays: 9,
-      durationLabel: '9 ngày',
+      durationHours: 56, // 104h - (4h + 8h + 16h + 8h + 4h + 4h + 4h) = 56h = 7 ngày
+      durationDays: 7,
+      durationLabel: '7 ngày',
     },
     {
       key: RecordStatus.PENDING_CHECK,
@@ -547,10 +546,9 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
       description: 'Thu nhận biên bản hết niêm yết, lập Phiếu chuyển thông tin địa chính gửi Thuế',
       dateField: 'taxTransferDate',
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-      durationHours: 0,
-      durationDays: 0,
-      durationLabel: 'Không tính hạn',
-      isTaxPhase: true,
+      durationHours: 16,
+      durationDays: 2,
+      durationLabel: '2 ngày',
     },
     {
       key: RecordStatus.PENDING_TAX_KV7,
@@ -583,9 +581,9 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
       description: 'Dành toàn bộ thời gian còn lại của Chi nhánh để ban hành QĐ hủy GCN cũ và in phôi GCN mới',
       dateField: 'printCertDate',
       badgeColor: 'bg-teal-100 text-teal-800 border-teal-300',
-      durationHours: 72, // 104h - (4h + 8h + 8h + 4h + 4h + 4h) = 72h = 9 ngày
-      durationDays: 9,
-      durationLabel: '9 ngày',
+      durationHours: 56, // 104h - (4h + 8h + 16h + 8h + 4h + 4h + 4h) = 56h = 7 ngày
+      durationDays: 7,
+      durationLabel: '7 ngày',
     },
     {
       key: RecordStatus.PENDING_CHECK,

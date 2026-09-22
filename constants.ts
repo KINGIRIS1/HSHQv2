@@ -49,7 +49,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 
   // Nhãn hiển thị cho Module Cấp giấy
   [RecordStatus.APPRAISAL]: 'Chờ thẩm định',
-  [RecordStatus.PENDING_POSTING]: 'Chờ niêm yết (30 ngày)',
+  [RecordStatus.PENDING_POSTING]: 'Chờ niêm yết',
   [RecordStatus.TAX_TRANSFER]: 'Chờ chuyển thuế',
   [RecordStatus.PENDING_TAX_KV7]: 'Chờ thuế khu vực 7',
   [RecordStatus.PENDING_TAX_PAYMENT]: 'Chờ Giấy nộp tiền',
@@ -60,6 +60,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 export const CAP_GIAY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận hồ sơ' },
   { key: RecordStatus.APPRAISAL, label: 'Chờ thẩm định' },
+  { key: RecordStatus.PENDING_POSTING, label: 'Chờ niêm yết' },
   { key: RecordStatus.TAX_TRANSFER, label: 'Chờ chuyển thuế' },
   { key: RecordStatus.PENDING_TAX_KV7, label: 'Chờ thuế khu vực 7' },
   { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Chờ Giấy nộp tiền' },

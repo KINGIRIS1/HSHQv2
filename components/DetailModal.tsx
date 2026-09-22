@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus, DossierComponentItem, AttachedFileMeta, RolePermissions, DepartmentPermissions } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
-import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../constants';
+import { getNormalizedWard, getShortRecordType, isArchiveRecordType, isCertificateRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
 import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Paperclip, Eye, Download, ExternalLink, FolderOpen } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -11,6 +11,7 @@ import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
+import { getRegistrationWorkflowCategory, getRegistrationWorkflow, getWorkflowStepIndex } from '../utils/registrationWorkflows';
 import { previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isPreviewableFile } from '../services/attachmentStorage';
 import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
 
@@ -897,137 +898,212 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         </div>
 
                         <div className="p-6 space-y-0">
-                             <TimelineItem 
-                                date={record.receivedDate} 
-                                label="TIẾP NHẬN" 
-                                icon={UserIcon}
-                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                                subText={record.receivedBy ? (() => {
-                                    const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
-                                    const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
-                                    const name = receiver?.name || emp?.name || record.receivedBy;
-                                    return `${name} (${emp?.position || 'Nhân viên'})`;
-                                })() : undefined}
-                            />
+                             {getRegistrationWorkflowCategory(record.recordType) !== 'unclassified' || isCertificateRecordType(record.recordType) ? (
+                               (() => {
+                                   const wf = getRegistrationWorkflow(record.recordType);
+                                   const currentIdx = getWorkflowStepIndex(displayStatus || RecordStatus.RECEIVED, wf.steps);
 
-                            {isFieldWorkProcedure(record.recordType) ? (
-                              <>
-                                <TimelineItem 
-                                    date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
-                                    forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
-                                    label="ĐO ĐẠC THỰC ĐỊA" 
-                                    icon={UserIcon}
-                                    colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                                    subText={record.surveyorId ? (() => {
-                                        const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
-                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên Ngoại nghiệp'})` : record.surveyorId;
-                                    })() : (record.assignedTo ? (() => {
-                                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên'})` : record.assignedTo;
-                                    })() : undefined)}
-                                />
-                                <TimelineItem 
-                                    date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
-                                    forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
-                                    label="BIÊN TẬP BẢN ĐỒ" 
-                                    icon={UserIcon}
-                                    colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
-                                    subText={record.drafterId ? (() => {
-                                        const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
-                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.drafterId;
-                                    })() : (isPendingCheckActive && record.assignedTo ? (() => {
-                                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.assignedTo;
-                                    })() : undefined)}
-                                />
-                              </>
-                            ) : isOfficeOnlySurveyProcedure(record.recordType) ? (
-                              <TimelineItem 
-                                  date={record.officeAssignedDate || record.assignedDate || record.completedWorkDate} 
-                                  forceActive={isWorkDone || !!record.assignedDate || !!record.officeAssignedDate || record.status === RecordStatus.OFFICE_WORK}
-                                  label="BIÊN TẬP BẢN ĐỒ" 
-                                  icon={UserIcon}
-                                  colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
-                                  subText={(record.drafterId || record.assignedTo) ? (() => {
-                                      const emp = employees.find(e => e.id === (record.drafterId || record.assignedTo) || e.name === (record.drafterId || record.assignedTo));
-                                      return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : (record.drafterId || record.assignedTo);
-                                  })() : undefined}
-                              />
-                            ) : (
-                              <TimelineItem 
-                                  date={record.assignedDate || record.completedWorkDate} 
-                                  forceActive={isWorkDone || Boolean(record.assignedDate || record.assignedTo || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS)}
-                                  label="ĐANG THỰC HIỆN" 
-                                  icon={UserIcon}
-                                  colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                                  subText={record.assignedTo ? (() => {
-                                      const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                                      if (!emp) return record.assignedTo;
-                                      return `${emp.name} (${emp.position || 'Chuyên viên'})`;
-                                  })() : undefined}
-                              />
-                            )}
+                                   return wf.steps.map((step, idx) => {
+                                       const isLast = idx === wf.steps.length - 1;
+                                       const isCompleted = idx < currentIdx || displayStatus === RecordStatus.RETURNED;
+                                       const isCurrent = idx === currentIdx;
+                                       const stepDate = step.dateField ? (record as any)[step.dateField] : null;
+                                       const isActive = Boolean(stepDate) || isCompleted || isCurrent;
 
-                            {/* Ẩn mốc kiểm tra cho hồ sơ Lưu trữ */}
-                            {!isArchiveRecordType(record.recordType) && (
+                                       let colorClass = {
+                                           text: 'text-emerald-700',
+                                           border: 'border-emerald-600',
+                                           bg: 'bg-emerald-600'
+                                       };
+
+                                       if (step.isTaxPhase) {
+                                           colorClass = {
+                                               text: 'text-amber-700',
+                                               border: 'border-amber-600',
+                                               bg: 'bg-amber-600'
+                                           };
+                                       } else if (isCurrent) {
+                                           colorClass = {
+                                               text: 'text-blue-700',
+                                               border: 'border-blue-600',
+                                               bg: 'bg-blue-600'
+                                           };
+                                       }
+
+                                       let detailInfo = '';
+                                       if (step.key === RecordStatus.RECEIVED && record.receivedBy) {
+                                           const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                                           const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                                           const name = receiver?.name || emp?.name || record.receivedBy;
+                                           detailInfo = `${name} (${emp?.position || 'Nhân viên'})`;
+                                       } else if (step.key === RecordStatus.APPRAISAL && record.assignedTo) {
+                                           const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                           if (emp) detailInfo = `${emp.name} (${emp.position || 'Chuyên viên'})`;
+                                       } else if (step.key === RecordStatus.PENDING_CHECK && record.checkedBy) {
+                                           const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
+                                                         users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
+                                           if (checker) detailInfo = `${checker.name} (${(checker as any).position || 'Người kiểm tra'})`;
+                                       } else if (step.key === RecordStatus.PENDING_SIGN && record.submittedTo) {
+                                           const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
+                                           const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
+                                           if (director || emp) detailInfo = `${director?.name || emp?.name} (Lãnh đạo)`;
+                                       } else if (step.key === RecordStatus.RETURNED && (record.receiverName || record.returnedBy)) {
+                                           detailInfo = record.receiverName ? `Người nhận: ${record.receiverName}` : `Người trả: ${record.returnedBy}`;
+                                       }
+
+                                       const subText = [detailInfo, step.durationLabel ? `SLA: ${step.durationLabel}` : '']
+                                           .filter(Boolean)
+                                           .join(' • ');
+
+                                       return (
+                                           <TimelineItem
+                                               key={step.key}
+                                               date={stepDate}
+                                               forceActive={isActive}
+                                               label={step.label}
+                                               icon={step.isTaxPhase ? DollarSign : (step.key === RecordStatus.RETURNED ? FileCheck : UserIcon)}
+                                               isLast={isLast}
+                                               colorClass={colorClass}
+                                               subText={subText || undefined}
+                                           />
+                                       );
+                                   });
+                               })()
+                             ) : (
+                               <>
+                                 <TimelineItem 
+                                    date={record.receivedDate} 
+                                    label="TIẾP NHẬN" 
+                                    icon={UserIcon}
+                                    colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                                    subText={record.receivedBy ? (() => {
+                                        const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                                        const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                                        const name = receiver?.name || emp?.name || record.receivedBy;
+                                        return `${name} (${emp?.position || 'Nhân viên'})`;
+                                    })() : undefined}
+                                />
+
+                                {isFieldWorkProcedure(record.recordType) ? (
+                                  <>
+                                    <TimelineItem 
+                                        date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
+                                        forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
+                                        label="ĐO ĐẠC THỰC ĐỊA" 
+                                        icon={UserIcon}
+                                        colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                                        subText={record.surveyorId ? (() => {
+                                            const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
+                                            return emp ? `${emp.name} (${emp.position || 'Chuyên viên Ngoại nghiệp'})` : record.surveyorId;
+                                        })() : (record.assignedTo ? (() => {
+                                            const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                            return emp ? `${emp.name} (${emp.position || 'Chuyên viên'})` : record.assignedTo;
+                                        })() : undefined)}
+                                    />
+                                    <TimelineItem 
+                                        date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
+                                        forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
+                                        label="BIÊN TẬP BẢN ĐỒ" 
+                                        icon={UserIcon}
+                                        colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                                        subText={record.drafterId ? (() => {
+                                            const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
+                                            return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.drafterId;
+                                        })() : (isPendingCheckActive && record.assignedTo ? (() => {
+                                            const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                            return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.assignedTo;
+                                        })() : undefined)}
+                                    />
+                                  </>
+                                ) : isOfficeOnlySurveyProcedure(record.recordType) ? (
+                                  <TimelineItem 
+                                      date={record.officeAssignedDate || record.assignedDate || record.completedWorkDate} 
+                                      forceActive={isWorkDone || !!record.assignedDate || !!record.officeAssignedDate || record.status === RecordStatus.OFFICE_WORK}
+                                      label="BIÊN TẬP BẢN ĐỒ" 
+                                      icon={UserIcon}
+                                      colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                                      subText={(record.drafterId || record.assignedTo) ? (() => {
+                                          const emp = employees.find(e => e.id === (record.drafterId || record.assignedTo) || e.name === (record.drafterId || record.assignedTo));
+                                          return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : (record.drafterId || record.assignedTo);
+                                      })() : undefined}
+                                  />
+                                ) : (
+                                  <TimelineItem 
+                                      date={record.assignedDate || record.completedWorkDate} 
+                                      forceActive={isWorkDone || Boolean(record.assignedDate || record.assignedTo || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS)}
+                                      label="ĐANG THỰC HIỆN" 
+                                      icon={UserIcon}
+                                      colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                                      subText={record.assignedTo ? (() => {
+                                          const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                          if (!emp) return record.assignedTo;
+                                          return `${emp.name} (${emp.position || 'Chuyên viên'})`;
+                                      })() : undefined}
+                                  />
+                                )}
+
+                                {/* Ẩn mốc kiểm tra cho hồ sơ Lưu trữ */}
+                                {!isArchiveRecordType(record.recordType) && (
+                                    <TimelineItem 
+                                        date={record.pendingCheckDate || record.checkedDate} 
+                                        forceActive={isPendingCheckActive}
+                                        label="TRÌNH KIỂM TRA" 
+                                        icon={Send}
+                                        colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
+                                        subText={(() => {
+                                            if (record.checkedBy) {
+                                                const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
+                                                              users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
+                                                const name = checker?.name || record.checkedBy;
+                                                const pos = (checker as any)?.position || 'Người kiểm tra';
+                                                return `${name} (${pos})`;
+                                            }
+                                            if (isPendingCheckActive) {
+                                                return 'Chờ phân công kiểm tra';
+                                            }
+                                            return undefined;
+                                        })()}
+                                    />
+                                )}
+
                                 <TimelineItem 
-                                    date={record.pendingCheckDate || record.checkedDate} 
-                                    forceActive={isPendingCheckActive}
-                                    label="TRÌNH KIỂM TRA" 
+                                    date={record.submissionDate || record.approvalDate} 
+                                    forceActive={isPendingSignActive || isSignedActive}
+                                    label="TRÌNH KÝ DUYỆT" 
                                     icon={Send}
-                                    colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                                    subText={(() => {
-                                        if (record.checkedBy) {
-                                            const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
-                                                          users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
-                                            const name = checker?.name || record.checkedBy;
-                                            const pos = (checker as any)?.position || 'Người kiểm tra';
-                                            return `${name} (${pos})`;
+                                    colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
+                                    subText={record.submittedTo ? (() => {
+                                        const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
+                                        if (!director) {
+                                            const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
+                                            return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
                                         }
-                                        if (isPendingCheckActive) {
-                                            return 'Chờ phân công kiểm tra';
-                                        }
-                                        return undefined;
-                                    })()}
+                                        const emp = employees.find(e => e.id === director.employeeId);
+                                        return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
+                                    })() : undefined}
                                 />
-                            )}
-
-                            <TimelineItem 
-                                date={record.submissionDate || record.approvalDate} 
-                                forceActive={isPendingSignActive || isSignedActive}
-                                label="TRÌNH KÝ DUYỆT" 
-                                icon={Send}
-                                colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
-                                subText={record.submittedTo ? (() => {
-                                    const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
-                                    if (!director) {
-                                        const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
-                                        return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
-                                    }
-                                    const emp = employees.find(e => e.id === director.employeeId);
-                                    return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
-                                })() : undefined}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.completedDate || record.exportDate} 
-                                forceActive={isHandoverActive}
-                                label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
-                                icon={CheckSquare}
-                                isLast={false}
-                                colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
-                                subText={record.exportBatch ? `Đợt xuất: ${getPureBatchNumber(record.exportBatch)}` : undefined}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.resultReturnedDate} 
-                                forceActive={isReturnedActive}
-                                label="TRẢ KẾT QUẢ" 
-                                icon={FileCheck}
-                                isLast={true}
-                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                                subText={record.receiverName ? `Người nhận: ${record.receiverName}` : (record.returnedBy ? `Người trả: ${record.returnedBy}` : undefined)}
-                            />
+                                
+                                <TimelineItem 
+                                    date={record.completedDate || record.exportDate} 
+                                    forceActive={isHandoverActive}
+                                    label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
+                                    icon={CheckSquare}
+                                    isLast={false}
+                                    colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
+                                    subText={record.exportBatch ? `Đợt xuất: ${getPureBatchNumber(record.exportBatch)}` : undefined}
+                                />
+                                
+                                <TimelineItem 
+                                    date={record.resultReturnedDate} 
+                                    forceActive={isReturnedActive}
+                                    label="TRẢ KẾT QUẢ" 
+                                    icon={FileCheck}
+                                    isLast={true}
+                                    colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                                    subText={record.receiverName ? `Người nhận: ${record.receiverName}` : (record.returnedBy ? `Người trả: ${record.returnedBy}` : undefined)}
+                                />
+                               </>
+                             )}
                         </div>
                     </div>
                 </div>

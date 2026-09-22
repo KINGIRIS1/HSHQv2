@@ -163,6 +163,22 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
     };
 };
 
+export const isStatusEligibleForVaoSo = (status: any): boolean => {
+    if (!status) return false;
+    const st = String(status).toUpperCase().trim();
+    return (
+        st === 'PENDING_HANDOVER' ||
+        st === 'CHO_BAN_GIAO' ||
+        st === 'CHỜ BÀN GIAO' ||
+        st === 'HANDOVER' ||
+        st === 'DA_BAN_GIAO' ||
+        st === 'ĐÃ GIAO 1 CỬA' ||
+        st === 'RETURNED' ||
+        st === 'DA_TRA_KET_QUA' ||
+        st === 'ĐÃ TRẢ KẾT QUẢ'
+    );
+};
+
 export const isVaoSoRecord = (row: any): boolean => {
     if (!row) return false;
     const code = String(row.code || row.so_hieu || row.id || '').toUpperCase();
@@ -170,23 +186,24 @@ export const isVaoSoRecord = (row: any): boolean => {
     if (code.startsWith('LT-')) return false;
     if (row.sourceTable === 'luutru_records') return false;
 
+    // KHÓA CỨNG: Tuyệt đối chỉ nhận hồ sơ đã hoàn thành ký duyệt và đạt từ bước Chờ bàn giao trở đi
+    const rawSt = row.data?.status || row.status || (row as any).stage;
+    if (!isStatusEligibleForVaoSo(rawSt)) return false;
+
     const rowType = String(row.type || '').toLowerCase();
     const dataType = String(row.data?.type || '').toLowerCase();
     const recType = String(row.recordType || row.content || '').toLowerCase();
-    const dataStage = String(row.data?.stage || '').toLowerCase();
-    const entryNum = String(row.entryNumber || row.data?.so_vao_so || row.data?.entryNumber || '').trim();
-    const dataStatus = String(row.data?.status || '').toLowerCase();
+    const isCapGiay = row.group === '3. Đăng ký đất đai, cấp GCN' || 
+                      row.sourceTable === 'dangky_records' || 
+                      (row.data && (row.data.sourceTable === 'dangky_records' || row.data.group === '3. Đăng ký đất đai, cấp GCN'));
 
     return (
         rowType === 'vaoso' ||
         dataType === 'vaoso' ||
+        isCapGiay ||
         recType.includes('vào sổ') ||
         recType.includes('vao so') ||
-        recType.includes('vaoso') ||
-        dataStage === 'vao_so' ||
-        entryNum.length > 0 ||
-        dataStatus.includes('vào sổ') ||
-        dataStatus.includes('vao so')
+        recType.includes('vaoso')
     );
 };
 
@@ -316,6 +333,8 @@ export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
 
     const mergedData = {
         ...d,
+        status: r.status || d.status || '',
+        rawStatus: r.status || d.status || '',
         ma_ho_so: code,
         ten_chu_su_dung: customerName,
         loai_bien_dong: recordType,
@@ -723,7 +742,9 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             const cachedVaoso = getFromCache<ArchiveRecord[]>(cacheKey, []);
             const cleanCached = cachedVaoso.filter(r => {
                 const code = String(r.so_hieu || r.id || '').toUpperCase();
-                return !code.startsWith('LT-') && (r as any).sourceTable !== 'luutru_records';
+                if (code.startsWith('LT-') || (r as any).sourceTable === 'luutru_records') return false;
+                const recStatus = r.data?.status || r.data?.rawStatus || r.status;
+                return isStatusEligibleForVaoSo(recStatus);
             });
             if (cleanCached.length !== cachedVaoso.length) {
                 saveToCache(cacheKey, cleanCached);
@@ -753,29 +774,15 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                     }
 
                     if (data && data.length > 0) {
-                        // CHỈ lấy hồ sơ đã ký duyệt và chuyển qua Chờ bàn giao (PENDING_HANDOVER) hoặc đã có số vào sổ
+                        // KHÓA CỨNG: CHỈ lấy hồ sơ đã hoàn thành ký duyệt và chuyển sang:
+                        // PENDING_HANDOVER (Chờ bàn giao), HANDOVER (Đã giao 1 cửa), RETURNED (Đã trả kết quả).
+                        // Tuyệt đối KHÔNG lấy hồ sơ ở các bước trước: Tiếp nhận, Thẩm định, Chờ niêm yết, Chờ chuyển thuế, Chờ thuế KV7, Chờ GNT, Chờ in GCN, Chờ kiểm tra, Chờ ký duyệt.
                         const eligibleData = data.filter(item => {
                             const code = String(item.code || item.id || '').toUpperCase();
                             if (code.startsWith('LT-')) return false;
 
-                            const entryNum = item.entryNumber || (item.data && (item.data.so_vao_so || item.data.entryNumber));
-                            if (entryNum && String(entryNum).trim() !== '') return true;
-
-                            const st = String(item.status || '').toUpperCase().trim();
-                            if (
-                                st === 'PENDING_HANDOVER' ||
-                                st === 'CHO_BAN_GIAO' ||
-                                st === 'HANDOVER' ||
-                                st === 'DA_BAN_GIAO' ||
-                                st === 'RETURNED' ||
-                                st === 'DA_TRA_KET_QUA'
-                            ) {
-                                return true;
-                            }
-                            if (item.pendingHandoverDate || (item.data && item.data.ngay_cho_ban_giao)) {
-                                return true;
-                            }
-                            return false;
+                            const recStatus = item.status || (item.data && item.data.status);
+                            return isStatusEligibleForVaoSo(recStatus);
                         });
 
                         const mapped = eligibleData.map(item => mapDangkyRecordToArchiveRecord(item));
@@ -1260,7 +1267,7 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
                     recordType: r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận',
                     content: r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận',
                     notes: d.ghi_chu || '',
-                    status: 'DA_KY',
+                    status: (r as any).status || d.status || 'PENDING_HANDOVER',
                     data: d,
                     updatedAt: new Date().toISOString()
                 };
@@ -1820,19 +1827,10 @@ export const allocateNextVaoSoNumbers = async (
 export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean> => {
     if (!records || records.length === 0) return true;
 
-    // CHỈ đồng bộ những hồ sơ đã ký duyệt và chuyển qua Chờ bàn giao (PENDING_HANDOVER) hoặc đã có số vào sổ
+    // KHÓA CỨNG: CHỈ đồng bộ những hồ sơ đã ký duyệt và chuyển sang: PENDING_HANDOVER, HANDOVER, RETURNED
     const eligibleRecords = records.filter(rec => {
-        const hasEntryNum = Boolean(rec.entryNumber && String(rec.entryNumber).trim() !== '');
-        const st = String(rec.status || '').toUpperCase().trim();
-        const isHandoverReady = 
-            st === RecordStatus.PENDING_HANDOVER ||
-            st === 'CHO_BAN_GIAO' ||
-            st === RecordStatus.HANDOVER ||
-            st === 'DA_BAN_GIAO' ||
-            st === RecordStatus.RETURNED ||
-            st === 'DA_TRA_KET_QUA' ||
-            Boolean(rec.pendingHandoverDate);
-        return hasEntryNum || isHandoverReady;
+        const recStatus = rec.status || (rec.data && rec.data.status);
+        return isStatusEligibleForVaoSo(recStatus);
     });
 
     if (eligibleRecords.length === 0) return true;

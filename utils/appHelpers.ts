@@ -195,16 +195,19 @@ export const formatDateKey = (date: Date): string => {
 };
 
 // Tính hạn trả (deadline) dựa trên loại hồ sơ, ngày nhận, danh sách ngày nghỉ lễ
-export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[]): string => {
-    if (!receivedDateStr) return '';
-    const cleanDate = receivedDateStr.split('T')[0];
-    const lowerType = (type || '').toLowerCase().trim();
-    const short = getShortRecordType(type);
+export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[], fullRecord?: Partial<RecordFile>): string => {
+    const rType = fullRecord?.recordType || type;
+    const rDate = fullRecord?.receivedDate || receivedDateStr;
+    if (!rDate) return '';
+    const cleanDate = String(rDate).split('T')[0];
+    const lowerType = (rType || '').toLowerCase().trim();
+    const short = getShortRecordType(rType);
 
     // 1. Nếu là nhóm 3.x (Đăng ký / Cấp giấy), dùng Single Source of Truth
-    const category = getRegistrationWorkflowCategory(type);
+    const category = getRegistrationWorkflowCategory(rType);
     if (category !== 'unclassified') {
-        const res = calculateRegistrationDeadline({ recordType: type, receivedDate: cleanDate }, holidays);
+        const recObj = fullRecord ? { ...fullRecord, recordType: rType, receivedDate: cleanDate } : { recordType: rType, receivedDate: cleanDate };
+        const res = calculateRegistrationDeadline(recObj, holidays);
         return res.deadline;
     }
 

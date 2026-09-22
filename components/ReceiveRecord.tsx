@@ -201,8 +201,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
   };
 
   // --- LOGIC TÍNH HẠN TRẢ ---
-  const calculateDeadline = (type: string, receivedDateStr: string) => {
-      return calculateDeadlineHelper(type, receivedDateStr, holidays);
+  const calculateDeadline = (type: string, receivedDateStr: string, fullRecord?: Partial<RecordFile>) => {
+      return calculateDeadlineHelper(type, receivedDateStr, holidays, fullRecord);
   };
 
   // ... (Phần logic in ấn và render giữ nguyên)

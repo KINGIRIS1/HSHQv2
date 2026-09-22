@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, allocateNextVaoSoNumbers, isVaoSoRecord } from '../../services/apiArchive';
+import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch, allocateNextVaoSoNumbers, isVaoSoRecord, isStatusEligibleForVaoSo } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { User } from '../../types';
 import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, ChevronDown, ChevronUp, Clock, AlertTriangle, Eye, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
@@ -220,7 +220,14 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         ]);
         const cleanData = (data || []).filter(r => {
             const code = String(r.so_hieu || r.id || '').toUpperCase();
-            return !code.startsWith('LT-') && (r as any).sourceTable !== 'luutru_records';
+            if (code.startsWith('LT-') || (r as any).sourceTable === 'luutru_records') return false;
+            
+            // Khóa cứng: Chỉ cho phép hồ sơ Cấp giấy xuất hiện trong module Vào sổ GCN
+            // KHI VÀ CHỈ KHI hồ sơ đã hoàn thành bước Ký duyệt và đã chuyển sang trạng thái:
+            // PENDING_HANDOVER (Chờ bàn giao), HANDOVER (Đã giao 1 cửa), RETURNED (Đã trả kết quả).
+            // Loại bỏ toàn bộ hồ sơ đang ở các bước trước: Tiếp nhận, Thẩm định, Chờ niêm yết, Chờ chuyển thuế, Chờ thuế KV7, Chờ GNT, Chờ in GCN, Chờ kiểm tra, Chờ ký duyệt.
+            const recStatus = r.data?.status || r.data?.rawStatus || r.status;
+            return isStatusEligibleForVaoSo(recStatus);
         });
         setRecords(cleanData);
         
@@ -272,6 +279,22 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         setLoading(false);
     };
 
+    const tabCounts = useMemo(() => {
+        const isVaoSoBaseRec = (r: ArchiveRecord) => {
+            const code = String(r.so_hieu || r.id || '').toUpperCase();
+            if (code.startsWith('LT-') || (r as any).sourceTable === 'luutru_records') return false;
+            const recStatus = r.data?.status || r.data?.rawStatus || r.status;
+            return isStatusEligibleForVaoSo(recStatus);
+        };
+        const validRecords = records.filter(isVaoSoBaseRec);
+        return {
+            all: validRecords.length,
+            unallocated: validRecords.filter(r => !r.data?.is_scanned && !r.data?.is_pending_scan).length,
+            pending: validRecords.filter(r => !r.data?.is_scanned && !!r.data?.is_pending_scan).length,
+            scanned: validRecords.filter(r => !!r.data?.is_scanned).length,
+        };
+    }, [records]);
+
     const filteredRecords = useMemo(() => {
         let filtered = records;
 
@@ -280,6 +303,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             const code = String(r.so_hieu || r.id || '').toUpperCase();
             if (code.startsWith('LT-')) return false;
             if ((r as any).sourceTable === 'luutru_records') return false;
+
+            const recStatus = r.data?.status || r.data?.rawStatus || r.status;
+            if (!isStatusEligibleForVaoSo(recStatus)) return false;
+
             return r.type === 'vaoso' || isVaoSoRecord(r);
         };
 
@@ -387,6 +414,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             noi_nhan_gui: '',
             created_by: currentUser.username,
             data: {
+                status: 'PENDING_HANDOVER',
                 so_vao_so: generatedSoVaoSo,
                 ma_ho_so: '',
                 ten_chu_su_dung: '',
@@ -1179,7 +1207,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
                         }`}
                     >
-                        Tất cả hồ sơ
+                        <span>Tất cả hồ sơ</span>
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-gray-200/80 text-gray-700">{tabCounts.all}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('unallocated')}
@@ -1189,7 +1218,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
                         }`}
                     >
-                        Chờ Vô Số
+                        <span>Chờ Vô Số</span>
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">{tabCounts.unallocated}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('pending')}
@@ -1199,7 +1229,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
                         }`}
                     >
-                        Chờ Scan
+                        <span>Chờ Scan</span>
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800">{tabCounts.pending}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('scanned')}
@@ -1209,7 +1240,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/30'
                         }`}
                     >
-                        Đã Scan
+                        <span>Đã Scan</span>
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800">{tabCounts.scanned}</span>
                     </button>
                 </div>
             </div>
