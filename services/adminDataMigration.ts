@@ -189,7 +189,7 @@ const mapRecordForTable = (
 export const executeAtomicRoutingMigration = async (
   targetConflictIds?: string[]
 ): Promise<MigrationBatchResult> => {
-  const nowStr = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+  const nowStr = new Date().toISOString().replace(/[T.:-]/g, '').slice(0, 14);
   const batchId = `routing_migration_${nowStr}`;
 
   // 1. Audit current conflicts

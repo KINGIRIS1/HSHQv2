@@ -146,6 +146,48 @@ export function getLuuTruWorkflowStage(record: Partial<RecordFile>): { stageInde
   }
 }
 
+import { loadRegistrationSlaFullConfig } from '../components/registration/RegistrationSlaStatusView';
+
+export function getLuuTruWorkflow(procedureCode?: string | null): {
+  code: string;
+  name: string;
+  standardDays: number;
+  steps: { stepNumber: number; name: string; durationDays: number; durationHours: number }[];
+} {
+  const code = (procedureCode || '').trim();
+  const fullConfig = loadRegistrationSlaFullConfig();
+  
+  const matchedItem = fullConfig.procedureItems.find(p => p.module === 'luutru' && (p.code === code || code.includes(p.code)));
+
+  if (matchedItem) {
+    const totalDays = matchedItem.steps.reduce((sum, s) => sum + (s.durationDays || 0), 0);
+    return {
+      code: matchedItem.code,
+      name: matchedItem.name,
+      standardDays: totalDays,
+      steps: matchedItem.steps.map(s => ({
+        stepNumber: s.stepNumber,
+        name: s.name,
+        durationDays: s.durationDays,
+        durationHours: s.durationHours,
+      })),
+    };
+  }
+
+  return {
+    code: 'LUU_TRU_STANDARD',
+    name: 'Quy trình Lưu trữ (1.1, 1.2)',
+    standardDays: 3,
+    steps: [
+      { stepNumber: 1, name: 'Tiếp nhận mới', durationDays: 0.5, durationHours: 4 },
+      { stepNumber: 2, name: 'Đang thực hiện', durationDays: 1.5, durationHours: 12 },
+      { stepNumber: 3, name: 'Trình ký', durationDays: 0.5, durationHours: 4 },
+      { stepNumber: 4, name: 'Hoàn Thành', durationDays: 0.25, durationHours: 2 },
+      { stepNumber: 5, name: 'Trả kết quả', durationDays: 0.25, durationHours: 2 },
+    ]
+  };
+}
+
 export function handleLuuTruSupplement(
   record: Partial<RecordFile>,
   reason?: string,

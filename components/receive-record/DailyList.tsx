@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { fetchContracts } from '../../services/api';
 import { saveRecord } from '../../services/apiRecords';
+import { findMatchingContract } from '../../utils/contractMatching';
 import RecordAttachmentModal from './RecordAttachmentModal';
 
 interface DailyListProps {
@@ -303,29 +304,7 @@ const DailyList: React.FC<DailyListProps> = ({
   // Check contract existence for a given record
   const getContractForRecord = (record: RecordFile) => {
       if (!contracts || contracts.length === 0 || !record) return undefined;
-      const rCode = (record.code || '').trim().toLowerCase();
-      const rName = (record.customerName || '').trim().toLowerCase();
-      const rPlot = (record.landPlot || '').trim().toLowerCase();
-      const rMap = (record.mapSheet || '').trim().toLowerCase();
-      const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
-
-      return contracts.find(c => {
-          if (!c) return false;
-          const cAddr = (c.customerAddress || '').trim().toLowerCase();
-          const cCode = (c.code || '').trim().toLowerCase();
-          const cName = (c.customerName || '').trim().toLowerCase();
-          const cPlot = (c.landPlot || '').trim().toLowerCase();
-          const cMap = (c.mapSheet || '').trim().toLowerCase();
-
-          if (rCode && (cAddr === rCode || cCode === rCode)) return true;
-          if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
-          if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
-          if (rName && cName && rName === cName) {
-              if (rPlot && cPlot && rPlot === cPlot) return true;
-              if (rMap && cMap && rMap === cMap) return true;
-          }
-          return false;
-      });
+      return findMatchingContract(record, contracts) || undefined;
   };
 
 

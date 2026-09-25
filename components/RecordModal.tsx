@@ -7,8 +7,10 @@ import { extractRecordSequence, checkRecordCodeExistsInDb } from '../services/ap
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
+import { findMatchingContract } from '../utils/contractMatching';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile, isPreviewableFile } from '../services/attachmentStorage';
 import DossierComponentSection from './receive-record/DossierComponentSection';
+import { CertificateOwnersSection } from './common/CertificateOwnersSection';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
@@ -368,29 +370,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 // 2. Tra cứu hợp đồng giống DetailModal
                 try {
                     const fetchedContracts = await fetchContracts();
-                    const match = fetchedContracts.find(c => {
-                        if (!c) return false;
-                        const cAddr = (c.customerAddress || '').trim().toLowerCase();
-                        const cCode = (c.code || '').trim().toLowerCase();
-                        const rCode = (dataToSet.code || '').trim().toLowerCase();
-                        const cName = (c.customerName || '').trim().toLowerCase();
-                        const rName = (dataToSet.customerName || '').trim().toLowerCase();
-                        const cPlot = (c.landPlot || '').trim().toLowerCase();
-                        const rPlot = (dataToSet.landPlot || '').trim().toLowerCase();
-                        const cMap = (c.mapSheet || '').trim().toLowerCase();
-                        const rMap = (dataToSet.mapSheet || '').trim().toLowerCase();
-
-                        const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
-
-                        if (rCode && (cAddr === rCode || cCode === rCode)) return true;
-                        if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
-                        if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
-                        if (rName && cName && rName === cName) {
-                            if (rPlot && cPlot && rPlot === cPlot) return true;
-                            if (rMap && cMap && rMap === cMap) return true;
-                        }
-                        return false;
-                    });
+                    const match = findMatchingContract(dataToSet as any, fetchedContracts);
                     
                     if (match) {
                         const isLiquidated = Boolean(match.liquidationAmount && match.liquidationAmount > 0 && match.liquidationDate);
@@ -1031,6 +1011,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 {!isCongVan && (
                                     <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} /></div>
                                 )}
+                                {isCapGiay && (
+                                    <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50/50 text-teal-800" value={dateVal(formData.appraisalDate)} onChange={(e) => handleChange('appraisalDate', e.target.value)} /></div>
+                                )}
                                 {(() => {
                                     const statusFlow = [
                                         RecordStatus.RECEIVED,
@@ -1067,15 +1050,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     const hasAssigned = !isCapGiay;
                                     const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate || !!formData.checkedDate);
                                     const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
-                                    const hasApproval = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.SIGNED) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_HANDOVER) || !!formData.approvalDate;
-                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED || !!formData.completedDate;
+                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.HANDOVER) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED || !!formData.completedDate;
 
                                     // ĐIỀU KIỆN ẨN/HIỆN MỐC NGÀY CHO MODULE CẤP GIẤY
                                     const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
-                                                                         const hasAppraisal = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL) || cgIdx === -1 || formData.status === RecordStatus.IN_PROGRESS || formData.status === RecordStatus.ASSIGNED || !!formData.appraisalDate);
-                                     const hasPosting = isCapGiay && isLostCertType && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_POSTING) || !!formData.postingDate || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL));
+                                    const hasPosting = isCapGiay && isLostCertType && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_POSTING) || !!formData.postingDate || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL));
                                     const hasTaxTransfer = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.TAX_TRANSFER) || !!formData.taxTransferDate);
-                                     const hasTaxKv7 = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_KV7) || !!formData.taxKv7Date);
+                                    const hasTaxKv7 = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_KV7) || !!formData.taxKv7Date);
                                     const hasTaxPayment = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_PAYMENT) || !!formData.taxPaymentDate);
                                     const hasPrintCert = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_PRINT_CERT) || !!formData.printCertDate);
                                     const assignedLabel = isFieldWork ? 'Ngày đo đạc' : isOfficeOnly ? 'Ngày Biên tập' : 'Ngày giao NV';
@@ -1120,24 +1101,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                             {hasSubmission && (
                                                 <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50/50 text-purple-800" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value)} /></div>
                                             )}
-                                            {hasApproval && (
-                                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50/50 text-indigo-800" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value)} /></div>
-                                            )}
-                                            {hasHandover && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-green-700 mb-1">
-                                                        {formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành (Giao 1 cửa)'}
-                                                     </label>
-                                                    <input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50/50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} />
-                                                </div>
-                                            )}
                                             {/* CÁC MỐC NGÀY CHUYÊN BIỆT DÀNH CHO CẤP GIẤY (3.X) */}
-                                            {hasAppraisal && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label>
-                                                    <input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50/50 text-teal-800" value={dateVal(formData.appraisalDate)} onChange={(e) => handleChange('appraisalDate', e.target.value)} />
-                                                </div>
-                                            )}
                                             {hasPosting && (
                                                 <div>
                                                     <label className="block text-xs font-bold text-amber-700 mb-1">Ngày Niêm yết (UBND xã)</label>
@@ -1158,14 +1122,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                             )}
                                             {hasTaxPayment && (
                                                 <div>
-                                                    <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày Có Giấy nộp tiền (Hoàn thành thuế)</label>
-                                                    <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50/50 text-emerald-800 font-semibold" value={dateVal(formData.taxPaymentDate)} onChange={(e) => handleChange('taxPaymentDate', e.target.value)} />
+                                                    <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày TBT (Thông báo thuế)</label>
+                                                    <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50/50 text-emerald-800 font-semibold" value={dateVal(formData.taxNoticeDate || formData.taxPaymentDate)} onChange={(e) => handleChange('taxNoticeDate', e.target.value)} />
                                                 </div>
                                             )}
                                             {hasPrintCert && (
                                                 <div>
                                                     <label className="block text-xs font-bold text-blue-700 mb-1">Ngày In GCN</label>
                                                     <input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50/50 text-blue-800" value={dateVal(formData.printCertDate)} onChange={(e) => handleChange('printCertDate', e.target.value)} />
+                                                </div>
+                                            )}
+                                            {hasHandover && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-emerald-700 mb-1">
+                                                        {formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành'}
+                                                    </label>
+                                                    <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50/50 font-semibold text-emerald-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} />
                                                 </div>
                                             )}
                                         </>
@@ -1355,10 +1327,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
                                 </select>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 md:col-span-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Diện tích (m2)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} /></div>
+                                <div><label className="block text-xs font-bold text-emerald-700 mb-1">Đất ở (m2)</label><input type="number" className="w-full border border-emerald-300 bg-emerald-50/40 rounded-md px-3 py-2 text-right font-bold text-emerald-900" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value === '' ? null : parseFloat(e.target.value))} /></div>
                             </div>
                             <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Số phát hành</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="VD: CD 123456" value={val(formData.issueNumber)} onChange={(e) => handleChange('issueNumber', e.target.value)} /></div>
@@ -1368,6 +1341,27 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         </div>
                     )}
                 </div>
+
+                {/* BẢNG CHỦ HỒ SƠ (NGƯỜI ĐỨNG TÊN GCN) DÀNH CHO HỒ SƠ 3.X */}
+                {(isCertificateRecordType(formData.recordType) || (formData.group && formData.group.startsWith('3')) || (formData.recordType && formData.recordType.startsWith('3.'))) && (
+                    <CertificateOwnersSection
+                        owners={formData.certificateOwners}
+                        onChange={(newOwners) => setFormData(prev => ({ ...prev, certificateOwners: newOwners }))}
+                        applicantName={val(formData.customerName)}
+                        applicantCccd={val(formData.cccd)}
+                        applicantPhone={val(formData.phoneNumber)}
+                        applicantAddress={val(formData.customerAddress)}
+                        onSyncApplicant={(owner1) => {
+                            setFormData(prev => ({
+                                ...prev,
+                                customerName: owner1.name || prev.customerName,
+                                cccd: owner1.cccd || prev.cccd,
+                                phoneNumber: owner1.phone || prev.phoneNumber,
+                                customerAddress: owner1.address || prev.customerAddress
+                            }));
+                        }}
+                    />
+                )}
 
                 {/* 4. NỘI DUNG & KỸ THUẬT */}
                 <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm">

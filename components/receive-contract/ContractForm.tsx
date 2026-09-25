@@ -137,16 +137,23 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   // Unified automatic code preview generation based on tab & date
   useEffect(() => {
       if (mode === 'liquidation') return; // Không tự lấy số mới ở tab thanh lý hợp đồng
-      const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id);
-      if (isExistingContract || isManual) return;
+      if (isManual) return;
+      // Nếu initialData đã có mã hợp đồng cụ thể (ví dụ lấy từ Modal hoặc Hồ sơ), tuyệt đối giữ nguyên
+      if (initialData?.code && initialData.code.trim() !== '') return;
+
+      const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id || (c.code && initialData.code && c.code.trim().toLowerCase() === initialData.code.trim().toLowerCase()));
+      if (isExistingContract) return;
+
       const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
       const currentType = typeMap[activeTab] || 'Đo đạc';
       
       const fetchCode = async () => {
+          // Chỉ sinh mã xem trước nếu formData.code hiện tại đang trống
+          if (formData.code && formData.code.trim() !== '' && formData.code !== '...') return;
           const dateYear = formData.createdDate ? new Date(formData.createdDate).getFullYear() : new Date().getFullYear();
           const code = await generateCode(currentType, dateYear);
           setFormData(prev => {
-              if (prev.code === code) return prev;
+              if (prev.code === code || (prev.code && prev.code.trim() !== '' && prev.code !== '...')) return prev;
               return { ...prev, code };
           });
       };
@@ -811,37 +818,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             <p className="text-[10px] text-green-600 mt-1 italic">* Tự động quyết toán lại theo diện tích thực tế.</p>
                         </div>
                     )}
-
-                    {/* DYNAMIC TRANSITION BUTTON TO MULTI-PLOT MODE */}
-                    {activeTab === 'dd' && doDacItems.length === 0 && (
-                        <div className="mt-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const firstItem: SplitItem = {
-                                        serviceName: formData.serviceType || '',
-                                        quantity: 1,
-                                        price: formData.unitPrice || 0,
-                                        area: formData.area || undefined,
-                                        landPlot: formData.landPlot || '',
-                                        mapSheet: formData.mapSheet || ''
-                                    };
-                                    const secondItem: SplitItem = {
-                                        serviceName: '',
-                                        quantity: 1,
-                                        price: 0,
-                                        area: undefined,
-                                        landPlot: '',
-                                        mapSheet: ''
-                                    };
-                                    setDoDacItems([firstItem, secondItem]);
-                                }}
-                                className="w-full py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-dashed border-purple-300 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
-                            >
-                                <Plus size={13} /> Thêm thửa đất khác
-                            </button>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -864,46 +840,19 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-3.5 space-y-3.5">
                     {/* Basic Info */}
-                    <div className={`grid ${mode === 'liquidation' ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200`}>
-                        {mode !== 'liquidation' && (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        {mode !== 'liquidation' ? (
                             <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className={labelClass}>Mã Hợp Đồng (Nhập tay / Tự động)</label>
-                                    {onOpenGetNumberModal && (
-                                        <button
-                                            type="button"
-                                            onClick={onOpenGetNumberModal}
-                                            className="text-[11px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1 transition-all"
-                                        >
-                                            <Wand2 size={12} /> Lấy số
-                                        </button>
-                                    )}
-                                </div>
+                                <label className={labelClass}>Ngày lập hợp đồng</label>
                                 <div>
-                                    <input 
-                                        type="text" 
-                                        className={`${inputClass} font-mono font-bold text-purple-700 bg-white border-purple-300 focus:border-purple-500`} 
-                                        value={formData.code ?? ''} 
-                                        onChange={e => handleChange('code', e.target.value)}
-                                        placeholder="Để trống để tự động cấp số..."
-                                    />
+                                    <input type="date" className={`${inputClass} w-full text-sm font-semibold text-slate-800`} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
                                 </div>
                             </div>
-                        )}
-                        {mode !== 'liquidation' && (
+                        ) : (
                             <div>
-                                <label className={labelClass}>Ngày lập</label>
+                                <label className={labelClass}>Ngày thanh lý hợp đồng</label>
                                 <div>
-                                    <input type="date" className={inputClass} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
-                                </div>
-                            </div>
-                        )}
-
-                        {mode === 'liquidation' && (
-                            <div>
-                                <label className={labelClass}>Ngày thanh lý HĐ</label>
-                                <div>
-                                    <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
+                                    <input type="date" className={`${inputClass} w-full text-sm font-semibold text-slate-800`} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
                                 </div>
                             </div>
                         )}
@@ -987,6 +936,37 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                         />
                                     </div>
                                 </div>
+
+                                {/* BUTTON THÊM THỦA ĐẤT KHÁC ĐẶT NGAY BÊN DƯỚI Ô SỐ THỦA VÀ ĐƠN GIÁ */}
+                                {activeTab === 'dd' && doDacItems.length === 0 && (
+                                    <div className="mt-3 pt-2 border-t border-purple-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const firstItem: SplitItem = {
+                                                    serviceName: formData.serviceType || '',
+                                                    quantity: formData.plotCount || 1,
+                                                    price: formData.unitPrice || derivedPricing.unitPrice || 0,
+                                                    area: formData.area || undefined,
+                                                    landPlot: formData.landPlot || '',
+                                                    mapSheet: formData.mapSheet || ''
+                                                };
+                                                const secondItem: SplitItem = {
+                                                    serviceName: '',
+                                                    quantity: 1,
+                                                    price: 0,
+                                                    area: undefined,
+                                                    landPlot: '',
+                                                    mapSheet: ''
+                                                };
+                                                setDoDacItems([firstItem, secondItem]);
+                                            }}
+                                            className="w-full py-2 bg-purple-100/90 hover:bg-purple-200 text-purple-800 border border-purple-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-98"
+                                        >
+                                            <Plus size={15} /> Thêm thửa đất khác (Đo đạc nhiều thửa)
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 

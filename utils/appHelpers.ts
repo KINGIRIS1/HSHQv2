@@ -5,6 +5,7 @@ import { CAP_GIAY_STEP_ORDER, getCapGiayWorkflowStage } from './capGiayStateMach
 import { getDodacWorkflowStage } from './dodacStateMachine';
 import { getLuuTruWorkflowStage } from './luuTruStateMachine';
 import { calculateRegistrationDeadline, getRegistrationWorkflowCategory } from './registrationWorkflows';
+import { loadRegistrationSlaFullConfig } from '../components/registration/RegistrationSlaStatusView';
 
 /**
  * Unified Workflow Stage Resolver for Dashboard, Report, Filter, KPI, SLA
@@ -201,40 +202,43 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     if (!rDate) return '';
     const cleanDate = String(rDate).split('T')[0];
     const lowerType = (rType || '').toLowerCase().trim();
-    const short = getShortRecordType(rType);
+    const sourceTable = (fullRecord as any)?.sourceTable;
 
-    // 1. Nếu là nhóm 3.x (Đăng ký / Cấp giấy), dùng Single Source of Truth
-    const category = getRegistrationWorkflowCategory(rType);
-    if (category !== 'unclassified') {
+    // 1. Nếu là nhóm 3.x hoặc Module Cấp giấy, dùng SLA Cấp giấy
+    const isCapGiay = sourceTable === 'dangky_records' || lowerType.startsWith('3.') || lowerType.includes('3.');
+    if (isCapGiay) {
         const recObj = fullRecord ? { ...fullRecord, recordType: rType, receivedDate: cleanDate } : { recordType: rType, receivedDate: cleanDate };
         const res = calculateRegistrationDeadline(recObj, holidays);
         return res.deadline;
     }
 
-    // Nếu mang tiền tố 3.x mà không phân loại được -> Trả về rỗng, TUYỆT ĐỐI không tính bừa!
-    if (short.startsWith('3.') || lowerType.startsWith('3.')) {
-        return '';
-    }
+    // Look up SLA from procedureItems configuration first
+    const fullConfig = loadRegistrationSlaFullConfig();
+    const matchedProcItem = fullConfig.procedureItems.find(p => p.code === lowerType || lowerType.includes(p.code));
+    let daysToAdd = 3;
 
-    // 2. Nhóm 1.x (Lưu trữ) và 2.x (Đo đạc)
-    let daysToAdd = 30; 
+    const isLuuTru = sourceTable === 'luutru_records' || lowerType.startsWith('1.') || lowerType.includes('1.');
 
-    if (
-        short === '1.1 Sao lục' || short === '1.2 Công văn' || short === '2.1 Trích lục' ||
-        lowerType.startsWith('1.1') || lowerType.startsWith('1.2') || lowerType.startsWith('2.1') ||
-        lowerType.includes('sao lục') || lowerType.includes('công văn') || lowerType.includes('trích lục')
-    ) {
-        daysToAdd = 10;
-    } else if (
-        short === '2.3 Duyệt đơn' ||
-        lowerType.includes('2.3') || lowerType.includes('duyệt đơn') || lowerType.includes('số thửa')
-    ) {
-        daysToAdd = 12;
-    } else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
-               lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
-               lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
-               lowerType.includes('đo đạc')) {
-        daysToAdd = 30;
+    if (matchedProcItem) {
+        if (matchedProcItem.isNoSla) {
+            daysToAdd = 0;
+        } else {
+            const sumDays = matchedProcItem.steps.reduce((sum, s) => {
+                if (s.isNoSla) return sum;
+                return sum + (s.durationDays || 0);
+            }, 0);
+            daysToAdd = sumDays;
+        }
+    } else if (isLuuTru) {
+        daysToAdd = 3;
+    } else {
+        // 3. Nhóm 2.x (Đo đạc)
+        const isNoFieldWork = lowerType.includes('2.1') || lowerType.includes('2.3') || lowerType.includes('trích lục');
+        if (isNoFieldWork) {
+            daysToAdd = 6; // Đo đạc không thực địa (2.1, 2.3)
+        } else {
+            daysToAdd = 8; // Đo đạc có thực địa (2.2, 2.4, 2.5)
+        }
     }
     
     let count = 0;
@@ -1246,6 +1250,7 @@ export interface StatusTransitionOptions {
         appraisalDate?: string | null;
         taxTransferDate?: string | null;
         taxKv7Date?: string | null;
+        taxNoticeDate?: string | null;
         taxPaymentDate?: string | null;
         printCertDate?: string | null;
         pendingHandoverDate?: string | null;
@@ -1538,15 +1543,15 @@ export function syncRecordStatusTransition(
             }
         });
 
-        // BẢO TOÀN NGÀY THÁNG: Chỉ gán ngày mới khi thực sự chuyển sang trạng thái mới và ngày đó chưa có. Nếu chỉ lưu/cập nhật thông tin hồ sơ, tuyệt đối giữ nguyên ngày cũ.
-        const effectiveTargetDate = isActuallyChangingStatus ? targetDate : undefined;
+        // BẢO TOÀN NGÀY THÁNG: Bỏ cập nhật mốc tự động (Auto-advance = OFF). Chỉ gán ngày khi có customDates do người dùng nhập/chọn thủ công.
+        const effectiveTargetDate = undefined;
 
         if (newStatus === RecordStatus.RECEIVED) {
-            updates.receivedDate = options?.customDates?.receivedDate || currentRecord.receivedDate || effectiveTargetDate;
+            updates.receivedDate = options?.customDates?.receivedDate || currentRecord.receivedDate;
         } else if (newStatus === RecordStatus.ASSIGNED || newStatus === RecordStatus.IN_PROGRESS) {
-            updates.assignedDate = options?.customDates?.assignedDate || currentRecord.assignedDate || effectiveTargetDate;
+            updates.assignedDate = options?.customDates?.assignedDate || currentRecord.assignedDate;
         } else if (newStatus === RecordStatus.FIELD_WORK) {
-            const fieldDate = options?.customDates?.fieldAssignedDate || options?.customDates?.assignedDate || currentRecord.fieldAssignedDate || effectiveTargetDate;
+            const fieldDate = options?.customDates?.fieldAssignedDate || options?.customDates?.assignedDate || currentRecord.fieldAssignedDate;
             updates.fieldAssignedDate = fieldDate;
             if (!currentRecord.assignedDate && !updates.assignedDate) {
                 updates.assignedDate = fieldDate;
@@ -1555,7 +1560,7 @@ export function syncRecordStatusTransition(
                 updates.surveyorId = options?.assignedTo || currentRecord.assignedTo;
             }
         } else if (newStatus === RecordStatus.OFFICE_WORK) {
-            const officeDate = options?.customDates?.officeAssignedDate || options?.customDates?.assignedDate || currentRecord.officeAssignedDate || effectiveTargetDate;
+            const officeDate = options?.customDates?.officeAssignedDate || options?.customDates?.assignedDate || currentRecord.officeAssignedDate;
             updates.officeAssignedDate = officeDate;
             if (!currentRecord.assignedDate && !updates.assignedDate) {
                 updates.assignedDate = currentRecord.fieldAssignedDate || officeDate;
@@ -1567,26 +1572,30 @@ export function syncRecordStatusTransition(
                 updates.drafterId = currentRecord.assignedTo;
             }
         } else if (newStatus === RecordStatus.COMPLETED_WORK) {
-            updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || effectiveTargetDate;
+            updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate;
         } else if (newStatus === RecordStatus.APPRAISAL) {
-            updates.appraisalDate = options?.customDates?.appraisalDate || currentRecord.appraisalDate || effectiveTargetDate;
+            updates.appraisalDate = options?.customDates?.appraisalDate || currentRecord.appraisalDate;
             if (options?.assignedTo) updates.assignedTo = options.assignedTo;
         } else if (newStatus === RecordStatus.TAX_TRANSFER) {
-            updates.taxTransferDate = options?.customDates?.taxTransferDate || currentRecord.taxTransferDate || effectiveTargetDate;
+            updates.taxTransferDate = options?.customDates?.taxTransferDate || currentRecord.taxTransferDate;
         } else if (newStatus === RecordStatus.PENDING_TAX_KV7) {
-            updates.taxKv7Date = options?.customDates?.taxKv7Date || currentRecord.taxKv7Date || effectiveTargetDate;
+            updates.taxKv7Date = options?.customDates?.taxKv7Date || currentRecord.taxKv7Date;
+        } else if (newStatus === RecordStatus.PENDING_TAX_NOTICE) {
+            updates.taxNoticeDate = options?.customDates?.taxNoticeDate || currentRecord.taxNoticeDate;
         } else if (newStatus === RecordStatus.PENDING_TAX_PAYMENT) {
-            updates.taxPaymentDate = options?.customDates?.taxPaymentDate || currentRecord.taxPaymentDate || effectiveTargetDate;
+            updates.taxPaymentDate = options?.customDates?.taxPaymentDate || currentRecord.taxPaymentDate;
+            if (options?.customDates?.taxNoticeDate) updates.taxNoticeDate = options.customDates.taxNoticeDate;
         } else if (newStatus === RecordStatus.PENDING_PRINT_CERT) {
-            updates.printCertDate = options?.customDates?.printCertDate || currentRecord.printCertDate || effectiveTargetDate;
+            updates.printCertDate = options?.customDates?.printCertDate || currentRecord.printCertDate;
         } else if (newStatus === RecordStatus.PENDING_HANDOVER) {
-            updates.pendingHandoverDate = options?.customDates?.pendingHandoverDate || currentRecord.pendingHandoverDate || effectiveTargetDate;
+            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate;
+            updates.pendingHandoverDate = options?.customDates?.pendingHandoverDate || currentRecord.pendingHandoverDate;
         } else if (newStatus === RecordStatus.PENDING_SUPPLEMENT) {
             updates.previousStatus = currentRecord.status || RecordStatus.RECEIVED;
-            updates.supplementRequestDate = options?.customDates?.supplementRequestDate || currentRecord.supplementRequestDate || effectiveTargetDate;
+            updates.supplementRequestDate = options?.customDates?.supplementRequestDate || currentRecord.supplementRequestDate;
             if (options?.notes) updates.pendingSupplementReason = options.notes;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
-            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate || effectiveTargetDate;
+            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate;
             if (options?.checkedBy) {
                 updates.checkedBy = options.checkedBy;
             }
@@ -1604,17 +1613,18 @@ export function syncRecordStatusTransition(
                 updates.officeAssignedDate = currentRecord.fieldCompletedDate || currentRecord.assignedDate || updates.assignedDate;
             }
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
-            updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate || effectiveTargetDate;
+            updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate;
         } else if (newStatus === RecordStatus.SIGNED) {
-            updates.approvalDate = options?.customDates?.approvalDate || currentRecord.approvalDate || effectiveTargetDate;
+            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate;
+            updates.approvalDate = updates.completedDate;
         } else if (newStatus === RecordStatus.HANDOVER) {
-            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || effectiveTargetDate;
-            updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate || effectiveTargetDate;
+            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate;
+            updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate;
             if (options?.exportBatch !== undefined) updates.exportBatch = options.exportBatch;
             updates.is_handover = true;
             updates.handover_date = updates.exportDate || currentRecord.handover_date;
         } else if (newStatus === RecordStatus.RETURNED) {
-            updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate || effectiveTargetDate;
+            updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate;
             if (!updates.completedDate && !currentRecord.completedDate) {
                 updates.completedDate = updates.resultReturnedDate || currentRecord.completedDate;
             }
@@ -1642,26 +1652,18 @@ export function syncRecordStatusTransition(
                 if (options.customDates.officeAssignedDate) updates.officeAssignedDate = options.customDates.officeAssignedDate;
                 if (options.customDates.officeCompletedDate) updates.officeCompletedDate = options.customDates.officeCompletedDate;
             }
-            if (newRank >= 2) {
-                if (options.customDates.completedWorkDate) updates.completedWorkDate = options.customDates.completedWorkDate;
-            }
-            if (newRank >= 3) {
-                if (options.customDates.pendingCheckDate) updates.pendingCheckDate = options.customDates.pendingCheckDate;
-                if (options.customDates.checkedDate) updates.checkedDate = options.customDates.checkedDate;
-            }
-            if (newRank >= 4) {
-                if (options.customDates.submissionDate) updates.submissionDate = options.customDates.submissionDate;
-            }
-            if (newRank >= 5) {
-                if (options.customDates.approvalDate) updates.approvalDate = options.customDates.approvalDate;
-            }
-            if (newRank >= 6) {
-                if (options.customDates.completedDate) updates.completedDate = options.customDates.completedDate;
-                if (options.customDates.exportDate) updates.exportDate = options.customDates.exportDate;
-            }
-            if (newRank >= 7) {
-                if (options.customDates.resultReturnedDate) updates.resultReturnedDate = options.customDates.resultReturnedDate;
-            }
+            if (options.customDates.taxTransferDate) updates.taxTransferDate = options.customDates.taxTransferDate;
+            if (options.customDates.taxKv7Date) updates.taxKv7Date = options.customDates.taxKv7Date;
+            if (options.customDates.taxNoticeDate) updates.taxNoticeDate = options.customDates.taxNoticeDate;
+            if (options.customDates.taxPaymentDate) updates.taxPaymentDate = options.customDates.taxPaymentDate;
+            if (options.customDates.printCertDate) updates.printCertDate = options.customDates.printCertDate;
+            if (options.customDates.appraisalDate) updates.appraisalDate = options.customDates.appraisalDate;
+            if (options.customDates.pendingCheckDate) updates.pendingCheckDate = options.customDates.pendingCheckDate;
+            if (options.customDates.submissionDate) updates.submissionDate = options.customDates.submissionDate;
+            if (options.customDates.approvalDate) updates.approvalDate = options.customDates.approvalDate;
+            if (options.customDates.completedDate) updates.completedDate = options.customDates.completedDate;
+            if (options.customDates.exportDate) updates.exportDate = options.customDates.exportDate;
+            if (options.customDates.resultReturnedDate) updates.resultReturnedDate = options.customDates.resultReturnedDate;
         }
     }
 

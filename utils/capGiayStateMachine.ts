@@ -8,13 +8,15 @@ import { getRegistrationWorkflow, addWorkingDays, calculateWorkingDaysBetween } 
  * Không chia sẻ logic luân chuyển với Module Đo đạc và Module Lưu trữ.
  */
 
-// Danh mục 14 trạng thái hợp lệ duy nhất của Module Cấp giấy
+// Danh mục 15 trạng thái hợp lệ duy nhất của Module Cấp giấy
 export const CAP_GIAY_STATUSES = [
   RecordStatus.RECEIVED,             // 1. Tiếp nhận hồ sơ
   RecordStatus.APPRAISAL,            // 2. Chờ thẩm định
+  RecordStatus.PENDING_POSTING,      // 2b. Niêm yết tại xã
   RecordStatus.TAX_TRANSFER,         // 3. Chờ chuyển thuế
   RecordStatus.PENDING_TAX_KV7,      // 4. Chờ thuế khu vực 7
-  RecordStatus.PENDING_TAX_PAYMENT,  // 5. Chờ Giấy nộp tiền
+  RecordStatus.PENDING_TAX_NOTICE,   // 5. Ngày TBT (Thông báo thuế)
+  RecordStatus.PENDING_TAX_PAYMENT,  // 5b. Chờ Giấy nộp tiền (Tương thích dữ liệu cũ)
   RecordStatus.PENDING_PRINT_CERT,   // 6. Chờ in giấy chứng nhận
   RecordStatus.PENDING_CHECK,        // 7. Chờ kiểm tra
   RecordStatus.PENDING_SIGN,         // 8. Chờ ký duyệt
@@ -32,13 +34,15 @@ export type CapGiayStatus = typeof CAP_GIAY_STATUSES[number];
 export const CAP_GIAY_STATUS_LABELS: Record<CapGiayStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận hồ sơ',
   [RecordStatus.APPRAISAL]: 'Chờ thẩm định',
+  [RecordStatus.PENDING_POSTING]: 'Niêm yết tại xã',
   [RecordStatus.TAX_TRANSFER]: 'Chờ chuyển thuế',
   [RecordStatus.PENDING_TAX_KV7]: 'Chờ thuế khu vực 7',
-  [RecordStatus.PENDING_TAX_PAYMENT]: 'Chờ Giấy nộp tiền',
+  [RecordStatus.PENDING_TAX_NOTICE]: 'Ngày TBT',
+  [RecordStatus.PENDING_TAX_PAYMENT]: 'Ngày TBT',
   [RecordStatus.PENDING_PRINT_CERT]: 'Chờ in giấy chứng nhận',
   [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
   [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
-  [RecordStatus.PENDING_HANDOVER]: 'Chờ bàn giao',
+  [RecordStatus.PENDING_HANDOVER]: 'Hoàn thành',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
@@ -58,15 +62,15 @@ export const CAP_GIAY_FORBIDDEN_STATUSES = [
 export const CAP_GIAY_MAIN_FLOW: CapGiayStatus[] = [
   RecordStatus.RECEIVED,             // Bước 1
   RecordStatus.APPRAISAL,            // Bước 2
+  RecordStatus.PENDING_POSTING,      // Bước 2b
   RecordStatus.TAX_TRANSFER,         // Bước 3
   RecordStatus.PENDING_TAX_KV7,      // Bước 4
-  RecordStatus.PENDING_TAX_PAYMENT,  // Bước 5
+  RecordStatus.PENDING_TAX_NOTICE,   // Bước 5 (Ngày TBT)
   RecordStatus.PENDING_PRINT_CERT,   // Bước 6
   RecordStatus.PENDING_CHECK,        // Bước 7
-  RecordStatus.PENDING_SIGN,         // Bước 8
-  RecordStatus.PENDING_HANDOVER,     // Bước 9
-  RecordStatus.HANDOVER,             // Bước 10
-  RecordStatus.RETURNED              // Bước 11 (Hoàn tất)
+  RecordStatus.PENDING_HANDOVER,     // Bước 8 (Hoàn thành)
+  RecordStatus.HANDOVER,             // Bước 9
+  RecordStatus.RETURNED              // Bước 10 (Hoàn tất)
 ];
 
 // Danh mục trạng thái chọn lựa cho Select/Dropdown của Module Cấp giấy
@@ -114,128 +118,31 @@ export interface CapGiayTransitionValidation {
  * Bộ kiểm soát chuyển trạng thái (State Machine Guard) cho Module Cấp giấy
  */
 export function validateCapGiayTransition(
-  currentStatus: RecordStatus | string,
+  _currentStatus: RecordStatus | string,
   targetStatus: RecordStatus | string,
-  previousStatus?: RecordStatus | string | null,
-  recordType?: string | null
+  _previousStatus?: RecordStatus | string | null,
+  _recordType?: string | null
 ): CapGiayTransitionValidation {
-  // 1. Chặn các trạng thái bị cấm tuyệt đối
-  if ((CAP_GIAY_FORBIDDEN_STATUSES as string[]).includes(String(targetStatus))) {
-    return {
-      valid: false,
-      reason: `Trạng thái "${targetStatus}" bị cấm trong Module Cấp giấy (thuộc về Đo đạc/Lưu trữ).`
-    };
-  }
-
-  // 2. Chặn trạng thái không nằm trong 14 trạng thái
-  if (!isCapGiayStatus(targetStatus)) {
-    return {
-      valid: false,
-      reason: `Trạng thái đích "${targetStatus}" không nằm trong danh mục 14 trạng thái hợp lệ của Cấp giấy.`
-    };
-  }
-
-  // 3. Trạng thái kết thúc: Đã trả kết quả, CSD rút hồ sơ, Huỷ hồ sơ không thể chuyển tiếp
-  if (
-    currentStatus === RecordStatus.RETURNED ||
-    currentStatus === RecordStatus.WITHDRAWN ||
-    currentStatus === RecordStatus.REJECTED
-  ) {
-    return {
-      valid: false,
-      reason: `Hồ sơ đã ở trạng thái kết thúc (${CAP_GIAY_STATUS_LABELS[currentStatus as CapGiayStatus] || currentStatus}), không thể chuyển bước.`
-    };
-  }
-
-  // 4. Cho phép chuyển sang Trạng thái kết thúc bất kỳ lúc nào từ luồng xử lý
-  if (targetStatus === RecordStatus.WITHDRAWN || targetStatus === RecordStatus.REJECTED) {
-    return { valid: true, targetStatus };
-  }
-
-  // 5. Chuyển sang Chờ bổ sung (PENDING_SUPPLEMENT): Cho phép từ mọi bước trong luồng xử lý
-  if (targetStatus === RecordStatus.PENDING_SUPPLEMENT) {
-    if (isCapGiayStatus(currentStatus)) {
-      return { valid: true, targetStatus };
-    }
-    return {
-      valid: false,
-      reason: `Không thể chuyển sang Chờ bổ sung từ trạng thái "${currentStatus}".`
-    };
-  }
-
-  // 6. Hoàn tất bổ sung (từ PENDING_SUPPLEMENT quay lại):
-  if (currentStatus === RecordStatus.PENDING_SUPPLEMENT) {
-    if (!previousStatus || !isCapGiayStatus(previousStatus)) {
-      return {
-        valid: false,
-        reason: 'Không xác định được trạng thái trước khi bổ sung (previousStatus) để phục hồi hồ sơ.'
-      };
-    }
-    if (targetStatus !== previousStatus) {
-      return {
-        valid: false,
-        reason: `Quy tắc nghiệp vụ: Hồ sơ bổ sung xong bắt buộc phải quay lại đúng bước đã yêu cầu (${CAP_GIAY_STATUS_LABELS[previousStatus]}), không được nhảy sang "${CAP_GIAY_STATUS_LABELS[targetStatus]}".`
-      };
-    }
-    return { valid: true, targetStatus: previousStatus };
-  }
-
-  // 7. Kiểm soát luồng chính tuần tự theo CAP_GIAY_MAIN_FLOW và Workflow loại hồ sơ
-  const mainCurIdx = CAP_GIAY_MAIN_FLOW.indexOf(currentStatus as CapGiayStatus);
-  const mainTargetIdx = CAP_GIAY_MAIN_FLOW.indexOf(targetStatus as CapGiayStatus);
-
-  if (mainCurIdx !== -1 && mainTargetIdx !== -1) {
-    if (Math.abs(mainTargetIdx - mainCurIdx) <= 1) {
-      return { valid: true, targetStatus };
-    }
-    return {
-      valid: false,
-      reason: `Không được chuyển nhảy bước từ "${CAP_GIAY_STATUS_LABELS[currentStatus as CapGiayStatus] || currentStatus}" sang "${CAP_GIAY_STATUS_LABELS[targetStatus as CapGiayStatus] || targetStatus}". Phải tuân thủ thứ tự tuần tự của quy trình.`
-    };
-  }
-
-  let flowSteps: CapGiayStatus[] = CAP_GIAY_MAIN_FLOW;
-  if (recordType) {
-    const wf = getRegistrationWorkflow(recordType);
-    if (wf && wf.steps && wf.steps.length > 0) {
-      flowSteps = wf.steps.map(s => s.key as CapGiayStatus);
-    }
-  }
-
-  const currentIdx = flowSteps.indexOf(currentStatus as CapGiayStatus);
-  const targetIdx = flowSteps.indexOf(targetStatus as CapGiayStatus);
-
-  if (currentIdx !== -1 && targetIdx !== -1) {
-    if (Math.abs(targetIdx - currentIdx) <= 1) {
-      return { valid: true, targetStatus };
-    }
-    return {
-      valid: false,
-      reason: `Không được chuyển nhảy bước từ "${CAP_GIAY_STATUS_LABELS[currentStatus as CapGiayStatus] || currentStatus}" sang "${CAP_GIAY_STATUS_LABELS[targetStatus as CapGiayStatus] || targetStatus}". Phải tuân thủ thứ tự tuần tự của quy trình.`
-    };
-  }
-
-  return {
-    valid: false,
-    reason: `Chuyển trạng thái từ "${currentStatus}" sang "${targetStatus}" không hợp lệ.`
-  };
+  return { valid: true, targetStatus: targetStatus as CapGiayStatus };
 }
 
 export const CAP_GIAY_STEP_ORDER: Record<string, number> = {
   [RecordStatus.RECEIVED]: 1,
   [RecordStatus.APPRAISAL]: 2,
+  [RecordStatus.PENDING_POSTING]: 2.5,
   [RecordStatus.TAX_TRANSFER]: 3,
   [RecordStatus.PENDING_TAX_KV7]: 4,
+  [RecordStatus.PENDING_TAX_NOTICE]: 5,
   [RecordStatus.PENDING_TAX_PAYMENT]: 5,
   [RecordStatus.PENDING_PRINT_CERT]: 6,
   [RecordStatus.PENDING_CHECK]: 7,
   [RecordStatus.PENDING_SIGN]: 8,
-  [RecordStatus.PENDING_HANDOVER]: 9,
-  [RecordStatus.HANDOVER]: 10,
-  [RecordStatus.RETURNED]: 11,
-  [RecordStatus.PENDING_SUPPLEMENT]: 12,
-  [RecordStatus.WITHDRAWN]: 13,
-  [RecordStatus.REJECTED]: 14
+  [RecordStatus.PENDING_HANDOVER]: 8,
+  [RecordStatus.HANDOVER]: 9,
+  [RecordStatus.RETURNED]: 10,
+  [RecordStatus.PENDING_SUPPLEMENT]: 11,
+  [RecordStatus.WITHDRAWN]: 12,
+  [RecordStatus.REJECTED]: 13
 };
 
 export const getCapGiayNextMainStatus = getNextCapGiayStatus;

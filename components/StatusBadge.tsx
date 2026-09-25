@@ -30,6 +30,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     [RecordStatus.PENDING_POSTING]: 'bg-amber-500 animate-pulse',
     [RecordStatus.TAX_TRANSFER]: 'bg-indigo-500',
     [RecordStatus.PENDING_TAX_KV7]: 'bg-violet-500',
+    [RecordStatus.PENDING_TAX_NOTICE]: 'bg-amber-500',
     [RecordStatus.PENDING_TAX_PAYMENT]: 'bg-amber-500',
     [RecordStatus.PENDING_PRINT_CERT]: 'bg-teal-500',
     [RecordStatus.PENDING_HANDOVER]: 'bg-cyan-500 animate-pulse',

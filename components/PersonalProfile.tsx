@@ -40,6 +40,7 @@ import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, STATUS_LABELS } from "../constants";
 import { confirmAction, cleanSyncNotes, isFieldWorkProcedure } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
+import { findMatchingContract, isCoreCodeMatching } from "../utils/contractMatching";
 import { enqueueRecordForBackgroundDriveSync, hasPendingRecordAttachments } from "../services/attachmentStorage";
 import {
   fetchArchiveRecords,
@@ -1264,12 +1265,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const recCode = (recordCode || "").trim();
     if (!recCode) return "";
 
-    const cleanRecCode = recCode.toLowerCase();
-    const foundContract = contractsList.find(
-      (c) =>
-        (c.customerAddress && c.customerAddress.trim().toLowerCase() === cleanRecCode) ||
-        (c.code && c.code.trim().toLowerCase() === cleanRecCode)
-    );
+    const dummyRecord = { code: recCode } as RecordFile;
+    const foundContract = findMatchingContract(dummyRecord, contractsList);
 
     const rawContractCode = foundContract && foundContract.code ? foundContract.code : recCode;
     const cleanContract = rawContractCode.trim();

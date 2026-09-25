@@ -216,14 +216,31 @@ console.log('================================================================\n'
   assert(resUnc.category === 'unclassified', 'Test 14.1: Thiếu recordType phân loại unclassified');
   assert(resUnc.deadline === '', 'Test 14.2: Thiếu recordType KHÔNG default deadline bừa bãi, trả về rỗng');
 
-  // B. State machine: 14 trạng thái khép kín & chặn trạng thái Đo đạc/Lưu trữ
-  assert(CAP_GIAY_STATUSES.length === 14, 'Test 14.3: Module Cấp giấy có đủ 14 trạng thái khép kín');
+  // B. State machine: Các trạng thái khép kín & chặn trạng thái Đo đạc/Lưu trữ
+  assert(CAP_GIAY_STATUSES.length === 16, 'Test 14.3: Module Cấp giấy có đủ trạng thái khép kín');
   const invalidTransition = validateCapGiayTransition(
     RecordStatus.RECEIVED,
     'ASSIGNED_SURVEYOR' as any, // Trạng thái của Đo đạc
     null
   );
   assert(invalidTransition.valid === false, 'Test 14.4: Chặn triệt để trạng thái Đo đạc xâm nhập Cấp giấy');
+
+  // Kiểm tra chuyển bước tuần tự hợp lệ theo từng loại thủ tục
+  const fastTrackVal = validateCapGiayTransition(
+    RecordStatus.RECEIVED,
+    RecordStatus.PENDING_PRINT_CERT,
+    null,
+    '3.2.1 Cấp đổi'
+  );
+  assert(fastTrackVal.valid === true, 'Test 14.4b: Fast-track (3.2.1 Cấp đổi) chuyển từ RECEIVED trực tiếp sang PENDING_PRINT_CERT hợp lệ');
+
+  const gdbdVal = validateCapGiayTransition(
+    RecordStatus.APPRAISAL,
+    RecordStatus.PENDING_SIGN,
+    null,
+    '3.8.1 Đăng ký GDBD'
+  );
+  assert(gdbdVal.valid === true, 'Test 14.4c: Thế chấp (3.8.1 GDBD) chuyển từ APPRAISAL trực tiếp sang PENDING_SIGN hợp lệ');
 
   // C. Cơ chế Tạm dừng (PENDING_SUPPLEMENT) và Phục hồi (RESUME)
   const baseRecord: RecordFile = {

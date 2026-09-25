@@ -53,15 +53,38 @@ export const useRegistrationFilter = ({ records }: UseRegistrationFilterProps) =
     return Array.from(assignees).sort();
   }, [records]);
 
-  // Bộ lọc dữ liệu theo Sub-Tab nghiệp vụ
+  // Bộ lọc dữ liệu theo Sub-Tab nghiệp vụ (12 tabs chuẩn)
   const subTabFilteredRecords = useMemo(() => {
     if (activeSubTab === 'all') return records;
 
     switch (activeSubTab) {
-      case 'unassigned':
-        return records.filter((r) => !r.assignedTo || r.status === RecordStatus.RECEIVED);
-      case 'appraisal':
+      case 'unassigned': // Chưa giao (Tiếp nhận hồ sơ)
+        return records.filter(
+          (r) => !r.assignedTo || r.status === RecordStatus.RECEIVED
+        );
+      case 'appraisal': // Thẩm định (Chờ thẩm định)
         return records.filter((r) => r.status === RecordStatus.APPRAISAL);
+      case 'tax_transfer': // Phiếu chuyển thuế (Chờ chuyển thuế)
+        return records.filter((r) => r.status === RecordStatus.TAX_TRANSFER);
+      case 'tax_kv7': // Thuế Khu vực 7 (Chờ thuế khu vực 7)
+        return records.filter((r) => r.status === RecordStatus.PENDING_TAX_KV7);
+      case 'tax_notice': // Thông báo thuế (Chờ giấy nộp tiền)
+        return records.filter((r) => r.status === RecordStatus.PENDING_TAX_PAYMENT);
+      case 'print_cert': // In GCN (Chờ in giấy chứng nhận)
+        return records.filter((r) => r.status === RecordStatus.PENDING_PRINT_CERT);
+      case 'pending_check': // Kiểm tra (Chờ kiểm tra)
+        return records.filter((r) => r.status === RecordStatus.PENDING_CHECK);
+      case 'pending_sign': // Trình ký (Chờ ký duyệt)
+        return records.filter((r) => r.status === RecordStatus.PENDING_SIGN);
+      case 'signed': // Chờ bàn giao (Chờ bàn giao / Đã ký)
+        return records.filter(
+          (r) => r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER
+        );
+      case 'handover': // Chờ trả kết quả (Đã giao 1 cửa)
+        return records.filter((r) => r.isHandedOver || r.status === RecordStatus.HANDOVER);
+      case 'returned': // Đã trả kết quả
+        return records.filter((r) => r.status === RecordStatus.RETURNED);
+      // Legacy fallback
       case 'tax':
         return records.filter(
           (r) =>
@@ -69,39 +92,10 @@ export const useRegistrationFilter = ({ records }: UseRegistrationFilterProps) =
             r.status === RecordStatus.PENDING_TAX_KV7 ||
             r.status === RecordStatus.PENDING_TAX_PAYMENT
         );
-      case 'print_cert':
-        return records.filter((r) => r.status === RecordStatus.PENDING_PRINT_CERT);
-      case 'processing':
-        return records.filter(
-          (r) =>
-            r.status === RecordStatus.IN_PROGRESS ||
-            r.status === RecordStatus.ASSIGNED ||
-            r.status === RecordStatus.APPRAISAL
-        );
-      case 'pending_check':
-        return records.filter((r) => r.status === RecordStatus.PENDING_CHECK);
-      case 'pending_sign':
-        return records.filter((r) => r.status === RecordStatus.PENDING_SIGN);
-      case 'signed':
-        return records.filter(
-          (r) => r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER
-        );
       case 'supplement':
         return records.filter((r) => r.status === RecordStatus.PENDING_SUPPLEMENT);
       case 'handed_over':
         return records.filter((r) => r.isHandedOver || r.status === RecordStatus.HANDOVER);
-      case 'returned':
-        return records.filter((r) => r.status === RecordStatus.RETURNED);
-      case 'overdue': {
-        const today = new Date().toISOString().substring(0, 10);
-        return records.filter(
-          (r) =>
-            r.deadline &&
-            r.deadline < today &&
-            r.status !== RecordStatus.RETURNED &&
-            r.status !== RecordStatus.HANDOVER
-        );
-      }
       default:
         return records;
     }

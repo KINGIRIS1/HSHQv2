@@ -1,4 +1,5 @@
 import { RecordStatus, RecordFile } from '../types';
+import { loadRegistrationSlaFullConfig } from '../components/registration/RegistrationSlaStatusView';
 
 /**
  * STATE MACHINE ĐỘC LẬP CHO MODULE ĐO ĐẠC
@@ -191,6 +192,71 @@ export function getDodacWorkflowStage(record: Partial<RecordFile>): { stageIndex
     default:
       return { stageIndex: 0, stageName: 'Chưa xác định', category: 'TIEN_TRINH' };
   }
+}
+
+export function getDodacWorkflow(procedureCode?: string | null): {
+  code: string;
+  name: string;
+  hasFieldWork: boolean;
+  standardDays: number;
+  steps: { stepNumber: number; name: string; durationDays: number; durationHours: number }[];
+} {
+  const code = (procedureCode || '').trim();
+  const fullConfig = loadRegistrationSlaFullConfig();
+  
+  const matchedItem = fullConfig.procedureItems.find(p => p.module === 'dodac' && (p.code === code || code.includes(p.code)));
+
+  if (matchedItem) {
+    const totalDays = matchedItem.steps.reduce((sum, s) => sum + (s.durationDays || 0), 0);
+    return {
+      code: matchedItem.code,
+      name: matchedItem.name,
+      hasFieldWork: !!matchedItem.hasFieldWork,
+      standardDays: totalDays,
+      steps: matchedItem.steps.map(s => ({
+        stepNumber: s.stepNumber,
+        name: s.name,
+        durationDays: s.durationDays,
+        durationHours: s.durationHours,
+      })),
+    };
+  }
+
+  const isNoFieldWork = code.includes('2.1') || code.includes('2.3');
+
+  if (isNoFieldWork) {
+    return {
+      code: 'DODAC_NO_FIELD',
+      name: 'Đo đạc không thực địa (2.1, 2.3)',
+      hasFieldWork: false,
+      standardDays: 6,
+      steps: [
+        { stepNumber: 1, name: 'Tiếp nhận mới', durationDays: 1, durationHours: 8 },
+        { stepNumber: 2, name: 'Biên tập bản đồ', durationDays: 2, durationHours: 16 },
+        { stepNumber: 3, name: 'Kiểm tra', durationDays: 1, durationHours: 8 },
+        { stepNumber: 4, name: 'Trình ký', durationDays: 1, durationHours: 8 },
+        { stepNumber: 5, name: 'Hoàn Thành', durationDays: 0.5, durationHours: 4 },
+        { stepNumber: 6, name: 'Trả kết quả', durationDays: 0.5, durationHours: 4 },
+      ]
+    };
+  }
+
+  // Mặc định nhóm có thực địa (2.2, 2.4, 2.5)
+  return {
+    code: 'DODAC_FIELD',
+    name: 'Đo đạc có thực địa (2.2, 2.4, 2.5)',
+    hasFieldWork: true,
+    standardDays: 8,
+    steps: [
+      { stepNumber: 1, name: 'Tiếp nhận mới', durationDays: 1, durationHours: 8 },
+      { stepNumber: 2, name: 'Đo đạc thực địa', durationDays: 2, durationHours: 16 },
+      { stepNumber: 3, name: 'Biên tập bản đồ', durationDays: 2, durationHours: 16 },
+      { stepNumber: 4, name: 'Kiểm tra', durationDays: 1, durationHours: 8 },
+      { stepNumber: 5, name: 'Trình ký', durationDays: 1, durationHours: 8 },
+      { stepNumber: 6, name: 'Hoàn Thành', durationDays: 0.5, durationHours: 4 },
+      { stepNumber: 7, name: 'Trả kết quả', durationDays: 0.5, durationHours: 4 },
+    ]
+  };
 }
 
 export function handleDodacSupplement(

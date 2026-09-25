@@ -46,6 +46,7 @@ export const ConfirmPaymentReceiptModal: React.FC<ConfirmPaymentReceiptModalProp
       if (selectedRecords.length === 1) {
         setReceiptNumber(selectedRecords[0].receiptNumber || '');
         setReceiptDate(
+          selectedRecords[0].taxNoticeDate ||
           selectedRecords[0].taxPaymentDate ||
           selectedRecords[0].paymentReceiptDate ||
           new Date().toISOString().substring(0, 10)

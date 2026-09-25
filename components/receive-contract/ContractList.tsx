@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contract, User, Employee, UserRole } from '../../types';
-import { fetchContracts } from '../../services/api';
-import { Search, RotateCcw, Edit, Download, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { fetchContracts, parseContractDateMs, repairAllContractDatesApi, fixContractDateString } from '../../services/apiContracts';
+import { Search, RotateCcw, Edit, Download, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight, CalendarCheck } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
 interface ContractListProps {
@@ -20,6 +20,7 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
   const [contracts, setContracts] = useState<Contract[]>(propContracts || []);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [repairingDate, setRepairingDate] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,6 +31,23 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
       const data = await fetchContracts();
       setContracts(data);
       setLoading(false);
+  };
+
+  const handleRepairDates = async () => {
+      if (!window.confirm("Hệ thống sẽ quét và tự động chuẩn hóa ngày tháng cho toàn bộ danh sách hợp đồng (khắc phục lỗi hoán đổi ngày/tháng). Bạn có muốn thực hiện không?")) {
+          return;
+      }
+      setRepairingDate(true);
+      try {
+          const res = await repairAllContractDatesApi();
+          alert(`Đã kiểm tra ${res.totalCount} hợp đồng. Tự động chuẩn hóa thành công ${res.fixedCount} hợp đồng bị ngược ngày tháng!`);
+          await loadContracts();
+      } catch (e) {
+          console.error("Lỗi khi sửa ngày tháng:", e);
+          alert("Lỗi khi sửa ngày tháng hợp đồng.");
+      } finally {
+          setRepairingDate(false);
+      }
   };
 
   useEffect(() => {
@@ -48,10 +66,10 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
   const filtered = useMemo(() => {
       let list = [...contracts];
       
-      // Sắp xếp danh sách hợp đồng/thanh lý theo ngày lập từ mới nhất đến cũ nhất
+      // Sắp xếp danh sách hợp đồng/thanh lý theo ngày lập từ mới nhất đến cũ nhất (sử dụng parser thông minh)
       list.sort((a, b) => {
-          const timeA = a.createdDate ? new Date(a.createdDate).getTime() : 0;
-          const timeB = b.createdDate ? new Date(b.createdDate).getTime() : 0;
+          const timeA = parseContractDateMs(a.createdDate);
+          const timeB = parseContractDateMs(b.createdDate);
           return timeB - timeA;
       });
 
@@ -117,6 +135,10 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                     onChange={(e) => setSearchTerm(e.target.value)} 
                 />
             </div>
+            <button onClick={handleRepairDates} disabled={repairingDate} className="p-2 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-xs" title="Chuẩn hóa ngày tháng cho các hợp đồng bị ngược ngày/tháng"> 
+                <CalendarCheck size={16} className={repairingDate ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">Sửa Ngày HĐ</span>
+            </button>
             <button onClick={loadContracts} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full" title="Tải lại"> 
                 <RotateCcw size={18} /> 
             </button>
@@ -158,7 +180,13 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                                 <td className="p-4 align-middle"> 
                                     <span className="px-2 py-1 bg-gray-100 rounded text-xs border border-gray-200">{c.contractType || 'Khác'}</span> 
                                 </td>
-                                <td className="p-4 text-gray-500 align-middle">{c.createdDate ? new Date(c.createdDate).toLocaleDateString('vi-VN') : '-'}</td>
+                                <td className="p-4 text-gray-500 align-middle">
+                                    {c.createdDate ? (() => {
+                                        const { fixedDate } = fixContractDateString(c.createdDate);
+                                        const parts = fixedDate.split('-');
+                                        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : fixedDate;
+                                    })() : '-'}
+                                </td>
                                 
                                 {/* Cột tiền */}
                                 {!isLiquidationMode && <td className="p-4 text-right font-mono font-bold text-gray-800 align-middle">{c.totalAmount?.toLocaleString('vi-VN')}</td>}

@@ -21,7 +21,8 @@ export enum RecordStatus {
   PENDING_POSTING = 'PENDING_POSTING',         // Đang niêm yết tại xã (30 ngày)
   TAX_TRANSFER = 'TAX_TRANSFER',               // Chờ chuyển thuế
   PENDING_TAX_KV7 = 'PENDING_TAX_KV7',         // Chờ thuế khu vực 7
-  PENDING_TAX_PAYMENT = 'PENDING_TAX_PAYMENT', // Chờ Giấy nộp tiền
+  PENDING_TAX_NOTICE = 'PENDING_TAX_NOTICE',   // Chờ Thông báo thuế (Ngày TBT)
+  PENDING_TAX_PAYMENT = 'PENDING_TAX_PAYMENT', // Chờ Giấy nộp tiền (Giữ lại enum key để tương thích)
   PENDING_PRINT_CERT = 'PENDING_PRINT_CERT',   // Chờ in giấy chứng nhận
   PENDING_HANDOVER = 'PENDING_HANDOVER'        // Chờ bàn giao
 }
@@ -197,6 +198,8 @@ export interface RecordFile {
   receivedBy?: string | null; // Người nhận hồ sơ (ID của user)
   deadline?: string | null;       
   assignedDate?: string | null;  
+  assignedAt?: string | null;   // Ngày giờ giao việc đầy đủ (VD: 2026-09-25T14:30:00)
+  assignedBy?: string | null;   // Người thực hiện giao việc (Lãnh đạo / Cán bộ)
   
   submissionDate?: string | null; // Ngày trình ký
   submittedTo?: string | null;    // Người được trình ký (ID của giám đốc)
@@ -303,6 +306,7 @@ export interface RecordFile {
   postingEndDate?: string | null;    // Ngày hết hạn 30 ngày niêm yết tại xã
   taxTransferDate?: string | null;
   taxKv7Date?: string | null;
+  taxNoticeDate?: string | null;      // Ngày TBT (Thông báo thuế)
   taxPaymentDate?: string | null;
   printCertDate?: string | null;
   pendingHandoverDate?: string | null;
@@ -321,8 +325,20 @@ export interface RecordFile {
   paymentReceiptDate?: string | null;
   payment_receipt_date?: string | null;
 
+  // Danh sách Chủ hồ sơ (Người đứng tên Giấy chứng nhận) cho hồ sơ 3.x
+  certificateOwners?: CertificateOwnerItem[] | string | null;
+  certificate_owners?: CertificateOwnerItem[] | string | null;
+
   updated_at?: string | null;
   updatedAt?: string | null;
+}
+
+export interface CertificateOwnerItem {
+  id?: string;
+  name: string;        // Họ tên chủ hồ sơ (Người đứng tên GCN) *
+  cccd: string;        // Giấy CMND/ CCCD *
+  phone?: string;      // Số điện thoại
+  address?: string;    // Địa chỉ chủ sử dụng
 }
 
 export type AttachmentDocType = 'GCN' | 'DON' | 'VBUQ' | 'BANVE' | 'BIENBAN' | 'TAICHINH' | 'PHIEU_KT' | 'TO_TRINH' | 'TLKHAC';

@@ -269,18 +269,29 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     const currentUserName = receiverOfficerName;
     const wardName = getNormalizedWard(data.ward || '');
 
-    // Trích xuất tên người đại diện / chủ chính từ chuỗi tên khách hàng (nếu có danh sách đồng sở hữu)
-    const getPrimaryOwnerName = (rawName?: string | null): string => {
-        if (!rawName) return '';
-        const name = rawName.trim();
-        const splitMatch = name.split(/[,;\n\r]|\s+(?:và|cùng|kèm theo)\s+/i);
-        if (splitMatch && splitMatch.length > 0 && splitMatch[0].trim()) {
-            return splitMatch[0].trim();
-        }
-        return name;
-    };
+    // Trích xuất thông tin Người nộp hồ sơ (Chủ đứng tên số 1) - Chỉ hiển thị người nộp trên biên nhận
+    let primaryOwnerName = '';
+    let primaryOwnerCccd = data.cccd || '';
+    let primaryOwnerPhone = data.phoneNumber || '';
 
-    const primaryCustomerName = getPrimaryOwnerName(data.customerName);
+    const certOwnersRaw = data.certificateOwners || data.certificate_owners;
+    if (certOwnersRaw) {
+      let parsedList: any[] = [];
+      if (Array.isArray(certOwnersRaw)) parsedList = certOwnersRaw;
+      else if (typeof certOwnersRaw === 'string') {
+        try { parsedList = JSON.parse(certOwnersRaw); } catch { parsedList = []; }
+      }
+      if (parsedList.length > 0 && parsedList[0]?.name) {
+        primaryOwnerName = parsedList[0].name.trim();
+        if (parsedList[0].cccd) primaryOwnerCccd = parsedList[0].cccd.trim();
+        if (parsedList[0].phone) primaryOwnerPhone = parsedList[0].phone.trim();
+      }
+    }
+
+    if (!primaryOwnerName && data.customerName) {
+      const splitMatch = data.customerName.trim().split(/[,;\n\r]|\s+(?:và|cùng|kèm theo)\s+/i);
+      primaryOwnerName = (splitMatch && splitMatch.length > 0 && splitMatch[0].trim()) ? splitMatch[0].trim() : data.customerName.trim();
+    }
 
     const getDisplayLandAddress = () => {
         let addr = '';
@@ -455,9 +466,9 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             {/* Content */}
                             <div>
                                 <div className="receipt-line" style={{ marginBottom: '5px' }}>Bộ phận tiếp nhận và trả kết quả: <span style={{ fontWeight: 'bold' }}>Văn phòng Đăng ký đất đai Thành phố Đồng Nai - Chi nhánh Hớn Quản</span></div>
-                                <div className="receipt-line" style={{ marginBottom: '5px' }}>Tiếp nhận hồ sơ của: <span style={{ fontWeight: 'bold' }}>{primaryCustomerName || data.customerName || ''}</span></div>
-                                <div className="receipt-line" style={{ marginBottom: '5px' }}>CCCD/MST: <span style={{ fontWeight: 'bold' }}>{data.cccd || ''}</span></div>
-                                <div className="receipt-line" style={{ marginBottom: '5px' }}>Số điện thoại: {data.phoneNumber}</div>
+                                <div className="receipt-line" style={{ marginBottom: '5px' }}>Tiếp nhận hồ sơ của: <span style={{ fontWeight: 'bold' }}>{primaryOwnerName || data.customerName || ''}</span></div>
+                                <div className="receipt-line" style={{ marginBottom: '5px' }}>CCCD/MST: <span style={{ fontWeight: 'bold' }}>{primaryOwnerCccd || ''}</span></div>
+                                <div className="receipt-line" style={{ marginBottom: '5px' }}>Số điện thoại: {primaryOwnerPhone || ''}</div>
                                 <div className="receipt-line" style={{ display: 'flex', marginBottom: '5px' }}>
                                     <div style={{ marginRight: '2cm' }}>Tờ: {data.mapSheet}</div>
                                     <div>Thửa: {data.landPlot}</div>

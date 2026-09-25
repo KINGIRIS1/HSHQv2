@@ -18,13 +18,20 @@ import {
 } from 'lucide-react';
 import { RecordFile, Employee, User as AppUser, RecordStatus, RecordStatusLog } from '../../types';
 import { RegistrationWorkflowStepper } from './RegistrationWorkflowStepper';
+import { HandoverPostingModal } from './HandoverPostingModal';
+import { HandoverTaxModal } from './HandoverTaxModal';
+import { HandoverPrintModal } from './HandoverPrintModal';
+import { RegistrationAssignModal } from './RegistrationAssignModal';
 import { validateCapGiayTransition } from '../../utils/capGiayStateMachine';
 import {
   getRegistrationWorkflow,
   WorkflowStep,
   getAppointmentInfo,
   calculateRegistrationDeadline,
+  addCalendarDays,
+  getStepSlaInfo,
 } from '../../utils/registrationWorkflows';
+import { CertificateOwnersSection } from '../common/CertificateOwnersSection';
 
 interface RegistrationDetailModalProps {
   isOpen: boolean;
@@ -49,6 +56,11 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'info' | 'status' | 'milestones' | 'attachments'>('status');
+  const [isPostingModalOpen, setIsPostingModalOpen] = useState<boolean>(false);
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+
   const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
 
   React.useEffect(() => {
@@ -68,7 +80,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
-      if (['receivedDate', 'recordType', 'postingDate', 'taxPaymentDate'].includes(field as string)) {
+      if (['receivedDate', 'recordType', 'postingDate', 'taxNoticeDate', 'printCertDate'].includes(field as string)) {
         const calc = calculateRegistrationDeadline(next);
         if (calc.deadline) {
           next.deadline = calc.deadline;
@@ -78,7 +90,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     });
   };
 
-  const handleStatusChange = (
+  const handleStatusChange = async (
     newStatus: RecordStatus,
     updatedFields?: Partial<RecordFile>,
     note?: string
@@ -95,40 +107,50 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
       return;
     }
 
+    // Nếu chuyển sang bước Niêm yết, Chuyển thuế, In GCN mà chưa chỉ định cán bộ -> Mở Tab/Modal giao việc
+    if (newStatus === RecordStatus.PENDING_POSTING && !updatedFields?.assignedTo) {
+      setIsPostingModalOpen(true);
+      return;
+    }
+    if (newStatus === RecordStatus.TAX_TRANSFER && !updatedFields?.assignedTo) {
+      setIsTaxModalOpen(true);
+      return;
+    }
+    if (newStatus === RecordStatus.PENDING_PRINT_CERT && !updatedFields?.assignedTo) {
+      setIsPrintModalOpen(true);
+      return;
+    }
+
     const now = new Date().toISOString();
     const today = now.substring(0, 10);
+    let assignedStaff = updatedFields?.assignedTo || formData.assignedTo || currentUser?.name || 'Cán bộ Cấp giấy';
+
     const newLog: RecordStatusLog = {
       id: crypto.randomUUID(),
       recordId: formData.id,
       previousStatus: formData.status,
       newStatus,
-      changedBy: formData.assignedTo || currentUser?.name || 'Cán bộ Cấp giấy',
+      changedBy: assignedStaff,
       changedAt: now,
       note: note || undefined,
     };
 
     const autoDates: Partial<RecordFile> = {};
-    if (newStatus === RecordStatus.APPRAISAL && !formData.appraisalDate) autoDates.appraisalDate = today;
-    if (newStatus === RecordStatus.TAX_TRANSFER && !formData.taxTransferDate) autoDates.taxTransferDate = today;
-    if (newStatus === RecordStatus.PENDING_TAX_KV7 && !formData.taxKv7Date) autoDates.taxKv7Date = today;
-    if (newStatus === RecordStatus.PENDING_TAX_PAYMENT && !formData.taxPaymentDate) autoDates.taxPaymentDate = today;
-    if (newStatus === RecordStatus.PENDING_PRINT_CERT && !formData.printCertDate) autoDates.printCertDate = today;
-    if (newStatus === RecordStatus.PENDING_CHECK && !formData.pendingCheckDate) autoDates.pendingCheckDate = today;
-    if (newStatus === RecordStatus.PENDING_SIGN && !formData.submissionDate) autoDates.submissionDate = today;
-    if ((newStatus === RecordStatus.SIGNED || newStatus === RecordStatus.PENDING_HANDOVER) && !formData.approvalDate) {
-      autoDates.approvalDate = today;
+    if (newStatus === RecordStatus.TAX_TRANSFER) {
+      autoDates.taxTransferDate = today;
+      autoDates.assignedDate = today;
     }
-    if (newStatus === RecordStatus.HANDOVER) {
-      if (!formData.completedDate) autoDates.completedDate = today;
-      autoDates.isHandedOver = true;
-    }
-    if (newStatus === RecordStatus.RETURNED && !formData.resultReturnedDate) {
-      autoDates.resultReturnedDate = today;
+    if (newStatus === RecordStatus.PENDING_POSTING) {
+      autoDates.postingDate = today;
+      autoDates.postingEndDate = addCalendarDays(today, 30);
+      autoDates.assignedDate = today;
     }
 
     const updatedRecordData: RecordFile = {
       ...formData,
       status: newStatus,
+      assignedTo: assignedStaff,
+      assignedDate: (newStatus === RecordStatus.TAX_TRANSFER || newStatus === RecordStatus.PENDING_POSTING || !formData.assignedDate) ? today : formData.assignedDate,
       statusLogs: [...(formData.statusLogs || []), newLog],
       ...autoDates,
       ...(updatedFields || {}),
@@ -139,6 +161,16 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     }
 
     setFormData(updatedRecordData);
+
+    try {
+      setIsSaving(true);
+      await onSave(updatedRecordData);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Có lỗi xảy ra khi đồng bộ trạng thái.');
+    } finally {
+      setIsSaving(false);
+    }
+
     if ([
       RecordStatus.TAX_TRANSFER,
       RecordStatus.PENDING_TAX_KV7,
@@ -277,41 +309,112 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block">
                     Phân công & Hạn giải quyết
                   </span>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Cán bộ thụ lý</label>
-                    <select
-                      value={formData.assignedTo || ''}
-                      onChange={(e) => handleChange('assignedTo', e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-                    >
-                      <option value="">-- Chưa phân công --</option>
-                      {employees.map((emp) => (
-                        <option key={emp.id} value={emp.name}>
-                          {emp.name} {emp.department ? `(${emp.department})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Ngày tiếp nhận</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Cán bộ thụ lý</label>
+                      <select
+                        value={formData.assignedTo || ''}
+                        onChange={(e) => {
+                          const newStaff = e.target.value;
+                          const now = new Date();
+                          const isoNow = now.toISOString();
+                          const today = isoNow.split('T')[0];
+                          setFormData((prev) => ({
+                            ...prev,
+                            assignedTo: newStaff,
+                            assignedDate: prev.assignedDate || today,
+                            assignedAt: prev.assignedAt || isoNow,
+                            assignedBy: prev.assignedBy || currentUser?.name || 'Lãnh đạo',
+                          }));
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                      >
+                        <option value="">-- Chưa phân công --</option>
+                        {employees.map((emp) => (
+                          <option key={emp.id} value={emp.name}>
+                            {emp.name} {emp.department ? `(${emp.department})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Người giao việc</label>
                       <input
-                        type="date"
-                        value={formData.receivedDate || ''}
-                        onChange={(e) => handleChange('receivedDate', e.target.value)}
+                        type="text"
+                        placeholder="Tên Lãnh đạo / Người giao"
+                        value={formData.assignedBy || ''}
+                        onChange={(e) => handleChange('assignedBy', e.target.value)}
                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Hạn xử lý (Deadline)</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Ngày giờ giao việc</label>
                       <input
-                        type="date"
-                        value={formData.deadline || ''}
-                        onChange={(e) => handleChange('deadline', e.target.value)}
+                        type="datetime-local"
+                        value={
+                          formData.assignedAt
+                            ? formData.assignedAt.substring(0, 16)
+                            : formData.assignedDate
+                            ? `${formData.assignedDate}T08:00`
+                            : ''
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((prev) => ({
+                            ...prev,
+                            assignedAt: val ? `${val}:00.000Z` : null,
+                            assignedDate: val ? val.split('T')[0] : prev.assignedDate,
+                          }));
+                        }}
                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label>
+                      <input
+                        type="date"
+                        value={formData.appraisalDate || ''}
+                        onChange={(e) => handleChange('appraisalDate', e.target.value)}
+                        className="w-full px-3 py-2 bg-teal-50/50 border border-teal-300 rounded-lg text-xs font-semibold text-teal-800 focus:ring-2 focus:ring-teal-500 outline-none"
+                      />
+                    </div>
                   </div>
+
+                  {/* Thẻ hiển thị trực quan thông tin Giao việc */}
+                  {formData.assignedTo && (
+                    <div className="p-3 bg-blue-50/90 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1.5">
+                          <User size={14} className="text-blue-600" />
+                          <span>Cán bộ thụ lý: <strong className="text-blue-800">{formData.assignedTo}</strong></span>
+                        </span>
+                        <span className="text-[11px] text-blue-700 bg-blue-100 px-2 py-0.5 rounded font-mono border border-blue-200">
+                          <Clock size={12} className="inline mr-1 text-blue-600" />
+                          {formData.assignedAt
+                            ? new Date(formData.assignedAt).toLocaleString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
+                            : formData.assignedDate
+                            ? formData.assignedDate.split('-').reverse().join('/')
+                            : '—'}
+                        </span>
+                      </div>
+                      {formData.assignedBy && (
+                        <p className="text-[11px] text-slate-600 pl-5">
+                          Lãnh đạo giao việc: <strong className="text-slate-800">{formData.assignedBy}</strong>
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Thẻ thông tin Ngày hẹn trả theo giai đoạn quy trình */}
                   {(() => {
@@ -386,21 +489,35 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {/* 1. Thẩm định */}
+                {/* 1. Trình kiểm tra (Ngoài cùng bên trái) */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                   <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <FileCheck size={14} className="text-blue-600" />
-                    <span>Ngày hoàn thành thẩm định</span>
+                    <CheckCircle2 size={14} className="text-orange-600" />
+                    <span>Ngày trình kiểm tra</span>
                   </label>
                   <input
                     type="date"
-                    value={formData.appraisalDate || ''}
-                    onChange={(e) => handleChange('appraisalDate', e.target.value)}
+                    value={formData.pendingCheckDate || ''}
+                    onChange={(e) => handleChange('pendingCheckDate', e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
-                {/* 1.1 Niêm yết tại UBND xã */}
+                {/* 2. Trình ký */}
+                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Send size={14} className="text-purple-600" />
+                    <span>Ngày trình ký duyệt</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.submissionDate || ''}
+                    onChange={(e) => handleChange('submissionDate', e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* 2.1 Niêm yết tại UBND xã (nếu có) */}
                 {isLostCertType && (
                   <div className="p-3 bg-white border border-amber-200 rounded-xl space-y-1 bg-amber-50/30">
                     <label className="block text-xs font-bold text-amber-900 flex items-center gap-1.5">
@@ -416,7 +533,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   </div>
                 )}
 
-                {/* 2. Chuyển thuế */}
+                {/* 3. Chuyển thuế */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                   <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Send size={14} className="text-indigo-600" />
@@ -430,7 +547,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   />
                 </div>
 
-                {/* 3. Thuế KV7 */}
+                {/* 4. Thuế KV7 */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                   <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Building size={14} className="text-violet-600" />
@@ -444,21 +561,21 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   />
                 </div>
 
-                {/* 4. Giấy nộp tiền */}
+                {/* 5. Ngày TBT */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                   <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <DollarSign size={14} className="text-amber-600" />
-                    <span>Ngày nộp tiền / Nhận GNT</span>
+                    <span>Ngày TBT (Thông báo thuế)</span>
                   </label>
                   <input
                     type="date"
-                    value={formData.taxPaymentDate || ''}
-                    onChange={(e) => handleChange('taxPaymentDate', e.target.value)}
+                    value={formData.taxNoticeDate || ''}
+                    onChange={(e) => handleChange('taxNoticeDate', e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
-                {/* 5. In GCN */}
+                {/* 6. In GCN */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                   <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Printer size={14} className="text-teal-600" />
@@ -472,49 +589,21 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   />
                 </div>
 
-                {/* 6. Trình kiểm tra */}
-                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
-                  <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-orange-600" />
-                    <span>Ngày trình kiểm tra</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.pendingCheckDate || ''}
-                    onChange={(e) => handleChange('pendingCheckDate', e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-
-                {/* 7. Trình ký */}
-                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
-                  <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <Send size={14} className="text-purple-600" />
-                    <span>Ngày trình ký duyệt</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.submissionDate || ''}
-                    onChange={(e) => handleChange('submissionDate', e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-
-                {/* 8. Ký duyệt */}
+                {/* 7. Hoàn thành */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                   <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <CheckCircle2 size={14} className="text-emerald-600" />
-                    <span>Ngày lãnh đạo ký duyệt</span>
+                    <span>Ngày hoàn thành</span>
                   </label>
                   <input
                     type="date"
-                    value={formData.approvalDate || ''}
-                    onChange={(e) => handleChange('approvalDate', e.target.value)}
+                    value={formData.completedDate || ''}
+                    onChange={(e) => handleChange('completedDate', e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
-                {/* 9. Trả kết quả */}
+                {/* 8. Trả kết quả */}
                 <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                   <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <CheckCircle2 size={14} className="text-green-600" />
@@ -622,7 +711,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                 <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block">
                   2. Thông tin thửa đất
                 </span>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">Xã / Phường</label>
                     <input
@@ -651,13 +740,23 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Diện tích (m²)</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Tổng dt (m²)</label>
                     <input
                       type="number"
                       step="any"
-                      value={formData.area || ''}
-                      onChange={(e) => handleChange('area', Number(e.target.value) || 0)}
+                      value={formData.area ?? ''}
+                      onChange={(e) => handleChange('area', e.target.value === '' ? null : Number(e.target.value))}
                       className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-emerald-700 mb-1">Đất ở ONT/ODT (m²)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.residentialArea ?? ''}
+                      onChange={(e) => handleChange('residentialArea', e.target.value === '' ? null : Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-emerald-50/50 border border-emerald-300 rounded-lg text-xs font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>
                 </div>
@@ -671,6 +770,25 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   />
                 </div>
               </div>
+
+              {/* Bảng Chủ hồ sơ (Người đứng tên Giấy chứng nhận) */}
+              <CertificateOwnersSection
+                owners={formData.certificateOwners}
+                onChange={(newOwners) => setFormData(prev => ({ ...prev, certificateOwners: newOwners }))}
+                applicantName={formData.customerName || ''}
+                applicantCccd={formData.cccd || ''}
+                applicantPhone={formData.phoneNumber || ''}
+                applicantAddress={formData.customerAddress || ''}
+                onSyncApplicant={(owner1) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    customerName: owner1.name || prev.customerName,
+                    cccd: owner1.cccd || prev.cccd,
+                    phoneNumber: owner1.phone || prev.phoneNumber,
+                    customerAddress: owner1.address || prev.customerAddress
+                  }));
+                }}
+              />
 
               {/* Khối 3: Nội dung & Ghi chú */}
               <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
@@ -755,6 +873,51 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
           </div>
         </form>
       </div>
+
+      <HandoverPostingModal
+        isOpen={isPostingModalOpen}
+        onClose={() => setIsPostingModalOpen(false)}
+        selectedRecords={[formData]}
+        employees={employees}
+        onConfirmHandoverPosting={async (ids, assignedTo) => {
+          setIsPostingModalOpen(false);
+          await handleStatusChange(RecordStatus.PENDING_POSTING, { assignedTo });
+        }}
+      />
+
+      <HandoverTaxModal
+        isOpen={isTaxModalOpen}
+        onClose={() => setIsTaxModalOpen(false)}
+        selectedRecords={[formData]}
+        employees={employees}
+        onConfirmHandoverTax={async (ids, assignedTo) => {
+          setIsTaxModalOpen(false);
+          await handleStatusChange(RecordStatus.TAX_TRANSFER, { assignedTo });
+        }}
+      />
+
+      <HandoverPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        selectedRecords={[formData]}
+        employees={employees}
+        onConfirmHandoverPrint={async (ids, assignedTo) => {
+          setIsPrintModalOpen(false);
+          await handleStatusChange(RecordStatus.PENDING_PRINT_CERT, { assignedTo });
+        }}
+      />
+
+      <RegistrationAssignModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        selectedRecords={[formData]}
+        employees={employees}
+        onConfirmAssign={async (recordIds, assignedTo, assignedDate, assignStep) => {
+          setIsAssignModalOpen(false);
+          const targetStatus = assignStep === 'tax_transfer' ? RecordStatus.TAX_TRANSFER : RecordStatus.APPRAISAL;
+          await handleStatusChange(targetStatus, { assignedTo, assignedDate });
+        }}
+      />
     </div>
   );
 };
