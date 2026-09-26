@@ -24,7 +24,6 @@ export interface ProcedureStep {
   name: string;
   durationHours: number; // e.g. 8 hours
   durationDays: number;  // e.g. 1 day
-  isNoSla?: boolean;     // Cờ không tính SLA cho riêng bước này
   description?: string;
 }
 
@@ -36,7 +35,6 @@ export interface ProcedureItemConfig {
   hasTax?: boolean;
   hasPosting?: boolean;
   hasFieldWork?: boolean;
-  isNoSla?: boolean;    // Cờ không tính SLA cho thủ tục này
   description: string;
   steps: ProcedureStep[];
 }
@@ -440,8 +438,15 @@ export function loadRegistrationSlaFullConfig(): RegistrationSlaFullConfig {
             procedureItems.push(defaultItem);
           } else {
             // Đồng bộ tên chuẩn theo loại hồ sơ nếu chưa trùng
-            if (!existing.name) {
+            if (existing.name !== defaultItem.name) {
               existing.name = defaultItem.name;
+            }
+            // Tự động nâng cấp danh sách bước & thời gian SLA cho các mã chuẩn nếu chưa đổi thủ công
+            const currentDaysSum = existing.steps.reduce((s, st) => s + (st.durationDays || 0), 0);
+            const defaultDaysSum = defaultItem.steps.reduce((s, st) => s + (st.durationDays || 0), 0);
+            if (currentDaysSum !== defaultDaysSum) {
+              existing.steps = defaultItem.steps;
+              existing.description = defaultItem.description;
             }
           }
         });
@@ -655,29 +660,12 @@ export const RegistrationSlaStatusView: React.FC = () => {
     showToast('success', 'Đã xóa ánh xạ trạng thái!');
   };
 
-  const handleToggleStepNoSla = (procCode: string, stepIdx: number, isNoSla: boolean) => {
-    setFullConfig(prev => {
-      const nextProcs = prev.procedureItems.map(p => {
-        if (p.code === procCode) {
-          const updatedSteps = p.steps.map((s, idx) => idx === stepIdx ? { ...s, isNoSla } : s);
-          return { ...p, steps: updatedSteps };
-        }
-        return p;
-      });
-      return { ...prev, procedureItems: nextProcs };
-    });
-  };
-
-  // Tính tổng số ngày SLA của thủ tục hiện tại (bỏ qua các bước bị tích Không tính SLA)
-  const totalProcedureDays = currentProcedure
-    ? currentProcedure.steps.reduce((sum, s) => sum + (s.isNoSla ? 0 : (s.durationDays || 0)), 0)
-    : 0;
-  const totalProcedureHours = currentProcedure
-    ? currentProcedure.steps.reduce((sum, s) => sum + (s.isNoSla ? 0 : (s.durationHours || 0)), 0)
-    : 0;
+  // Tính tổng số ngày SLA của thủ tục hiện tại
+  const totalProcedureDays = currentProcedure ? currentProcedure.steps.reduce((sum, s) => sum + (s.durationDays || 0), 0) : 0;
+  const totalProcedureHours = currentProcedure ? currentProcedure.steps.reduce((sum, s) => sum + (s.durationHours || 0), 0) : 0;
 
   return (
-    <div className="flex flex-col min-h-full bg-slate-50 rounded-xl border border-slate-200 shadow-sm animate-fade-in">
+    <div className="flex flex-col h-full bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-sm animate-fade-in">
       {/* HEADER BAR */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -757,7 +745,7 @@ export const RegistrationSlaStatusView: React.FC = () => {
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 overflow-y-auto">
         {/* --- TAB 1: SCHEDULE CONFIG --- */}
         {activeSubTab === 'schedule' && (
           <div className="max-w-4xl space-y-6 animate-fade-in">
@@ -909,7 +897,7 @@ export const RegistrationSlaStatusView: React.FC = () => {
                   >
                     {filteredProcedures.map((item) => (
                       <option key={item.id} value={item.code}>
-                        {item.name} {item.isNoSla ? '(Không tính SLA)' : ''}
+                        {item.name}
                       </option>
                     ))}
                   </select>
@@ -920,19 +908,12 @@ export const RegistrationSlaStatusView: React.FC = () => {
                       <span className="text-xs font-black bg-blue-600 text-white px-2.5 py-1 rounded shadow-2xs font-mono">
                         Mã {currentProcedure.code}
                       </span>
-                      {currentProcedure.isNoSla ? (
-                        <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded border border-slate-300">
-                          Không tính SLA ({currentProcedure.steps.length} bước)
-                        </span>
-                      ) : (
-                        <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded border border-blue-200">
-                          {totalProcedureDays} Ngày ({totalProcedureHours}h) - {currentProcedure.steps.length} bước
-                        </span>
-                      )}
+                      <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded border border-blue-200">
+                        {totalProcedureDays} Ngày ({totalProcedureHours}h) - {currentProcedure.steps.length} bước
+                      </span>
                       {currentProcedure.hasTax && <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">Có thuế</span>}
                       {currentProcedure.hasPosting && <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded">Niêm yết</span>}
                       {currentProcedure.hasFieldWork && <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded">Thực địa</span>}
-                      {currentProcedure.isNoSla && <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded">Không tính SLA</span>}
                     </div>
                   )}
                 </div>
@@ -964,7 +945,7 @@ export const RegistrationSlaStatusView: React.FC = () => {
                         </span>
                         <div>
                           <h3 className="font-bold text-slate-800 text-base">{currentProcedure.name}</h3>
-                          <span className="text-xs text-slate-400">Thiết lập quy trình & SLA theo từng bước tiến độ</span>
+                          <span className="text-xs text-slate-400">Thiết lập quy trình & SLA theo đúng mã thủ tục</span>
                         </div>
                       </div>
 
@@ -1017,7 +998,7 @@ export const RegistrationSlaStatusView: React.FC = () => {
                         onClick={() => setEditingStep({
                           procCode: currentProcedure.code,
                           stepIdx: null,
-                          step: { id: '', stepNumber: currentProcedure.steps.length + 1, name: '', durationHours: 8, durationDays: 1, description: '', isNoSla: false }
+                          step: { id: '', stepNumber: currentProcedure.steps.length + 1, name: '', durationHours: 8, durationDays: 1, description: '' }
                         })}
                         className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors shadow-sm"
                       >
@@ -1035,9 +1016,7 @@ export const RegistrationSlaStatusView: React.FC = () => {
                         return (
                           <div
                             key={step.id || idx}
-                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border transition-all shadow-2xs ${
-                              step.isNoSla ? 'bg-amber-50/40 border-amber-200 hover:bg-amber-50' : 'bg-slate-50/80 border-slate-200 hover:border-blue-400 hover:bg-white'
-                            }`}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-white transition-all shadow-2xs"
                           >
                             <div className="flex items-center gap-3">
                               <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm">
@@ -1045,18 +1024,11 @@ export const RegistrationSlaStatusView: React.FC = () => {
                               </span>
 
                               <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-xs text-slate-800 block">
-                                    {step.name}
-                                  </span>
-                                  {step.isNoSla && (
-                                    <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded border border-amber-200">
-                                      Không tính SLA
-                                    </span>
-                                  )}
-                                </div>
+                                <span className="font-bold text-xs text-slate-800 block">
+                                  {step.name}
+                                </span>
                                 {step.description && (
-                                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                                  <span className="text-[11px] text-slate-500 block">
                                     {step.description}
                                   </span>
                                 )}
@@ -1064,29 +1036,10 @@ export const RegistrationSlaStatusView: React.FC = () => {
                             </div>
 
                             <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
-                              {/* CỘT KHÔNG TÍNH SLA */}
-                              <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-100 rounded-lg border border-slate-300 cursor-pointer text-xs font-bold transition-colors shrink-0 shadow-2xs">
-                                <input
-                                  type="checkbox"
-                                  checked={step.isNoSla || false}
-                                  onChange={(e) => handleToggleStepNoSla(currentProcedure.code, idx, e.target.checked)}
-                                  className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
-                                />
-                                <span className={step.isNoSla ? "text-amber-800 font-black" : "text-slate-600 font-semibold"}>
-                                  Không tính SLA
-                                </span>
-                              </label>
-
                               <div className="text-right">
-                                {step.isNoSla ? (
-                                  <span className="text-xs font-extrabold text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded font-mono block border border-amber-200">
-                                    0 ngày (Không tính)
-                                  </span>
-                                ) : (
-                                  <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2.5 py-1 rounded font-mono block border border-blue-200/60">
-                                    {step.durationDays} ngày ({step.durationHours}h)
-                                  </span>
-                                )}
+                                <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2.5 py-1 rounded font-mono block border border-blue-200/60">
+                                  {step.durationDays} ngày ({step.durationHours}h)
+                                </span>
                               </div>
 
                               {/* ACTIONS */}
@@ -1327,21 +1280,6 @@ export const RegistrationSlaStatusView: React.FC = () => {
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-lg"
                   placeholder="Ghi chú chi tiết cho nhân viên..."
                 />
-              </div>
-
-              <div className="pt-1">
-                <label className="flex items-center gap-2 cursor-pointer p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200">
-                  <input
-                    type="checkbox"
-                    checked={editingStep.step.isNoSla || false}
-                    onChange={(e) => setEditingStep({
-                      ...editingStep,
-                      step: { ...editingStep.step, isNoSla: e.target.checked }
-                    })}
-                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                  />
-                  <span className="text-xs font-bold text-slate-800">Không tính SLA cho bước này</span>
-                </label>
               </div>
             </div>
 

@@ -8,11 +8,8 @@ import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/do
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import GetContractNumberModal from './GetContractNumberModal';
-import { UnsavedContractAuditModal } from './UnsavedContractAuditModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
-import { findMatchingContract } from '../utils/contractMatching';
 import saveAs from 'file-saver'; // Import saveAs
-import { supabase } from '../services/supabaseClient';
 
 // Child Components
 import ContractForm from './receive-contract/ContractForm';
@@ -75,7 +72,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isGetContractNumberOpen, setIsGetContractNumberOpen] = useState(false);
-  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   
   // Không dùng Modal Preview nữa, nhưng vẫn giữ state để tránh lỗi biên dịch nếu cần
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -223,8 +219,9 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           const record = recordToCreateContract; // Ghi nhận bản ghi để xử lý ổn định trong closure
           if (onClearRecordToCreateContract) onClearRecordToCreateContract(); // Xóa cờ đồng bộ ngay lập tức để tránh re-render lặp vô tận
 
-          // Sử dụng hàm so khớp đa tầng để phát hiện hợp đồng đã lập trước đó
-          const existingContract = findMatchingContract(record, contracts);
+          const existingContract = contracts.find(c => 
+              c.customerAddress && c.customerAddress.trim().toLowerCase() === record.code.trim().toLowerCase()
+          );
           if (existingContract) {
               setEditingContract(existingContract);
               setActiveModule('contract');
@@ -360,25 +357,21 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
   const handleSaveContract = async (contract: Contract & { isManualCode?: boolean }, isUpdateParam: boolean): Promise<string | null> => {
       let success = false;
-      let finalCode = contract.code ? contract.code.trim() : '';
+      let finalCode = contract.code;
 
-      // Kiểm tra thực tế xem hợp đồng này đã có trong danh sách CSDL hay chưa (theo ID hoặc theo Mã hợp đồng)
-      const isExistingInDb = contracts.some(c => 
-          c.id === contract.id || 
-          (c.code && finalCode && c.code.trim().toLowerCase() === finalCode.toLowerCase())
-      );
+      // Kiểm tra thực tế xem hợp đồng này đã có trong danh sách CSDL hay chưa
+      const isExistingInDb = contracts.some(c => c.id === contract.id);
       const isUpdate = isExistingInDb;
 
       if (isUpdate) {
-          const finalContract = { ...contract, code: finalCode };
-          success = await updateContractApi(finalContract);
+          success = await updateContractApi(contract);
+          finalCode = contract.code;
       } else {
           try {
-              // BẢO VỆ MÃ HỢP ĐỒNG: Nếu contract đã có mã hợp đồng hợp lệ (như đã lấy số tự động hoặc nhập), DÙNG LUÔN mã đó!
-              if (finalCode && finalCode !== '' && finalCode !== '...') {
-                  // Giữ nguyên mã số đã lấy
+              // Thực sự Lấy mã hợp đồng chính thức và TĂNG giá trị seq tự động trong DB khi LƯU THÀNH CÔNG
+              if (contract.isManualCode && contract.code && contract.code.trim() !== '') {
+                  finalCode = contract.code;
               } else {
-                  // Chỉ gọi consumeNextHDKTCode khi mã thực sự rỗng
                   const year = contract.createdDate ? new Date(contract.createdDate).getFullYear() : new Date().getFullYear();
                   const userName = currentUser.name || currentUser.username || "Nhân viên";
                   const note = `${contract.customerName || ''} - ${contract.contractType}`;
@@ -398,24 +391,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               success = false;
           }
       }
-
       if (success) {
-          // ĐỒNG BỘ HAI CHIỀU VÀO CƠ SỞ DỮ LIỆU SUPABASE LAND_RECORDS:
-          // Nếu contract có mã số biên nhận / hồ sơ liên kết (ở customerAddress), cập nhật thông tin giá trị & liên kết hợp đồng trên Supabase
-          try {
-              const recordCode = contract.customerAddress?.trim();
-              if (recordCode && recordCode.length >= 2) {
-                  await supabase.from('land_records')
-                      .update({ 
-                          price: contract.totalAmount, 
-                          advancePayment: contract.deposit 
-                      })
-                      .eq('code', recordCode);
-              }
-          } catch (recSyncErr) {
-              console.warn("⚠️ Cập nhật hai chiều cho land_records:", recSyncErr);
-          }
-
           loadContracts(); // Reload list
           return finalCode;
       }
@@ -453,20 +429,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
       
       setIsProcessing(true);
       
-      // TỰ ĐỘNG CẤP SỐ HỢP ĐỒNG KHI IN NẾU CHƯA CÓ
-      let contractCodeToPrint = dataToPrint.code ? String(dataToPrint.code).trim() : '';
-      if (printType !== 'liquidation' && (!contractCodeToPrint || contractCodeToPrint === '...')) {
-          try {
-              const year = dataToPrint.createdDate ? new Date(dataToPrint.createdDate).getFullYear() : new Date().getFullYear();
-              const userName = currentUser.name || currentUser.username || "Nhân viên";
-              const note = `${dataToPrint.customerName || ''} - ${dataToPrint.contractType || 'HĐ'}`;
-              contractCodeToPrint = await consumeNextHDKTCode(year, userName, note);
-              dataToPrint.code = contractCodeToPrint;
-          } catch (codeErr) {
-              console.warn("Chưa cấp được số tự động khi in:", codeErr);
-          }
-      }
-
       // XỬ LÝ NGÀY THÁNG
       const currentFormDate = dataToPrint.createdDate ? new Date(dataToPrint.createdDate) : new Date();
       let originalContractDate = currentFormDate; 
@@ -718,13 +680,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
         {/* UTILITY BUTTONS */}
         <div className="flex gap-2 shrink-0">
             {activeModule !== 'liquidation' && (
-                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-xs flex items-center gap-1 font-bold text-xs" title="Lấy số Hợp đồng Tự động">
-                    <Hash size={18} /> Lấy Số
+                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" title="Lấy số Hợp đồng Tự động">
+                    <Hash size={18} />
                 </button>
             )}
-            <button onClick={() => setIsAuditModalOpen(true)} className="p-2 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 font-bold text-xs" title="Kiểm tra & Khôi phục Hợp đồng chưa lưu">
-                <ShieldAlert size={18} className="text-amber-600" /> Kiểm Tra HĐ Chưa Lưu
-            </button>
             <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-xs" title="Cấu hình Bảng giá Dịch vụ">
                 <Settings2 size={18} />
             </button>
@@ -847,40 +806,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               }
               setActiveModule('contract');
               setIsGetContractNumberOpen(false);
-          }}
-      />
-      <UnsavedContractAuditModal
-          isOpen={isAuditModalOpen}
-          onClose={() => setIsAuditModalOpen(false)}
-          contracts={contracts}
-          currentUser={currentUser}
-          onRefreshContracts={loadContracts}
-          onSelectCodeToCreate={(code, note, date) => {
-              setEditingContract({
-                  id: Math.random().toString(36).substr(2, 9),
-                  code: code,
-                  customerName: note || '',
-                  phoneNumber: '',
-                  address: '',
-                  ward: '',
-                  landPlot: '',
-                  mapSheet: '',
-                  area: 0,
-                  contractType: 'Đo đạc',
-                  serviceType: 'Trích đo chỉnh lý bản đồ địa chính',
-                  areaType: 'Đất nông thôn',
-                  plotCount: 1,
-                  markerCount: 1,
-                  quantity: 1,
-                  unitPrice: 0,
-                  vatRate: 8,
-                  vatAmount: 0,
-                  totalAmount: 0,
-                  deposit: 0,
-                  createdDate: date || new Date().toISOString(),
-                  status: 'PENDING'
-              });
-              setActiveModule('contract');
           }}
       />
     </div>

@@ -14,7 +14,7 @@ interface EmployeeStatsViewProps {
     toDate: string;
     selectedEmpId: string;
     setSelectedEmpId: (id: string) => void;
-    defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement' | 'registration';
+    defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement';
     isEmployee?: boolean;
 }
 
@@ -23,7 +23,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 }) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
-    const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement' | 'registration'>(defaultDeptFilter);
+    const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement'>(defaultDeptFilter);
 
     // Synchronize deptFilter if defaultDeptFilter changes
     React.useEffect(() => {
@@ -36,7 +36,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
     const filteredEmployeesByDept = useMemo(() => {
         const list = employees.filter(emp => {
             const d = (emp.department || '').toLowerCase();
-            const pos = (emp.position || '').toLowerCase();
             if (deptFilter === 'archive') {
                 return d.includes('lưu trữ') && !d.includes('một cửa') && !d.includes('hành chính');
             }
@@ -45,18 +44,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             }
             if (deptFilter === 'measurement') {
                 return d.includes('đo đạc') || d.includes('kỹ thuật');
-            }
-            if (deptFilter === 'registration') {
-                const isExcluded = 
-                    d.includes('đo đạc') || 
-                    d.includes('kỹ thuật') || 
-                    d.includes('lưu trữ') || 
-                    d.includes('hành chính') || 
-                    d.includes('một cửa') || 
-                    d.includes('ban giám đốc') ||
-                    pos.includes('giám đốc');
-                if (isExcluded) return false;
-                return d.includes('cấp giấy') || d.includes('đăng ký') || d.includes('thẩm định') || d.includes('đkđđ') || d.includes('gcn');
             }
             return true;
         });

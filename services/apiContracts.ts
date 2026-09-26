@@ -69,161 +69,6 @@ const setLocalContracts = async (contracts: Contract[]): Promise<void> => {
     } catch (_) {}
 };
 
-/**
- * Chuyển đổi và trả về Timestamp (ms) an toàn cho ngày tạo hợp đồng, tự động sửa lỗi đảo ngày/tháng
- */
-export const parseContractDateMs = (val: any): number => {
-    if (!val) return 0;
-    if (typeof val === 'number') return isNaN(val) ? 0 : val;
-    if (val instanceof Date) return isNaN(val.getTime()) ? 0 : val.getTime();
-    
-    let str = String(val).trim();
-    if (!str || str === 'null' || str === 'undefined') return 0;
-
-    const now = new Date();
-    const curY = now.getFullYear();
-    const curM = now.getMonth() + 1;
-
-    // YYYY-MM-DD
-    const matchYmd = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-    if (matchYmd) {
-        let y = parseInt(matchYmd[1], 10);
-        let m = parseInt(matchYmd[2], 10);
-        let d = parseInt(matchYmd[3], 10);
-
-        if (m > 12 || (y === curY && m > curM && d <= 12)) {
-            const temp = m;
-            m = d;
-            d = temp;
-        }
-
-        const dateObj = new Date(y, m - 1, d);
-        return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
-    }
-
-    // DD/MM/YYYY
-    const matchDmy = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
-    if (matchDmy) {
-        let d = parseInt(matchDmy[1], 10);
-        let m = parseInt(matchDmy[2], 10);
-        let y = parseInt(matchDmy[3], 10);
-
-        if (m > 12 || (y === curY && m > curM && d <= 12)) {
-            const temp = m;
-            m = d;
-            d = temp;
-        }
-
-        const dateObj = new Date(y, m - 1, d);
-        return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
-    }
-
-    const parsed = new Date(str);
-    return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
-};
-
-/**
- * Phát hiện và sửa lỗi chuỗi ngày bị hoán đổi ngày/tháng hoặc lỗi định dạng
- */
-export const fixContractDateString = (val: any): { fixedDate: string; wasFixed: boolean } => {
-    if (!val) {
-        const today = new Date().toISOString().split('T')[0];
-        return { fixedDate: today, wasFixed: false };
-    }
-    let str = String(val).trim();
-    
-    const now = new Date();
-    const curY = now.getFullYear();
-    const curM = now.getMonth() + 1;
-
-    // 1. YYYY-MM-DD
-    const matchYmd = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-    if (matchYmd) {
-        let y = parseInt(matchYmd[1], 10);
-        let m = parseInt(matchYmd[2], 10);
-        let d = parseInt(matchYmd[3], 10);
-
-        let wasFixed = false;
-        if (m > 12 || (y === curY && m > curM && d <= 12)) {
-            const temp = m;
-            m = d;
-            d = temp;
-            wasFixed = true;
-        }
-
-        const cleanY = String(y).padStart(4, '0');
-        const cleanM = String(m).padStart(2, '0');
-        const cleanD = String(d).padStart(2, '0');
-        const formatted = `${cleanY}-${cleanM}-${cleanD}`;
-        return { fixedDate: formatted, wasFixed: wasFixed || formatted !== str.substring(0, 10) };
-    }
-
-    // 2. DD/MM/YYYY
-    const matchDmy = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
-    if (matchDmy) {
-        let d = parseInt(matchDmy[1], 10);
-        let m = parseInt(matchDmy[2], 10);
-        let y = parseInt(matchDmy[3], 10);
-
-        let wasFixed = false;
-        if (m > 12 || (y === curY && m > curM && d <= 12)) {
-            const temp = m;
-            m = d;
-            d = temp;
-            wasFixed = true;
-        }
-
-        const cleanY = String(y).padStart(4, '0');
-        const cleanM = String(m).padStart(2, '0');
-        const cleanD = String(d).padStart(2, '0');
-        return { fixedDate: `${cleanY}-${cleanM}-${cleanD}`, wasFixed: true };
-    }
-
-    const parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) {
-        const y = parsed.getFullYear();
-        const m = String(parsed.getMonth() + 1).padStart(2, '0');
-        const d = String(parsed.getDate()).padStart(2, '0');
-        return { fixedDate: `${y}-${m}-${d}`, wasFixed: false };
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    return { fixedDate: today, wasFixed: true };
-};
-
-/**
- * Quét toàn bộ danh sách hợp đồng và sửa tự động các hợp đồng bị lưu ngược ngày/tháng
- */
-export const repairAllContractDatesApi = async (): Promise<{ totalCount: number; fixedCount: number }> => {
-    let contracts = memoryContractsCache;
-    if (!contracts || contracts.length === 0) {
-        contracts = await getIndexedDBContracts();
-    }
-    if (!contracts || contracts.length === 0) {
-        return { totalCount: 0, fixedCount: 0 };
-    }
-
-    let fixedCount = 0;
-    const updatedContracts = [...contracts];
-
-    for (let i = 0; i < updatedContracts.length; i++) {
-        const c = updatedContracts[i];
-        const { fixedDate, wasFixed } = fixContractDateString(c.createdDate);
-        if (wasFixed && fixedDate !== c.createdDate) {
-            fixedCount++;
-            const updated = { ...c, createdDate: fixedDate };
-            updatedContracts[i] = updated;
-            await updateContractApi(updated);
-        }
-    }
-
-    if (fixedCount > 0) {
-        await setLocalContracts(updatedContracts);
-    }
-
-    return { totalCount: contracts.length, fixedCount };
-};
-
 export const mapContractToDbSnake = (c: Contract) => ({
     id: c.id,
     code: c.code,
@@ -312,17 +157,13 @@ export const fetchContracts = async (): Promise<Contract[]> => {
             }
 
             if (cloudContracts.length > 0) {
-                const cloudIds = new Set(cloudContracts.map(c => c.id));
-                const offlineOnly = localContracts.filter(c => (c as any)._isOfflineSaved && !cloudIds.has(c.id));
-                
                 const map = new Map<string, Contract>();
+                localContracts.forEach(c => map.set(c.id || c.code, c));
                 cloudContracts.forEach(c => map.set(c.id || c.code, c));
-                offlineOnly.forEach(c => map.set(c.id || c.code, c));
-
                 const merged = Array.from(map.values()).sort((a, b) => 
                     new Date(b.createdDate || 0).getTime() - new Date(a.createdDate || 0).getTime()
                 );
-                await setLocalContracts(merged);
+                setLocalContracts(merged);
             }
         } catch (error) {
             logError("fetchContracts background sync", error, true);
@@ -340,7 +181,7 @@ export const createContractApi = async (contract: Contract): Promise<boolean> =>
             contracts = await getIndexedDBContracts();
         }
         const updatedContracts = [...contracts];
-        const index = updatedContracts.findIndex(c => c.id === contract.id || (c.code && contract.code && c.code.trim().toLowerCase() === contract.code.trim().toLowerCase()));
+        const index = updatedContracts.findIndex(c => c.id === contract.id || (c.code && c.code === contract.code));
         if (index >= 0) {
             updatedContracts[index] = contract;
         } else {
@@ -352,12 +193,12 @@ export const createContractApi = async (contract: Contract): Promise<boolean> =>
         if (isConfigured) {
             try {
                 const payload = mapContractToDb(contract);
-                const { error } = await supabase.from('contracts').upsert([payload], { onConflict: 'id' });
+                const { error } = await supabase.from('contracts').insert([payload]);
                 if (error) {
                     if (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist'))) {
                         console.warn("⚠️ Bảng contracts thiếu cột camelCase. Đang thử lại với kiểu cột snake_case...");
                         const snakePayload = mapContractToDbSnake(contract);
-                        const { error: err2 } = await supabase.from('contracts').upsert([snakePayload], { onConflict: 'id' });
+                        const { error: err2 } = await supabase.from('contracts').insert([snakePayload]);
                         if (err2) logError("createContractApi snake_case", err2);
                     } else {
                         logError("createContractApi camelCase", error);
@@ -375,51 +216,6 @@ export const createContractApi = async (contract: Contract): Promise<boolean> =>
     }
 };
 
-export const createContractBatchApi = async (newContractsList: Contract[]): Promise<{ success: boolean; count: number }> => {
-    if (!newContractsList || newContractsList.length === 0) return { success: true, count: 0 };
-    try {
-        // 1. Cập nhật lập tức vào RAM Cache & IndexedDB
-        let contracts = memoryContractsCache;
-        if (!contracts || contracts.length === 0) {
-            contracts = await getIndexedDBContracts();
-        }
-        const updatedContracts = [...contracts];
-        for (const item of newContractsList) {
-            const idx = updatedContracts.findIndex(c => c.id === item.id || (c.code && item.code && c.code.trim().toLowerCase() === item.code.trim().toLowerCase()));
-            if (idx >= 0) {
-                updatedContracts[idx] = item;
-            } else {
-                updatedContracts.unshift(item);
-            }
-        }
-        await setLocalContracts(updatedContracts);
-
-        // 2. Đồng bộ hàng loạt 1 lần lên Cloud Supabase (Atomic Bulk Upsert)
-        if (isConfigured) {
-            try {
-                const camelPayloads = newContractsList.map(c => mapContractToDb(c));
-                const { error } = await supabase.from('contracts').upsert(camelPayloads, { onConflict: 'id' });
-                if (error) {
-                    if (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist'))) {
-                        const snakePayloads = newContractsList.map(c => mapContractToDbSnake(c));
-                        const { error: err2 } = await supabase.from('contracts').upsert(snakePayloads, { onConflict: 'id' });
-                        if (err2) logError("createContractBatchApi snake_case", err2);
-                    } else {
-                        logError("createContractBatchApi camelCase", error);
-                    }
-                }
-            } catch (cloudErr) {
-                logError("createContractBatchApi Cloud sync", cloudErr);
-            }
-        }
-
-        return { success: true, count: newContractsList.length };
-    } catch (error) {
-        logError("createContractBatchApi Local error", error);
-        return { success: false, count: 0 };
-    }
-};
-
 export const updateContractApi = async (contract: Contract): Promise<boolean> => {
     try {
         // 1. Cập nhật RAM Cache & IndexedDB
@@ -428,24 +224,25 @@ export const updateContractApi = async (contract: Contract): Promise<boolean> =>
             contracts = await getIndexedDBContracts();
         }
         const updatedContracts = [...contracts];
-        const index = updatedContracts.findIndex(c => c.id === contract.id || (c.code && contract.code && c.code.trim().toLowerCase() === contract.code.trim().toLowerCase()));
+        const index = updatedContracts.findIndex(c => c.id === contract.id || (c.code && c.code === contract.code));
         if (index >= 0) {
             updatedContracts[index] = contract;
+            await setLocalContracts(updatedContracts);
         } else {
             updatedContracts.unshift(contract);
+            await setLocalContracts(updatedContracts);
         }
-        await setLocalContracts(updatedContracts);
 
         // 2. Thử đồng bộ lên Supabase
         if (isConfigured) {
             try {
                 const payload = mapContractToDb(contract);
-                const { error } = await supabase.from('contracts').upsert([payload], { onConflict: 'id' });
+                const { error } = await supabase.from('contracts').update(payload).eq('id', contract.id);
                 if (error) {
                     if (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist'))) {
                         console.warn("⚠️ Bảng contracts thiếu cột camelCase. Đang thử lại cập nhật với kiểu cột snake_case...");
                         const snakePayload = mapContractToDbSnake(contract);
-                        const { error: err2 } = await supabase.from('contracts').upsert([snakePayload], { onConflict: 'id' });
+                        const { error: err2 } = await supabase.from('contracts').update(snakePayload).eq('id', contract.id);
                         if (err2) logError("updateContractApi snake_case", err2);
                     } else {
                         logError("updateContractApi camelCase", error);

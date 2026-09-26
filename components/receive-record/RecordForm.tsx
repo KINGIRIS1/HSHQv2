@@ -7,7 +7,6 @@ import { getDepartmentForRecord } from '../../utils/appHelpers';
 import { getVerifiedUniqueRecordCode, checkRecordCodeExistsInDb } from '../../services/apiRecords';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile } from '../../services/attachmentStorage';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2 } from 'lucide-react';
-import { CertificateOwnersSection } from '../common/CertificateOwnersSection';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
@@ -293,16 +292,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         return; 
     }
 
-    if (!isCongVan) {
-        if (!formData.customerName?.trim() || !formData.cccd?.trim() || !formData.phoneNumber?.trim() || !formData.customerAddress?.trim()) {
-            setNotification({ 
-                type: 'error', 
-                message: "Vui lòng nhập đầy đủ thông tin bắt buộc (*): Chủ sử dụng, Số CCCD, Số điện thoại và Địa chỉ trước khi tiếp nhận!" 
-            });
-            return;
-        }
-    }
-
     setLoading(true);
 
     const recBy = formData.receivedBy || currentUser?.employeeId || currentUser?.name || currentUser?.username || '';
@@ -526,9 +515,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                             <div><label className={labelClass}>Chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className={inputClass} placeholder="Nguyễn Văn A..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
-                            <div><label className={labelClass}>CCCD <span className="text-red-500">*</span></label><input type="text" required className={inputClass} placeholder="0123456789..." value={formData.cccd || ''} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
-                            <div><label className={labelClass}>Địa chỉ chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className={inputClass} placeholder="Địa chỉ thường trú..." value={formData.customerAddress || ''} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
-                            <div><label className={labelClass}>Số điện thoại <span className="text-red-500">*</span></label><input type="text" required className={inputClass} placeholder="09xxxxxxxx" value={formData.phoneNumber || ''} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
+                            <div><label className={labelClass}>CCCD</label><input type="text" className={inputClass} placeholder="0123456789..." value={formData.cccd || ''} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
+                            <div><label className={labelClass}>Địa chỉ chủ sử dụng</label><input type="text" className={inputClass} placeholder="Địa chỉ thường trú..." value={formData.customerAddress || ''} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
+                            <div><label className={labelClass}>Số điện thoại</label><input type="text" className={inputClass} placeholder="09xxxxxxxx" value={formData.phoneNumber || ''} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
                         </div>
                     )}
                 </div>
@@ -578,27 +567,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         </div>
                     )}
                 </div>
-                {/* Chủ hồ sơ (Người đứng tên Giấy chứng nhận) cho hồ sơ 3.x */}
-                {(isCertificateRecordType(formData.recordType) || (formData.group && formData.group.startsWith('3')) || (formData.recordType && formData.recordType.startsWith('3.'))) && (
-                    <CertificateOwnersSection
-                        owners={formData.certificateOwners}
-                        onChange={(newOwners) => setFormData(prev => ({ ...prev, certificateOwners: newOwners }))}
-                        applicantName={formData.customerName || ''}
-                        applicantCccd={formData.cccd || ''}
-                        applicantPhone={formData.phoneNumber || ''}
-                        applicantAddress={formData.customerAddress || ''}
-                        onSyncApplicant={(owner1) => {
-                            setFormData(prev => ({
-                                ...prev,
-                                customerName: owner1.name || prev.customerName,
-                                cccd: owner1.cccd || prev.cccd,
-                                phoneNumber: owner1.phone || prev.phoneNumber,
-                                customerAddress: owner1.address || prev.customerAddress
-                            }));
-                        }}
-                    />
-                )}
-
                 {/* Nội dung chi tiết */}
                 <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-2 flex items-center gap-1.5 border-b pb-2 border-slate-100">

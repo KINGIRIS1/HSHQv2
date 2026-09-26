@@ -15,7 +15,6 @@ import {
   Settings,
 } from 'lucide-react';
 import { RecordFile, RecordStatus } from '../../types';
-import { formatDateTimeVN } from '../../utils/appHelpers';
 import {
   getProcedureByRecordType,
   calculateRecordStepSla,
@@ -65,8 +64,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
   const currentStep = steps[activeIndex] || steps[0];
 
   // Tính SLA cho bước hiện tại
-  const stepKey = currentStep ? ((currentStep.statusKey || currentStep.key || currentStep.name) as RecordStatus) : undefined;
-  const slaResult: StepSlaResult = calculateRecordStepSla(record, stepKey);
+  const slaResult: StepSlaResult = calculateRecordStepSla(record, currentStep, procedure);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
@@ -79,16 +77,12 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-sm text-slate-100">
-                Bước {activeIndex + 1}/{steps.length}: {currentStep ? ((currentStep.name || currentStep.label || 'TIẾP NHẬN').toUpperCase()) : 'TIẾP NHẬN'}
+                Bước {activeIndex + 1}/{steps.length}: {currentStep ? currentStep.name.toUpperCase() : 'TIẾP NHẬN'}
               </span>
-              {slaResult.startTime && (
-                <>
-                  <span className="text-slate-400 text-xs">|</span>
-                  <span className="text-xs font-semibold text-slate-300">
-                    Bắt đầu: <strong className="text-blue-300">{formatDateTimeVN(slaResult.startTime, 'start')}</strong>
-                  </span>
-                </>
-              )}
+              <span className="text-slate-400 text-xs">|</span>
+              <span className="text-xs font-semibold text-slate-300">
+                Định mức: <strong className="text-white">{slaResult.durationLabel}</strong>
+              </span>
             </div>
           </div>
         </div>
@@ -98,7 +92,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
           {slaResult.isPaused ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5 shadow-2xs">
               <Pause size={13} className="shrink-0 animate-pulse" />
-              <span>{slaResult.stepHeaderText ? (slaResult.stepHeaderText.split('|')[2] || slaResult.stepHeaderText) : `Tạm dừng tính SLA (${slaResult.pauseReason || 'Theo luật'})`}</span>
+              <span>{slaResult.stepHeaderText.split('|')[2] || `Tạm dừng tính SLA (${slaResult.pauseReason})`}</span>
             </span>
           ) : slaResult.isOverdue ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-400/40 flex items-center gap-1.5 shadow-2xs animate-pulse">
@@ -162,15 +156,15 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="truncate max-w-[130px]" title={step.name || step.label}>
-                      {step.name || step.label}
+                    <span className="truncate max-w-[130px]" title={step.name}>
+                      {step.name}
                     </span>
                     <span
                       className={`text-[10px] font-normal ${
                         isCurrent ? 'text-blue-100' : isCompleted ? 'text-emerald-700' : 'text-slate-400'
                       }`}
                     >
-                      {isCompleted ? 'Đã hoàn tất' : isCurrent ? 'Đang thực hiện' : 'Chờ thực hiện'}
+                      {step.isSlaPaused ? 'Tạm dừng SLA' : formatDurationShort(step.totalMinutes)}
                     </span>
                   </div>
                 </div>
@@ -197,12 +191,12 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
               if (idx === activeIndex) return null;
               return (
                 <button
-                  key={step.id || idx}
+                  key={step.id}
                   type="button"
-                  onClick={() => onChangeStatus((step.statusKey || step.key || RecordStatus.RECEIVED) as RecordStatus)}
+                  onClick={() => onChangeStatus(step.statusKey)}
                   className="px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <span>➔ Bước {idx + 1}: {step.name || step.label}</span>
+                  <span>➔ Bước {idx + 1}: {step.name}</span>
                 </button>
               );
             })}

@@ -99,7 +99,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   onCreateLiquidation,
   onMapCorrection,
 }) => {
-  // Thêm tab 'pending_sign', 'overdue'
+  // Thêm tab 'pending_sign'
   const [activeTab, setActiveTab] = useState<
     | "all"
     | "pending"
@@ -107,11 +107,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     | "pending_sign"
     | "finished"
     | "reminder"
-    | "overdue"
   >(isDirector ? "pending_sign" : "pending");
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const itemsPerPage = 10;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterFromDate, setFilterFromDate] = useState("");
@@ -553,67 +552,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     });
   }, [myRecords, searchTerm]);
 
-  // Chi tiết thời gian quá hạn chính xác theo quy tắc mới
-  const getOverdueDetails = (record: RecordFile) => {
-    if (
-      record.status === RecordStatus.HANDOVER ||
-      record.status === RecordStatus.RETURNED ||
-      record.status === RecordStatus.WITHDRAWN ||
-      record.status === RecordStatus.REJECTED ||
-      record.status === RecordStatus.SIGNED ||
-      record.exportBatch ||
-      record.exportDate ||
-      record.resultReturnedDate
-    ) {
-      return null;
-    }
-
-    if (!record.deadline) return null;
-
-    const deadline = parseSafeDate(record.deadline);
-    if (!deadline || isNaN(deadline.getTime())) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    deadline.setHours(0, 0, 0, 0);
-
-    const diffTime = today.getTime() - deadline.getTime();
-    if (diffTime <= 0) return null;
-
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    let text = "";
-    if (diffDays === 0) {
-      text = "Quá hạn hôm nay";
-    } else if (diffDays < 30) {
-      text = `Quá hạn ${diffDays} ngày`;
-    } else {
-      const months = Math.floor(diffDays / 30);
-      const days = diffDays % 30;
-      if (days === 0) {
-        text = `Quá hạn ${months} tháng`;
-      } else {
-        text = `Quá hạn ${months} tháng ${days} ngày`;
-      }
-    }
-
-    return {
-      isOverdue: true,
-      totalDays: diffDays,
-      text,
-    };
-  };
-
-  // 6. Hồ sơ Quá hạn (chưa hoàn thành và quá hạn trả)
-  const overdueRecords = useMemo(() => {
-    let list = myRecords.filter((r) => getOverdueDetails(r) !== null);
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
-
-  const totalOverdueCount = useMemo(() => {
-    return myRecords.filter((r) => getOverdueDetails(r) !== null).length;
-  }, [myRecords]);
-
   // Helper filter & sort chung
   function filterAndSort(list: RecordFile[], term: string, sort: any) {
     // 1. Time range filter
@@ -684,9 +622,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             ? reviewRecords
             : activeTab === "finished"
               ? finishedRecords
-              : activeTab === "overdue"
-                ? overdueRecords
-                : reminderRecords;
+              : reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
 
@@ -1537,8 +1473,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return "Trình ký";
       case "finished":
         return "Hoàn thành";
-      case "overdue":
-        return "Quá hạn";
       case "reminder":
         return "Nhắc việc";
       default:
@@ -1576,10 +1510,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             Danh sách hồ sơ bạn đang phụ trách.
           </p>
         </div>
-        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-3 sm:grid-cols-5"} sm:flex gap-1.5 md:gap-3 w-full md:w-auto justify-center`}>
+        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-5" : "grid-cols-4"} sm:flex gap-1.5 md:gap-3 w-full md:w-auto justify-center`}>
           <div 
             onClick={() => { setActiveTab("all"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-slate-50 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm bg-slate-100" : "border-slate-200 hover:border-slate-400"} min-w-0 md:min-w-[95px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-slate-50 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm bg-slate-100" : "border-slate-200 hover:border-slate-400"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
             title="Xem tất cả hồ sơ"
           >
             <div className="text-xs md:text-sm text-slate-700 uppercase font-bold tracking-wide leading-tight">
@@ -1588,7 +1522,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           </div>
           <div 
             onClick={() => { setActiveTab("pending"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-blue-50/60 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm bg-blue-50" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[105px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-blue-50/60 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm bg-blue-50" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
             title="Xem danh sách đang thực hiện"
           >
             <div className="text-xs md:text-sm text-blue-700 uppercase font-bold tracking-wide leading-tight">
@@ -1598,7 +1532,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           {(isChecker || isMeasurementTeam) && (
             <div 
               onClick={() => { setActiveTab("pending_check"); setCurrentPage(1); setSearchTerm(""); }}
-              className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-orange-50/60 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm bg-orange-50" : "border-orange-100 hover:border-orange-300"} min-w-0 md:min-w-[105px] flex flex-col justify-center`}
+              className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-orange-50/60 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm bg-orange-50" : "border-orange-100 hover:border-orange-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
               title="Xem danh sách kiểm tra"
             >
               <div className="text-xs md:text-sm text-orange-700 uppercase font-bold tracking-wide leading-tight">
@@ -1608,7 +1542,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           )}
           <div 
             onClick={() => { setActiveTab("pending_sign"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-purple-50/60 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm bg-purple-50" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[105px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-purple-50/60 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm bg-purple-50" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
             title="Xem danh sách trình ký"
           >
             <div className="text-xs md:text-sm text-purple-700 uppercase font-bold tracking-wide leading-tight">
@@ -1617,27 +1551,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           </div>
           <div 
             onClick={() => { setActiveTab("finished"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-green-50/60 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm bg-green-50" : "border-green-100 hover:border-green-300"} min-w-0 md:min-w-[105px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-green-50/60 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm bg-green-50" : "border-green-100 hover:border-green-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
             title="Xem danh sách hoàn thành"
           >
             <div className="text-xs md:text-sm text-green-700 uppercase font-bold tracking-wide leading-tight">
               Hoàn thành
-            </div>
-          </div>
-          <div 
-            onClick={() => { setActiveTab("overdue"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2 bg-red-50/70 rounded-lg border ${activeTab === "overdue" ? "ring-2 ring-red-500 border-red-500 font-extrabold shadow-sm bg-red-100/90" : "border-red-200 hover:border-red-400"} min-w-0 md:min-w-[110px] flex flex-col justify-center relative`}
-            title="Xem danh sách hồ sơ quá hạn"
-          >
-            <div className="flex items-center justify-center gap-1.5">
-              <span className="text-xs md:text-sm text-red-700 uppercase font-bold tracking-wide leading-tight flex items-center gap-1">
-                🔴 Quá hạn
-              </span>
-              {totalOverdueCount > 0 && (
-                <span className="bg-red-600 text-white text-[10px] md:text-xs font-black px-1.5 py-0.5 rounded-full shadow-xs leading-none">
-                  {totalOverdueCount}
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -1958,26 +1876,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 {formatDateTime(r.reminderDate || undefined)}
                               </div>
                             ) : (
-                              <div>
-                                <div
-                                  className={`flex items-center gap-1.5 ${deadlineStatus.color}`}
-                                >
-                                  {deadlineStatus.icon}
-                                  <span>{formatDate(r.deadline || undefined)}</span>
-                                  <span className="text-[10px] uppercase ml-1">
-                                    {deadlineStatus.text}
-                                  </span>
-                                </div>
-                                {(() => {
-                                  const overdueInfo = getOverdueDetails(r);
-                                  if (!overdueInfo) return null;
-                                  return (
-                                    <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-600 text-white text-[11px] font-bold shadow-xs">
-                                      <span>🔴</span>
-                                      <span>{overdueInfo.text}</span>
-                                    </div>
-                                  );
-                                })()}
+                              <div
+                                className={`flex items-center gap-1.5 ${deadlineStatus.color}`}
+                              >
+                                {deadlineStatus.icon}
+                                <span>{formatDate(r.deadline || undefined)}</span>
+                                <span className="text-[10px] uppercase ml-1">
+                                  {deadlineStatus.text}
+                                </span>
                               </div>
                             )}
                           </td>
@@ -2309,9 +2215,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           )}
         </div>
 
-        {/* PAGINATION FOOTER (Desktop only) */}
+        {/* PAGINATION FOOTER (Desktop only; mobile uses smooth infinite scroll) */}
         {displayRecords.length > 0 && (
-          <div className="sticky bottom-0 z-20 shadow-md border-t border-gray-200 p-3 bg-white hidden md:flex justify-between items-center shrink-0">
+          <div className="border-t border-gray-100 p-3 bg-gray-50 hidden md:flex justify-between items-center shrink-0">
             <span className="text-xs text-gray-500">
               Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> -{" "}
               <strong>
@@ -2319,44 +2225,26 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               </strong>{" "}
               trên tổng <strong>{displayRecords.length}</strong>
             </span>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                <span>Số dòng:</span>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="border border-gray-300 rounded px-2 py-1 bg-white text-xs outline-none focus:ring-1 focus:ring-blue-500 font-bold cursor-pointer"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <span className="text-xs font-medium mx-2">
-                  Trang {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="text-xs font-medium mx-2">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={currentPage === totalPages}
+                className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={18} />
+              </button>
             </div>
           </div>
         )}

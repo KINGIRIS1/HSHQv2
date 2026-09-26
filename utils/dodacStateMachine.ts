@@ -194,6 +194,8 @@ export function getDodacWorkflowStage(record: Partial<RecordFile>): { stageIndex
   }
 }
 
+import { loadRegistrationSlaFullConfig } from '../components/registration/RegistrationSlaStatusView';
+
 export function getDodacWorkflow(procedureCode?: string | null): {
   code: string;
   name: string;

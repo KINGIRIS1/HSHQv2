@@ -33,7 +33,6 @@ import {
 import { DetailModal } from '../DetailModal';
 import { ExtendDeadlineModal } from '../ExtendDeadlineModal';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, getBatchDisplayParts } from '../../utils/appHelpers';
-import { getRecordSlaBadge } from '../../utils/registrationWorkflows';
 import { hasRecordActionPermission } from '../../utils/permissionUtils';
 
 interface RecordSearchProps {
@@ -889,6 +888,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                         <td key="code" className="p-3 align-middle font-bold text-blue-600 cursor-pointer text-center" onClick={() => setSelectedDetailRecord(r)}>
                                                             <div className="flex flex-col items-center gap-0.5">
                                                                 <span className="text-sm font-bold">{r.code}</span>
+                                                                {isOverdue && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded border border-red-200 font-bold">Quá hạn</span>}
                                                             </div>
                                                         </td>
                                                     );
@@ -1025,25 +1025,12 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                             {r.receiptNumber || '--'}
                                                         </td>
                                                     );
-                                                case 'status': {
-                                                    const slaBadge = getRecordSlaBadge(r);
+                                                case 'status':
                                                     return (
                                                         <td key="status" className="p-3 align-middle text-center">
-                                                            <div className="flex flex-col items-center gap-1">
-                                                                <StatusBadge 
-                                                                    status={r.status} 
-                                                                    isApproaching={slaBadge?.isApproaching}
-                                                                    isOverdue={slaBadge?.isOverdue}
-                                                                />
-                                                                {slaBadge && (slaBadge.isOverdue || slaBadge.isPaused) && slaBadge.label && (
-                                                                    <span className={`inline-block px-1.5 py-0.5 text-[10px] leading-tight rounded-md text-center max-w-[130px] shadow-2xs border ${slaBadge.badgeClass}`}>
-                                                                        {slaBadge.label}
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                                            <StatusBadge status={r.status} />
                                                         </td>
                                                     );
-                                                }
                                                 default:
                                                     return null;
                                             }

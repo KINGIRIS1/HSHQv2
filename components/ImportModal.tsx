@@ -45,24 +45,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     }
   }, [isOpen, initialMode]);
 
-  const parseExcelDate = (input: any, fieldLabel?: string, errorsList?: string[], isDeadline: boolean = false): string | undefined => {
+  const parseExcelDate = (input: any, fieldLabel?: string, errorsList?: string[]): string | undefined => {
       if (input === undefined || input === null || input === '') return undefined;
       const strVal = String(input).trim();
       if (strVal === '' || strVal === '-' || strVal === 'N/A' || strVal === 'null' || strVal === 'undefined') return undefined;
 
       const dateIso = keepOnlyDate(input);
       if (dateIso) {
-          // Kiểm tra xem chuỗi đầu vào có sẵn phần giờ hay không
-          const timeMatch = strVal.match(/[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
-          if (timeMatch) {
-              const hh = String(timeMatch[1]).padStart(2, '0');
-              const mm = String(timeMatch[2]).padStart(2, '0');
-              const ss = timeMatch[3] ? String(timeMatch[3]).padStart(2, '0') : '00';
-              return `${dateIso}T${hh}:${mm}:${ss}`;
-          }
-          // Nếu người dùng nhập chỉ ngày tháng năm -> Lấy mặc định giờ đầu tiên của ngày làm việc (07:30:00), riêng hạn trả là 17:30:00
-          const defaultHour = isDeadline ? 'T17:30:00' : 'T07:30:00';
-          return `${dateIso}${defaultHour}`;
+          return dateIso;
       }
 
       if (fieldLabel && errorsList) {
@@ -218,7 +208,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             const deadlineRaw = getVal(['HẸN TRẢ', 'DEADLINE', 'deadline']);
-            if (deadlineRaw !== undefined) record.deadline = parseExcelDate(deadlineRaw, 'Ngày hẹn trả', errors, true);
+            if (deadlineRaw !== undefined) record.deadline = parseExcelDate(deadlineRaw, 'Ngày hẹn trả', errors);
 
             const completedWorkDateRaw = getVal(['NGÀY THỰC HIỆN', 'NGÀY ĐÃ THỰC HIỆN', 'completedworkdate', 'completed_work_date', 'completedWorkDate']);
             if (completedWorkDateRaw !== undefined) record.completedWorkDate = parseExcelDate(completedWorkDateRaw, 'Ngày thực hiện', errors);

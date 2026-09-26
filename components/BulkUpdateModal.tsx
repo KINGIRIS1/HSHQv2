@@ -324,11 +324,10 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     try {
         let isoDate: string | undefined = undefined;
         if (customDate) {
-            // Khi người dùng chỉ nhập ngày tháng năm -> Tự động lấy giờ đầu tiên của ngày làm việc (07:30:00)
-            const cleanD = customDate.trim();
-            const datePart = cleanD.split('T')[0].split(' ')[0];
-            const timePart = cleanD.includes('T') ? cleanD.split('T')[1] : (cleanD.includes(' ') ? cleanD.split(' ')[1] : '07:30:00');
-            isoDate = `${datePart}T${timePart.length === 5 ? timePart + ':00' : timePart}`;
+            const d = new Date(customDate.includes('T') ? customDate : customDate + "T12:00:00");
+            if (!isNaN(d.getTime())) {
+                isoDate = d.toISOString();
+            }
         }
         const targetIds = activeRecordsToUpdate.map(r => r.id);
         

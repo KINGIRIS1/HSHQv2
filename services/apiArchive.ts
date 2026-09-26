@@ -307,24 +307,7 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
 export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
     const d = (typeof r.data === 'object' && r.data !== null) ? r.data : {};
     const code = r.code || r.so_hieu || d.ma_ho_so || r.id || '';
-    let customerName = r.customerName || r.noi_nhan_gui || d.ten_chu_su_dung || '';
-
-    // Trích xuất danh sách Chủ hồ sơ (Người đứng tên Giấy chứng nhận)
-    let certOwners: any[] = [];
-    const rawCert = r.certificateOwners || r.certificate_owners || d.certificateOwners || d.certificate_owners;
-    if (Array.isArray(rawCert)) {
-      certOwners = rawCert;
-    } else if (typeof rawCert === 'string') {
-      try { certOwners = JSON.parse(rawCert); } catch { certOwners = []; }
-    }
-
-    if (certOwners.length > 0) {
-      const allNames = certOwners.map((o: any) => o?.name ? String(o.name).trim() : '').filter(Boolean);
-      if (allNames.length > 0) {
-        customerName = allNames.join(', ');
-      }
-    }
-
+    const customerName = r.customerName || r.noi_nhan_gui || d.ten_chu_su_dung || '';
     const recordType = r.recordType || r.content || r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận';
     const ward = r.ward || d.dia_danh || d.xa_phuong || '';
     const mapSheet = r.mapSheet || d.so_to || d.to_ban_do || '';
@@ -354,8 +337,6 @@ export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
         rawStatus: r.status || d.status || '',
         ma_ho_so: code,
         ten_chu_su_dung: customerName,
-        certificateOwners: certOwners,
-        certificate_owners: certOwners,
         loai_bien_dong: recordType,
         loai_gcn: d.loai_gcn || 'GCN mới',
         dia_danh: ward,

@@ -64,7 +64,7 @@ const SystemView: React.FC<SystemViewProps> = ({
     }, []);
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col flex-1 min-h-full animate-fade-in-up">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
             {/* TABS */}
             <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
                 {isAdmin && (
@@ -108,7 +108,7 @@ const SystemView: React.FC<SystemViewProps> = ({
             </div>
 
             {/* CONTENT */}
-            <div className="flex-1 flex flex-col p-4">
+            <div className="flex-1 overflow-hidden flex flex-col p-4">
                 {activeTab === 'users' && isAdmin && (
                     <UserManagement 
                         users={users} 

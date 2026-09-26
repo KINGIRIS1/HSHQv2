@@ -7,10 +7,8 @@ import { extractRecordSequence, checkRecordCodeExistsInDb } from '../services/ap
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
-import { findMatchingContract } from '../utils/contractMatching';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile, isPreviewableFile } from '../services/attachmentStorage';
 import DossierComponentSection from './receive-record/DossierComponentSection';
-import { CertificateOwnersSection } from './common/CertificateOwnersSection';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
@@ -370,7 +368,29 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 // 2. Tra cứu hợp đồng giống DetailModal
                 try {
                     const fetchedContracts = await fetchContracts();
-                    const match = findMatchingContract(dataToSet as any, fetchedContracts);
+                    const match = fetchedContracts.find(c => {
+                        if (!c) return false;
+                        const cAddr = (c.customerAddress || '').trim().toLowerCase();
+                        const cCode = (c.code || '').trim().toLowerCase();
+                        const rCode = (dataToSet.code || '').trim().toLowerCase();
+                        const cName = (c.customerName || '').trim().toLowerCase();
+                        const rName = (dataToSet.customerName || '').trim().toLowerCase();
+                        const cPlot = (c.landPlot || '').trim().toLowerCase();
+                        const rPlot = (dataToSet.landPlot || '').trim().toLowerCase();
+                        const cMap = (c.mapSheet || '').trim().toLowerCase();
+                        const rMap = (dataToSet.mapSheet || '').trim().toLowerCase();
+
+                        const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+                        if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+                        if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+                        if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+                        if (rName && cName && rName === cName) {
+                            if (rPlot && cPlot && rPlot === cPlot) return true;
+                            if (rMap && cMap && rMap === cMap) return true;
+                        }
+                        return false;
+                    });
                     
                     if (match) {
                         const isLiquidated = Boolean(match.liquidationAmount && match.liquidationAmount > 0 && match.liquidationDate);
@@ -1341,27 +1361,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         </div>
                     )}
                 </div>
-
-                {/* BẢNG CHỦ HỒ SƠ (NGƯỜI ĐỨNG TÊN GCN) DÀNH CHO HỒ SƠ 3.X */}
-                {(isCertificateRecordType(formData.recordType) || (formData.group && formData.group.startsWith('3')) || (formData.recordType && formData.recordType.startsWith('3.'))) && (
-                    <CertificateOwnersSection
-                        owners={formData.certificateOwners}
-                        onChange={(newOwners) => setFormData(prev => ({ ...prev, certificateOwners: newOwners }))}
-                        applicantName={val(formData.customerName)}
-                        applicantCccd={val(formData.cccd)}
-                        applicantPhone={val(formData.phoneNumber)}
-                        applicantAddress={val(formData.customerAddress)}
-                        onSyncApplicant={(owner1) => {
-                            setFormData(prev => ({
-                                ...prev,
-                                customerName: owner1.name || prev.customerName,
-                                cccd: owner1.cccd || prev.cccd,
-                                phoneNumber: owner1.phone || prev.phoneNumber,
-                                customerAddress: owner1.address || prev.customerAddress
-                            }));
-                        }}
-                    />
-                )}
 
                 {/* 4. NỘI DUNG & KỸ THUẬT */}
                 <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm">

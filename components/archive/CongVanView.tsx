@@ -12,7 +12,6 @@ import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
 import StatusBadge from '../StatusBadge';
-import { getRecordSlaBadge } from '../../utils/registrationWorkflows';
 import DeleteConfirmModal from '../DeleteConfirmModal';
 import * as XLSX from 'xlsx-js-style';
 
@@ -777,7 +776,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 <th className="p-3 w-28 text-center">Ngày</th>
                                 <th className="p-3 w-64 text-center">Trích yếu</th>
                                 <th className="p-3 w-40 text-center">Cơ quan phát hành</th>
-                                <th className="p-3 w-32 text-center">Trạng thái</th>
+                                {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
                                 {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
                                 {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày giao</th>}
                                 <th className="p-3 w-32 text-center">Thao tác</th>
@@ -794,31 +793,11 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <td className="p-3 font-mono text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
                                     <td className="p-3 text-gray-800">{r.trich_yeu}</td>
                                     <td className="p-3 text-gray-600">{toTitleCase(r.noi_nhan_gui)}</td>
-                                    <td className="p-3 text-center">
-                                        {(() => {
-                                            const slaBadge = getRecordSlaBadge({
-                                                id: r.id,
-                                                code: r.so_hieu,
-                                                status: r.status as any,
-                                                deadline: r.data?.hen_tra || r.data?.deadline,
-                                                data: r.data
-                                            } as RecordFile);
-                                            return (
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <StatusBadge 
-                                                        status={r.status} 
-                                                        isApproaching={slaBadge?.isApproaching}
-                                                        isOverdue={slaBadge?.isOverdue}
-                                                    />
-                                                    {slaBadge && (slaBadge.isOverdue || slaBadge.isPaused) && slaBadge.label && (
-                                                        <span className={`inline-block px-1.5 py-0.5 text-[10px] leading-tight rounded-md text-center max-w-[130px] shadow-2xs border ${slaBadge.badgeClass}`}>
-                                                            {slaBadge.label}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            );
-                                        })()}
-                                    </td>
+                                    {(subTab === 'all') && (
+                                        <td className="p-3 text-center">
+                                            <StatusBadge status={r.status} />
+                                        </td>
+                                    )}
                                     {(subTab !== 'draft') && (
                                         <td className="p-3 text-indigo-600 font-medium">
                                             {r.data?.assigned_to ? (

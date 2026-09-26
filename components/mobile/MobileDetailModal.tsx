@@ -13,14 +13,13 @@ import {
 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
-import { updateRecordApi, fetchContracts, updateContractApi } from '../../services/api';
+import { updateRecordApi, fetchContracts } from '../../services/api';
 import { previewAttachment, downloadAttachment, isPreviewableFile } from '../../services/attachmentStorage';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName, formatDateTimeVN } from '../../utils/appHelpers';
-import { getRegistrationWorkflowCategory, getRegistrationWorkflow, getWorkflowStepIndex, getStepSlaInfo, resolveWorkflowStepDetails } from '../../utils/registrationWorkflows';
+import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../../utils/appHelpers';
+import { getRegistrationWorkflowCategory, getRegistrationWorkflow, getWorkflowStepIndex, getStepSlaInfo } from '../../utils/registrationWorkflows';
 import { checkUserPermission, hasRecordActionPermission } from '../../utils/permissionUtils';
-import { findMatchingContract, isCoreCodeMatching } from '../../utils/contractMatching';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -186,21 +185,32 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       const fetchPrice = async () => {
         const fetchedContracts = await fetchContracts();
         setContracts(fetchedContracts);
-        const match = findMatchingContract(record, fetchedContracts);
+        const match = fetchedContracts.find(c => {
+            if (!c || !record) return false;
+            const cAddr = (c.customerAddress || '').trim().toLowerCase();
+            const cCode = (c.code || '').trim().toLowerCase();
+            const rCode = (record.code || '').trim().toLowerCase();
+            const cName = (c.customerName || '').trim().toLowerCase();
+            const rName = (record.customerName || '').trim().toLowerCase();
+            const cPlot = (c.landPlot || '').trim().toLowerCase();
+            const rPlot = (record.landPlot || '').trim().toLowerCase();
+            const cMap = (c.mapSheet || '').trim().toLowerCase();
+            const rMap = (record.mapSheet || '').trim().toLowerCase();
+
+            const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+            if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+            if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+            if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+            if (rName && cName && rName === cName) {
+                if (rPlot && cPlot && rPlot === cPlot) return true;
+                if (rMap && cMap && rMap === cMap) return true;
+            }
+            return false;
+        });
         
         if (match) {
           setMatchedContract(match);
-          const recData = (typeof record.data === 'object' && record.data !== null) ? record.data : {};
-          if (!recData.contractCode || match.customerAddress !== record.code) {
-            const updatedRecord = {
-              ...record,
-              data: { ...recData, contractCode: match.code, contractId: match.id }
-            };
-            updateRecordApi(updatedRecord).catch(() => {});
-            if (match.customerAddress !== record.code) {
-              updateContractApi({ ...match, customerAddress: record.code }).catch(() => {});
-            }
-          }
           setContractPrice(match.totalAmount ?? null);
           setContractSplitItems(match.splitItems || null);
           if (match.liquidationAmount !== null && match.liquidationAmount !== undefined && match.liquidationAmount > 0 && match.liquidationDate) {
@@ -453,7 +463,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           <div className="flex items-center gap-1.5">
             <Icon size={13} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
             <span className={`text-xs font-semibold ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-              {date ? formatDateTimeVN(date, (label?.toLowerCase().includes('hẹn') || label?.toLowerCase().includes('trả kết quả') || label?.toLowerCase().includes('bàn giao')) ? 'deadline' : 'start') : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
+              {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
             </span>
           </div>
           {subText && <p className="text-[10px] text-indigo-600 mt-0.5 italic">{subText}</p>}
@@ -735,9 +745,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
               <div className="text-center pb-3 mb-3 border-b border-slate-100">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Hạn trả kết quả</span>
-                <span className="text-xl font-bold text-blue-700 block font-mono mt-0.5">{formatDateTimeVN(record.deadline, 'deadline')}</span>
+                <span className="text-xl font-bold text-blue-700 block font-mono mt-0.5">{formatDate(record.deadline)}</span>
                 <span className="text-[11px] text-slate-500 font-medium inline-flex items-center gap-1 mt-1 bg-slate-50 px-2 py-0.5 rounded-full">
-                  <Calendar size={11} /> Tiếp nhận: {formatDateTimeVN(record.receivedDate, 'start')}
+                  <Calendar size={11} /> Tiếp nhận: {formatDate(record.receivedDate)}
                 </span>
               </div>
 
@@ -751,10 +761,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                           const isLast = idx === wf.steps.length - 1;
                           const isCompleted = idx < currentIdx || record.status === RecordStatus.RETURNED;
                           const isCurrent = idx === currentIdx;
-
-                          const { date: stepResolvedDate, assigneeInfo, isAssigned } = resolveWorkflowStepDetails(step, record, employees, users);
-                          const stepDate = stepResolvedDate;
-                          const isActive = Boolean(stepDate) || isCompleted || isCurrent || isAssigned;
+                          const stepDate = step.dateField ? (record as any)[step.dateField] : null;
+                          const isActive = Boolean(stepDate) || isCompleted || isCurrent;
 
                           let colorClass = {
                               text: 'text-emerald-600',
@@ -776,17 +784,41 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                               };
                           }
 
-                          let detailInfo = assigneeInfo || '';
-                          if (!detailInfo && isCurrent && record.assignedTo) {
+                          let detailInfo = '';
+                          if (step.key === RecordStatus.RECEIVED && record.receivedBy) {
+                              const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                              const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                              const name = receiver?.name || emp?.name || record.receivedBy;
+                              detailInfo = `${name} (${emp?.position || 'Nhân viên'})`;
+                          } else if (step.key === RecordStatus.APPRAISAL && record.assignedTo) {
                               const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                              detailInfo = emp ? `${emp.name} (${emp.position || 'Chuyên viên'})` : record.assignedTo;
+                              if (emp) detailInfo = `${emp.name} (${emp.position || 'Chuyên viên'})`;
+                          } else if (step.key === RecordStatus.PENDING_CHECK && record.checkedBy) {
+                              const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
+                                            users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
+                              if (checker) detailInfo = `${checker.name} (${(checker as any)?.position || 'Người kiểm tra'})`;
+                          } else if (step.key === RecordStatus.PENDING_SIGN && record.submittedTo) {
+                              const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
+                              const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
+                              if (director || emp) detailInfo = `${director?.name || emp?.name} (Lãnh đạo)`;
+                          } else if (step.key === RecordStatus.RETURNED && (record.receiverName || record.returnedBy)) {
+                              detailInfo = record.receiverName ? `Người nhận: ${record.receiverName}` : `Người trả: ${record.returnedBy}`;
+                          } else if (record.assignedTo && (isCurrent || step.key === record.status)) {
+                              const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                              if (emp) {
+                                  detailInfo = `${emp.name} (${emp.position || 'Chuyên viên'})`;
+                              } else {
+                                  detailInfo = record.assignedTo;
+                              }
                           }
 
-                          const subText = detailInfo || undefined;
+                          const subText = [detailInfo, step.durationLabel ? `SLA: ${step.durationLabel}` : '']
+                              .filter(Boolean)
+                              .join(' • ');
 
                           return (
                               <TimelineItem
-                                  key={step.key || idx}
+                                  key={step.key}
                                   date={stepDate}
                                   forceActive={isActive}
                                   label={step.label}

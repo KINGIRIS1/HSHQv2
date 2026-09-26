@@ -16,7 +16,6 @@ import {
   CreditCard,
   Printer,
   Settings,
-  BarChart3,
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus } from '../../types';
 import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
@@ -45,15 +44,11 @@ import { syncDangKyToVaoSo } from '../../services/apiArchive';
 interface RegistrationModuleViewProps {
   currentUser?: User | null;
   employees: Employee[];
-  setCurrentView?: (view: string) => void;
-  setReportMainTab?: (tab: 'measurement' | 'archive' | 'registration') => void;
 }
 
 export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   currentUser,
   employees,
-  setCurrentView,
-  setReportMainTab,
 }) => {
   const [records, setRecords] = useState<RecordFile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -353,18 +348,6 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              if (setReportMainTab) setReportMainTab('registration');
-              if (setCurrentView) setCurrentView('reports');
-            }}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-          >
-            <BarChart3 size={15} />
-            <span>📊 Báo cáo Cấp giấy</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setIsWorkflowModalOpen(true)}

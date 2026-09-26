@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { RecordFile, Employee, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
-import { getRegistrationWorkflowCategory, getProcedureByRecordType, getStepSlaInfo, getAppointmentInfo, getRecordSlaBadge } from '../../utils/registrationWorkflows';
+import { getRegistrationWorkflowCategory, getProcedureByRecordType, getStepSlaInfo, getAppointmentInfo } from '../../utils/registrationWorkflows';
 
 interface RegistrationRecordRowProps {
   record: RecordFile;
@@ -39,7 +39,17 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
   onAssign,
   employees = [],
 }) => {
-  const slaBadge = React.useMemo(() => getRecordSlaBadge(record), [record]);
+  const isOverdue = React.useMemo(() => {
+    if (
+      !record.deadline ||
+      record.status === RecordStatus.RETURNED ||
+      record.status === RecordStatus.HANDOVER
+    ) {
+      return false;
+    }
+    const today = new Date().toISOString().substring(0, 10);
+    return record.deadline < today;
+  }, [record.deadline, record.status]);
 
   const hasAttachments =
     (record.attachedFiles && record.attachedFiles.length > 0) ||
@@ -144,18 +154,9 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
               (e.name || '').trim().toLowerCase() === cleanKey
             );
             const displayName = emp && emp.name ? emp.name : record.assignedTo;
-            let assignedDateDisplay = null;
-            if (record.assignedAt) {
-              const dt = new Date(record.assignedAt);
-              if (!isNaN(dt.getTime())) {
-                const timeStr = dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                const dateStr = dt.toLocaleDateString('vi-VN');
-                assignedDateDisplay = `${timeStr} ${dateStr}`;
-              }
-            }
-            if (!assignedDateDisplay && record.assignedDate) {
-              assignedDateDisplay = record.assignedDate.split('T')[0].split('-').reverse().join('/');
-            }
+            const assignedDateDisplay = record.assignedDate 
+              ? record.assignedDate.split('T')[0].split('-').reverse().join('/') 
+              : null;
             return (
               <div className="flex flex-col gap-0.5">
                 <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-semibold text-xs">
@@ -197,7 +198,7 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
                 className={`flex items-center gap-1 font-bold ${
                   appInfo.phase === 'tax_notice'
                     ? 'text-indigo-700'
-                    : slaBadge?.isOverdue
+                    : isOverdue
                     ? 'text-red-600'
                     : 'text-emerald-700'
                 }`}
@@ -213,17 +214,8 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
 
       {/* Trạng thái */}
       <td className="py-2.5 px-3 text-center">
-        <div className="flex flex-col items-center gap-1">
-          <StatusBadge 
-            status={record.status} 
-            isApproaching={slaBadge?.isApproaching}
-            isOverdue={slaBadge?.isOverdue}
-          />
-          {slaBadge && (slaBadge.isOverdue || slaBadge.isPaused) && slaBadge.label && (
-            <span className={`inline-block px-2 py-0.5 text-[10px] leading-tight rounded-md text-center max-w-[140px] shadow-2xs border ${slaBadge.badgeClass}`}>
-              {slaBadge.label}
-            </span>
-          )}
+        <div className="flex flex-col items-center">
+          <StatusBadge status={record.status} />
         </div>
       </td>
 

@@ -198,8 +198,6 @@ export interface RecordFile {
   receivedBy?: string | null; // Người nhận hồ sơ (ID của user)
   deadline?: string | null;       
   assignedDate?: string | null;  
-  assignedAt?: string | null;   // Ngày giờ giao việc đầy đủ (VD: 2026-09-25T14:30:00)
-  assignedBy?: string | null;   // Người thực hiện giao việc (Lãnh đạo / Cán bộ)
   
   submissionDate?: string | null; // Ngày trình ký
   submittedTo?: string | null;    // Người được trình ký (ID của giám đốc)
@@ -325,20 +323,8 @@ export interface RecordFile {
   paymentReceiptDate?: string | null;
   payment_receipt_date?: string | null;
 
-  // Danh sách Chủ hồ sơ (Người đứng tên Giấy chứng nhận) cho hồ sơ 3.x
-  certificateOwners?: CertificateOwnerItem[] | string | null;
-  certificate_owners?: CertificateOwnerItem[] | string | null;
-
   updated_at?: string | null;
   updatedAt?: string | null;
-}
-
-export interface CertificateOwnerItem {
-  id?: string;
-  name: string;        // Họ tên chủ hồ sơ (Người đứng tên GCN) *
-  cccd: string;        // Giấy CMND/ CCCD *
-  phone?: string;      // Số điện thoại
-  address?: string;    // Địa chỉ chủ sử dụng
 }
 
 export type AttachmentDocType = 'GCN' | 'DON' | 'VBUQ' | 'BANVE' | 'BIENBAN' | 'TAICHINH' | 'PHIEU_KT' | 'TO_TRINH' | 'TLKHAC';

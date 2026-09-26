@@ -31,7 +31,6 @@ import {
   addCalendarDays,
   getStepSlaInfo,
 } from '../../utils/registrationWorkflows';
-import { CertificateOwnersSection } from '../common/CertificateOwnersSection';
 
 interface RegistrationDetailModalProps {
   isOpen: boolean;
@@ -309,71 +308,40 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block">
                     Phân công & Hạn giải quyết
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Cán bộ thụ lý</label>
-                      <select
-                        value={formData.assignedTo || ''}
-                        onChange={(e) => {
-                          const newStaff = e.target.value;
-                          const now = new Date();
-                          const isoNow = now.toISOString();
-                          const today = isoNow.split('T')[0];
-                          setFormData((prev) => ({
-                            ...prev,
-                            assignedTo: newStaff,
-                            assignedDate: prev.assignedDate || today,
-                            assignedAt: prev.assignedAt || isoNow,
-                            assignedBy: prev.assignedBy || currentUser?.name || 'Lãnh đạo',
-                          }));
-                        }}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-                      >
-                        <option value="">-- Chưa phân công --</option>
-                        {employees.map((emp) => (
-                          <option key={emp.id} value={emp.name}>
-                            {emp.name} {emp.department ? `(${emp.department})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Người giao việc</label>
-                      <input
-                        type="text"
-                        placeholder="Tên Lãnh đạo / Người giao"
-                        value={formData.assignedBy || ''}
-                        onChange={(e) => handleChange('assignedBy', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Cán bộ thụ lý</label>
+                    <select
+                      value={formData.assignedTo || ''}
+                      onChange={(e) => handleChange('assignedTo', e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                    >
+                      <option value="">-- Chưa phân công --</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.name}>
+                          {emp.name} {emp.department ? `(${emp.department})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Ngày giờ giao việc</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Ngày tiếp nhận</label>
                       <input
-                        type="datetime-local"
-                        value={
-                          formData.assignedAt
-                            ? formData.assignedAt.substring(0, 16)
-                            : formData.assignedDate
-                            ? `${formData.assignedDate}T08:00`
-                            : ''
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            assignedAt: val ? `${val}:00.000Z` : null,
-                            assignedDate: val ? val.split('T')[0] : prev.assignedDate,
-                          }));
-                        }}
+                        type="date"
+                        value={formData.receivedDate || ''}
+                        onChange={(e) => handleChange('receivedDate', e.target.value)}
                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                     </div>
-
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Hạn xử lý (Deadline)</label>
+                      <input
+                        type="date"
+                        value={formData.deadline || ''}
+                        onChange={(e) => handleChange('deadline', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label>
                       <input
@@ -384,37 +352,6 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                       />
                     </div>
                   </div>
-
-                  {/* Thẻ hiển thị trực quan thông tin Giao việc */}
-                  {formData.assignedTo && (
-                    <div className="p-3 bg-blue-50/90 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="flex items-center gap-1.5">
-                          <User size={14} className="text-blue-600" />
-                          <span>Cán bộ thụ lý: <strong className="text-blue-800">{formData.assignedTo}</strong></span>
-                        </span>
-                        <span className="text-[11px] text-blue-700 bg-blue-100 px-2 py-0.5 rounded font-mono border border-blue-200">
-                          <Clock size={12} className="inline mr-1 text-blue-600" />
-                          {formData.assignedAt
-                            ? new Date(formData.assignedAt).toLocaleString('vi-VN', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })
-                            : formData.assignedDate
-                            ? formData.assignedDate.split('-').reverse().join('/')
-                            : '—'}
-                        </span>
-                      </div>
-                      {formData.assignedBy && (
-                        <p className="text-[11px] text-slate-600 pl-5">
-                          Lãnh đạo giao việc: <strong className="text-slate-800">{formData.assignedBy}</strong>
-                        </p>
-                      )}
-                    </div>
-                  )}
 
                   {/* Thẻ thông tin Ngày hẹn trả theo giai đoạn quy trình */}
                   {(() => {
@@ -770,25 +707,6 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   />
                 </div>
               </div>
-
-              {/* Bảng Chủ hồ sơ (Người đứng tên Giấy chứng nhận) */}
-              <CertificateOwnersSection
-                owners={formData.certificateOwners}
-                onChange={(newOwners) => setFormData(prev => ({ ...prev, certificateOwners: newOwners }))}
-                applicantName={formData.customerName || ''}
-                applicantCccd={formData.cccd || ''}
-                applicantPhone={formData.phoneNumber || ''}
-                applicantAddress={formData.customerAddress || ''}
-                onSyncApplicant={(owner1) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    customerName: owner1.name || prev.customerName,
-                    cccd: owner1.cccd || prev.cccd,
-                    phoneNumber: owner1.phone || prev.phoneNumber,
-                    customerAddress: owner1.address || prev.customerAddress
-                  }));
-                }}
-              />
 
               {/* Khối 3: Nội dung & Ghi chú */}
               <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">

@@ -55,17 +55,6 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     }
   }
 
-  let certificateOwners: any[] = [];
-  if (Array.isArray(dbItem.certificateOwners)) {
-    certificateOwners = dbItem.certificateOwners;
-  } else if (Array.isArray(dbItem.certificate_owners)) {
-    certificateOwners = dbItem.certificate_owners;
-  } else if (typeof dbItem.certificateOwners === 'string') {
-    try { certificateOwners = JSON.parse(dbItem.certificateOwners); } catch { certificateOwners = []; }
-  } else if (typeof dbItem.certificate_owners === 'string') {
-    try { certificateOwners = JSON.parse(dbItem.certificate_owners); } catch { certificateOwners = []; }
-  }
-
   return {
     id: dbItem.id,
     code: dbItem.code || '',
@@ -91,8 +80,6 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     deadline: dbItem.deadline || '',
     assignedTo: dbItem.assignedTo || '',
     assignedDate: dbItem.assignedDate || '',
-    assignedAt: dbItem.assignedAt || dbItem.assigned_at || '',
-    assignedBy: dbItem.assignedBy || dbItem.assigned_by || '',
     checkedBy: dbItem.checkedBy || '',
     submissionDate: dbItem.submissionDate || '',
     approvalDate: dbItem.approvalDate || '',
@@ -158,8 +145,6 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     statusLogs,
     dossierComponents,
     attachedFiles,
-    certificateOwners,
-    certificate_owners: certificateOwners,
     data: dbItem.data || {},
     sourceTable: 'dangky_records',
   };
@@ -203,8 +188,6 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   }
   if (record.assignedTo !== undefined) payload.assignedTo = record.assignedTo;
   if (record.assignedDate !== undefined) payload.assignedDate = keepOnlyDate(record.assignedDate);
-  if (record.assignedAt !== undefined) payload.assignedAt = keepOnlyDateTime(record.assignedAt);
-  if (record.assignedBy !== undefined) payload.assignedBy = record.assignedBy;
   if (record.checkedBy !== undefined) payload.checkedBy = record.checkedBy;
   if (record.submissionDate !== undefined) payload.submissionDate = keepOnlyDate(record.submissionDate);
   if (record.approvalDate !== undefined) payload.approvalDate = keepOnlyDate(record.approvalDate);
@@ -571,20 +554,16 @@ export const assignDangkyRecordsBatch = async (
   recordIds: string[],
   assignedTo: string,
   assignedDate: string,
-  assignStep: 'appraisal' | 'tax_transfer' = 'appraisal',
-  assignedBy?: string
+  assignStep: 'appraisal' | 'tax_transfer' = 'appraisal'
 ): Promise<void> => {
   if (!recordIds || recordIds.length === 0) return;
 
   const targetStatus = assignStep === 'tax_transfer' ? RecordStatus.TAX_TRANSFER : RecordStatus.APPRAISAL;
-  const now = new Date().toISOString();
   const updateData: any = {
     assignedTo,
     assignedDate,
-    assignedAt: now,
-    assignedBy: assignedBy || null,
     status: targetStatus,
-    updatedAt: now,
+    updatedAt: new Date().toISOString(),
   };
 
   if (assignStep === 'appraisal') {

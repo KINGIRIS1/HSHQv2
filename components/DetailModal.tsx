@@ -10,7 +10,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper, findEmployeeMatch, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
 import { getRegistrationWorkflowCategory, getRegistrationWorkflow, getWorkflowStepIndex, getStepSlaInfo } from '../utils/registrationWorkflows';
 import { previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isPreviewableFile } from '../services/attachmentStorage';
 import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
@@ -932,22 +932,23 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                                        let detailInfo = '';
                                        if (step.key === RecordStatus.RECEIVED && record.receivedBy) {
-                                           const emp = findEmployeeMatch(record.receivedBy, employees, users);
-                                           detailInfo = `${emp ? emp.name : record.receivedBy} (${emp?.position || 'Nhân viên'})`;
+                                           const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                                           const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                                           const name = receiver?.name || emp?.name || record.receivedBy;
+                                           detailInfo = `${name} (${emp?.position || 'Nhân viên'})`;
                                        } else if (step.key === RecordStatus.APPRAISAL && record.assignedTo) {
-                                           const emp = findEmployeeMatch(record.assignedTo, employees, users);
+                                           const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
                                            if (emp) detailInfo = `${emp.name} (${emp.position || 'Chuyên viên'})`;
-                                           else detailInfo = record.assignedTo;
                                        } else if (step.key === RecordStatus.PENDING_CHECK && record.checkedBy) {
-                                           const checker = findEmployeeMatch(record.checkedBy, employees, users);
-                                           if (checker) detailInfo = `${checker.name} (${checker.position || 'Người kiểm tra'})`;
-                                           else detailInfo = record.checkedBy;
+                                           const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
+                                                         users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
+                                           if (checker) detailInfo = `${checker.name} (${(checker as any).position || 'Người kiểm tra'})`;
                                        } else if (step.key === RecordStatus.PENDING_SIGN && record.submittedTo) {
-                                           const director = findEmployeeMatch(record.submittedTo, employees, users);
-                                           if (director) detailInfo = `${director.name} (${director.position || 'Lãnh đạo'})`;
-                                           else detailInfo = record.submittedTo;
+                                           const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
+                                           const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
+                                           if (director || emp) detailInfo = `${director?.name || emp?.name} (Lãnh đạo)`;
                                        } else if (step.key === RecordStatus.RETURNED && (record.receiverName || record.returnedBy)) {
-                                           detailInfo = record.receiverName ? `Người nhận: ${record.receiverName}` : `Người trả: ${getEmpNameHelper(record.returnedBy, employees, users, false)}`;
+                                           detailInfo = record.receiverName ? `Người nhận: ${record.receiverName}` : `Người trả: ${record.returnedBy}`;
                                        }
 
                                        const subText = [detailInfo, step.durationLabel ? `SLA: ${step.durationLabel}` : '']
@@ -976,8 +977,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     icon={UserIcon}
                                     colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                                     subText={record.receivedBy ? (() => {
-                                        const emp = findEmployeeMatch(record.receivedBy, employees, users);
-                                        return `${emp ? emp.name : record.receivedBy} (${emp?.position || 'Nhân viên'})`;
+                                        const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                                        const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                                        const name = receiver?.name || emp?.name || record.receivedBy;
+                                        return `${name} (${emp?.position || 'Nhân viên'})`;
                                     })() : undefined}
                                 />
 
@@ -990,10 +993,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                         icon={UserIcon}
                                         colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
                                         subText={record.surveyorId ? (() => {
-                                            const emp = findEmployeeMatch(record.surveyorId, employees, users);
+                                            const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
                                             return emp ? `${emp.name} (${emp.position || 'Chuyên viên Ngoại nghiệp'})` : record.surveyorId;
                                         })() : (record.assignedTo ? (() => {
-                                            const emp = findEmployeeMatch(record.assignedTo, employees, users);
+                                            const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
                                             return emp ? `${emp.name} (${emp.position || 'Chuyên viên'})` : record.assignedTo;
                                         })() : undefined)}
                                     />
@@ -1004,10 +1007,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                         icon={UserIcon}
                                         colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
                                         subText={record.drafterId ? (() => {
-                                            const emp = findEmployeeMatch(record.drafterId, employees, users);
+                                            const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
                                             return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.drafterId;
                                         })() : (isPendingCheckActive && record.assignedTo ? (() => {
-                                            const emp = findEmployeeMatch(record.assignedTo, employees, users);
+                                            const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
                                             return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.assignedTo;
                                         })() : undefined)}
                                     />
@@ -1020,7 +1023,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                       icon={UserIcon}
                                       colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
                                       subText={(record.drafterId || record.assignedTo) ? (() => {
-                                          const emp = findEmployeeMatch(record.drafterId || record.assignedTo, employees, users);
+                                          const emp = employees.find(e => e.id === (record.drafterId || record.assignedTo) || e.name === (record.drafterId || record.assignedTo));
                                           return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : (record.drafterId || record.assignedTo);
                                       })() : undefined}
                                   />
@@ -1032,7 +1035,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                       icon={UserIcon}
                                       colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
                                       subText={record.assignedTo ? (() => {
-                                          const emp = findEmployeeMatch(record.assignedTo, employees, users);
+                                          const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
                                           if (!emp) return record.assignedTo;
                                           return `${emp.name} (${emp.position || 'Chuyên viên'})`;
                                       })() : undefined}
@@ -1049,9 +1052,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                         colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
                                         subText={(() => {
                                             if (record.checkedBy) {
-                                                const checker = findEmployeeMatch(record.checkedBy, employees, users);
+                                                const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
+                                                              users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
                                                 const name = checker?.name || record.checkedBy;
-                                                const pos = checker?.position || 'Người kiểm tra';
+                                                const pos = (checker as any)?.position || 'Người kiểm tra';
                                                 return `${name} (${pos})`;
                                             }
                                             if (isPendingCheckActive) {
@@ -1069,9 +1073,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     icon={Send}
                                     colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
                                     subText={record.submittedTo ? (() => {
-                                        const director = findEmployeeMatch(record.submittedTo, employees, users);
-                                        if (!director) return record.submittedTo;
-                                        return `${director.name} (${director.position || 'Lãnh đạo'})`;
+                                        const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
+                                        if (!director) {
+                                            const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
+                                            return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
+                                        }
+                                        const emp = employees.find(e => e.id === director.employeeId);
+                                        return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
                                     })() : undefined}
                                 />
                                 

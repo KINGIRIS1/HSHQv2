@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contract, User, Employee, UserRole } from '../../types';
-import { fetchContracts, parseContractDateMs, fixContractDateString, deleteContractApi } from '../../services/apiContracts';
-import { Search, RotateCcw, Edit, Download, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
+import { fetchContracts } from '../../services/api';
+import { Search, RotateCcw, Edit, Download, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
-import DuplicateRecordsAuditModal from '../DuplicateRecordsAuditModal';
 
 interface ContractListProps {
   contracts?: Contract[];
@@ -21,7 +20,6 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
   const [contracts, setContracts] = useState<Contract[]>(propContracts || []);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isDupAuditModalOpen, setIsDupAuditModalOpen] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,10 +48,10 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
   const filtered = useMemo(() => {
       let list = [...contracts];
       
-      // Sắp xếp danh sách hợp đồng/thanh lý theo ngày lập từ mới nhất đến cũ nhất (sử dụng parser thông minh)
+      // Sắp xếp danh sách hợp đồng/thanh lý theo ngày lập từ mới nhất đến cũ nhất
       list.sort((a, b) => {
-          const timeA = parseContractDateMs(a.createdDate);
-          const timeB = parseContractDateMs(b.createdDate);
+          const timeA = a.createdDate ? new Date(a.createdDate).getTime() : 0;
+          const timeB = b.createdDate ? new Date(b.createdDate).getTime() : 0;
           return timeB - timeA;
       });
 
@@ -119,17 +117,6 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                     onChange={(e) => setSearchTerm(e.target.value)} 
                 />
             </div>
-            
-            <button 
-                type="button" 
-                onClick={() => setIsDupAuditModalOpen(true)} 
-                className="p-2 bg-white text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer" 
-                title="Quét & Xóa hợp đồng trùng lặp"
-            >
-                <ShieldAlert size={16} className="text-purple-600" />
-                <span className="hidden md:inline">Quét trùng</span>
-            </button>
-
             <button onClick={loadContracts} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full" title="Tải lại"> 
                 <RotateCcw size={18} /> 
             </button>
@@ -171,13 +158,7 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                                 <td className="p-4 align-middle"> 
                                     <span className="px-2 py-1 bg-gray-100 rounded text-xs border border-gray-200">{c.contractType || 'Khác'}</span> 
                                 </td>
-                                <td className="p-4 text-gray-500 align-middle">
-                                    {c.createdDate ? (() => {
-                                        const { fixedDate } = fixContractDateString(c.createdDate);
-                                        const parts = fixedDate.split('-');
-                                        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : fixedDate;
-                                    })() : '-'}
-                                </td>
+                                <td className="p-4 text-gray-500 align-middle">{c.createdDate ? new Date(c.createdDate).toLocaleDateString('vi-VN') : '-'}</td>
                                 
                                 {/* Cột tiền */}
                                 {!isLiquidationMode && <td className="p-4 text-right font-mono font-bold text-gray-800 align-middle">{c.totalAmount?.toLocaleString('vi-VN')}</td>}
@@ -274,16 +255,6 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                 </div>
             </div>
         )}
-        {/* Modal Quét & Xóa hợp đồng trùng lặp */}
-        <DuplicateRecordsAuditModal
-            isOpen={isDupAuditModalOpen}
-            onClose={() => setIsDupAuditModalOpen(false)}
-            records={[]}
-            contracts={contracts}
-            onRefresh={async () => {
-                await loadContracts();
-            }}
-        />
     </div>
   );
 };
