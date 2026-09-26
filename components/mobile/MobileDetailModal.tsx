@@ -17,7 +17,7 @@ import { updateRecordApi, fetchContracts, updateContractApi } from '../../servic
 import { previewAttachment, downloadAttachment, isPreviewableFile } from '../../services/attachmentStorage';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../../utils/appHelpers';
+import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName, formatDateTimeVN } from '../../utils/appHelpers';
 import { getRegistrationWorkflowCategory, getRegistrationWorkflow, getWorkflowStepIndex, getStepSlaInfo, resolveWorkflowStepDetails } from '../../utils/registrationWorkflows';
 import { checkUserPermission, hasRecordActionPermission } from '../../utils/permissionUtils';
 import { findMatchingContract, isCoreCodeMatching } from '../../utils/contractMatching';
@@ -453,7 +453,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           <div className="flex items-center gap-1.5">
             <Icon size={13} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
             <span className={`text-xs font-semibold ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-              {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
+              {date ? formatDateTimeVN(date, (label?.toLowerCase().includes('hẹn') || label?.toLowerCase().includes('trả kết quả') || label?.toLowerCase().includes('bàn giao')) ? 'deadline' : 'start') : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
             </span>
           </div>
           {subText && <p className="text-[10px] text-indigo-600 mt-0.5 italic">{subText}</p>}
@@ -735,9 +735,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
               <div className="text-center pb-3 mb-3 border-b border-slate-100">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Hạn trả kết quả</span>
-                <span className="text-xl font-bold text-blue-700 block font-mono mt-0.5">{formatDate(record.deadline)}</span>
+                <span className="text-xl font-bold text-blue-700 block font-mono mt-0.5">{formatDateTimeVN(record.deadline, 'deadline')}</span>
                 <span className="text-[11px] text-slate-500 font-medium inline-flex items-center gap-1 mt-1 bg-slate-50 px-2 py-0.5 rounded-full">
-                  <Calendar size={11} /> Tiếp nhận: {formatDate(record.receivedDate)}
+                  <Calendar size={11} /> Tiếp nhận: {formatDateTimeVN(record.receivedDate, 'start')}
                 </span>
               </div>
 
@@ -782,9 +782,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                               detailInfo = emp ? `${emp.name} (${emp.position || 'Chuyên viên'})` : record.assignedTo;
                           }
 
-                          const subText = [detailInfo, step.durationLabel ? `SLA: ${step.durationLabel}` : '']
-                              .filter(Boolean)
-                              .join(' • ');
+                          const subText = detailInfo || undefined;
 
                           return (
                               <TimelineItem

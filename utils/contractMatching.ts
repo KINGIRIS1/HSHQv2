@@ -1,4 +1,5 @@
 import { Contract, RecordFile } from '../types';
+import { removeVietnameseTones } from './appHelpers';
 
 /**
  * Bóc tách tiền tố xã/phường dùng gạch nối (-) hoặc dấu chấm (.) (ví dụ: TK-, TQ-, MD-, TH-, TT-, MH-, CT-, TBA-, TQU- v.v.)
@@ -55,7 +56,7 @@ export const findMatchingContract = (record: RecordFile | null | undefined, cont
   const savedContractCode = d.contractCode || (record as any).contractCode;
   const savedContractId = d.contractId || (record as any).contractId;
 
-  // Tầng 1: Lưu trực tiếp contractCode / contractId
+  // Tầng 1: Khớp qua ID hoặc Mã Hợp đồng lưu trực tiếp
   if (savedContractCode) {
     const match = contracts.find(c => c && isCoreCodeMatching(c.code, savedContractCode));
     if (match) return match;
@@ -66,11 +67,11 @@ export const findMatchingContract = (record: RecordFile | null | undefined, cont
   }
 
   const rCode = (record.code || '').trim();
-  const rName = (record.customerName || '').trim().toLowerCase();
+  const rName = removeVietnameseTones((record.customerName || '').trim());
   const rPlot = (record.landPlot || '').trim().toLowerCase();
   const rMap = (record.mapSheet || '').trim().toLowerCase();
 
-  // Tầng 2: Khớp theo Mã hồ sơ (Đã bóc tách tiền tố xã TK., TQ., MD., TH...)
+  // Tầng 2: Khớp theo Mã hồ sơ (Đã bóc tách tiền tố xã TK., TQ., MD., TH... hoặc lưu trong customerAddress)
   if (rCode) {
     const matchByCode = contracts.find(c => {
       if (!c) return false;
@@ -84,17 +85,18 @@ export const findMatchingContract = (record: RecordFile | null | undefined, cont
     if (matchByCode) return matchByCode;
   }
 
-  // Tầng 3: Khớp theo Tên khách hàng + Thửa / Tờ
+  // Tầng 3: Khớp theo Tên khách hàng (chuẩn hóa không dấu) + Thửa / Tờ
   if (rName) {
     const matchByNamePlotMap = contracts.find(c => {
       if (!c) return false;
-      const cName = (c.customerName || '').trim().toLowerCase();
+      const cName = removeVietnameseTones((c.customerName || (c as any).customer_name || '').trim());
       const cPlot = (c.landPlot || '').trim().toLowerCase();
       const cMap = (c.mapSheet || '').trim().toLowerCase();
 
       if (cName && rName === cName) {
         if (rPlot && cPlot && rPlot === cPlot) return true;
         if (rMap && cMap && rMap === cMap) return true;
+        if (!rPlot && !rMap && !cPlot && !cMap) return true; // Cùng tên và cả 2 đều không có thửa/tờ
       }
       return false;
     });

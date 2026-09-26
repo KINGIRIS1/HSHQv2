@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType, isCertificateRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus, findEmployeeMatch } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -212,13 +212,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     break;
             }
 
-            const cleanPerson = (personId || '').trim().toLowerCase();
-            const emp = employees.find(e => 
-                (e.id || '').trim().toLowerCase() === cleanPerson || 
-                (e.name || '').trim().toLowerCase() === cleanPerson
-            );
+            const emp = findEmployeeMatch(personId, employees);
             return {
-                name: emp && emp.name ? emp.name : (personId || ''),
+                name: emp ? emp.name : (personId || ''),
                 date: dateVal
             };
         })();

@@ -10,6 +10,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import GetContractNumberModal from './GetContractNumberModal';
 import { UnsavedContractAuditModal } from './UnsavedContractAuditModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
+import { findMatchingContract } from '../utils/contractMatching';
 import saveAs from 'file-saver'; // Import saveAs
 import { supabase } from '../services/supabaseClient';
 
@@ -222,9 +223,8 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           const record = recordToCreateContract; // Ghi nhận bản ghi để xử lý ổn định trong closure
           if (onClearRecordToCreateContract) onClearRecordToCreateContract(); // Xóa cờ đồng bộ ngay lập tức để tránh re-render lặp vô tận
 
-          const existingContract = contracts.find(c => 
-              c.customerAddress && c.customerAddress.trim().toLowerCase() === record.code.trim().toLowerCase()
-          );
+          // Sử dụng hàm so khớp đa tầng để phát hiện hợp đồng đã lập trước đó
+          const existingContract = findMatchingContract(record, contracts);
           if (existingContract) {
               setEditingContract(existingContract);
               setActiveModule('contract');
@@ -401,7 +401,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
       if (success) {
           // ĐỒNG BỘ HAI CHIỀU VÀO CƠ SỞ DỮ LIỆU SUPABASE LAND_RECORDS:
-          // Nếu contract có mã số biên nhận / hồ sơ liên kết (ở customerAddress), cập nhật thông tin giá trị & nâng cấp trạng thái hợp đồng trên Supabase
+          // Nếu contract có mã số biên nhận / hồ sơ liên kết (ở customerAddress), cập nhật thông tin giá trị & liên kết hợp đồng trên Supabase
           try {
               const recordCode = contract.customerAddress?.trim();
               if (recordCode && recordCode.length >= 2) {

@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contract, User, Employee, UserRole } from '../../types';
-import { fetchContracts, parseContractDateMs, repairAllContractDatesApi, fixContractDateString } from '../../services/apiContracts';
-import { Search, RotateCcw, Edit, Download, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight, CalendarCheck } from 'lucide-react';
+import { fetchContracts, parseContractDateMs, fixContractDateString, deleteContractApi } from '../../services/apiContracts';
+import { Search, RotateCcw, Edit, Download, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
+import DuplicateRecordsAuditModal from '../DuplicateRecordsAuditModal';
 
 interface ContractListProps {
   contracts?: Contract[];
@@ -20,7 +21,7 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
   const [contracts, setContracts] = useState<Contract[]>(propContracts || []);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [repairingDate, setRepairingDate] = useState(false);
+  const [isDupAuditModalOpen, setIsDupAuditModalOpen] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,23 +32,6 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
       const data = await fetchContracts();
       setContracts(data);
       setLoading(false);
-  };
-
-  const handleRepairDates = async () => {
-      if (!window.confirm("Hệ thống sẽ quét và tự động chuẩn hóa ngày tháng cho toàn bộ danh sách hợp đồng (khắc phục lỗi hoán đổi ngày/tháng). Bạn có muốn thực hiện không?")) {
-          return;
-      }
-      setRepairingDate(true);
-      try {
-          const res = await repairAllContractDatesApi();
-          alert(`Đã kiểm tra ${res.totalCount} hợp đồng. Tự động chuẩn hóa thành công ${res.fixedCount} hợp đồng bị ngược ngày tháng!`);
-          await loadContracts();
-      } catch (e) {
-          console.error("Lỗi khi sửa ngày tháng:", e);
-          alert("Lỗi khi sửa ngày tháng hợp đồng.");
-      } finally {
-          setRepairingDate(false);
-      }
   };
 
   useEffect(() => {
@@ -135,10 +119,17 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                     onChange={(e) => setSearchTerm(e.target.value)} 
                 />
             </div>
-            <button onClick={handleRepairDates} disabled={repairingDate} className="p-2 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-xs" title="Chuẩn hóa ngày tháng cho các hợp đồng bị ngược ngày/tháng"> 
-                <CalendarCheck size={16} className={repairingDate ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Sửa Ngày HĐ</span>
+            
+            <button 
+                type="button" 
+                onClick={() => setIsDupAuditModalOpen(true)} 
+                className="p-2 bg-white text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer" 
+                title="Quét & Xóa hợp đồng trùng lặp"
+            >
+                <ShieldAlert size={16} className="text-purple-600" />
+                <span className="hidden md:inline">Quét trùng</span>
             </button>
+
             <button onClick={loadContracts} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full" title="Tải lại"> 
                 <RotateCcw size={18} /> 
             </button>
@@ -283,6 +274,16 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                 </div>
             </div>
         )}
+        {/* Modal Quét & Xóa hợp đồng trùng lặp */}
+        <DuplicateRecordsAuditModal
+            isOpen={isDupAuditModalOpen}
+            onClose={() => setIsDupAuditModalOpen(false)}
+            records={[]}
+            contracts={contracts}
+            onRefresh={async () => {
+                await loadContracts();
+            }}
+        />
     </div>
   );
 };

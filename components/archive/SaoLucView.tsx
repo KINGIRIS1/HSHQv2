@@ -12,6 +12,7 @@ import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
 import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
 import StatusBadge from '../StatusBadge';
+import { getRecordSlaBadge } from '../../utils/registrationWorkflows';
 import DeleteConfirmModal from '../DeleteConfirmModal';
 import * as XLSX from 'xlsx-js-style';
 
@@ -962,7 +963,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                     <th className="p-3 w-32 text-center">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
                                     <th className="p-3 w-24 text-center">Ngày nhận</th>
-                                    {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
+                                    <th className="p-3 w-32 text-center">Trạng thái</th>
                                     {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
                                     <th className="p-3 w-24 text-center">Hẹn trả</th>
                                     {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày giao</th>}
@@ -982,11 +983,31 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
                                         <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>
                                         <td className="p-3 text-gray-600">{formatDate(r.ngay_thang)}</td>
-                                        {(subTab === 'all') && (
-                                            <td className="p-3 text-center">
-                                                <StatusBadge status={r.status} />
-                                            </td>
-                                        )}
+                                        <td className="p-3 text-center">
+                                            {(() => {
+                                                const slaBadge = getRecordSlaBadge({
+                                                    id: r.id,
+                                                    code: r.so_hieu,
+                                                    status: r.status as any,
+                                                    deadline: r.data?.hen_tra || r.data?.deadline,
+                                                    data: r.data
+                                                } as RecordFile);
+                                                return (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <StatusBadge 
+                                                            status={r.status} 
+                                                            isApproaching={slaBadge?.isApproaching}
+                                                            isOverdue={slaBadge?.isOverdue}
+                                                        />
+                                                        {slaBadge && (slaBadge.isOverdue || slaBadge.isPaused) && slaBadge.label && (
+                                                            <span className={`inline-block px-1.5 py-0.5 text-[10px] leading-tight rounded-md text-center max-w-[130px] shadow-2xs border ${slaBadge.badgeClass}`}>
+                                                                {slaBadge.label}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </td>
                                         {(subTab !== 'draft') && (
                                             <td className="p-3 text-indigo-600 font-medium">
                                                 {r.data?.assigned_to ? (

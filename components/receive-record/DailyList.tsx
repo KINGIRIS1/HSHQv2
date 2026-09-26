@@ -7,12 +7,13 @@ import {
     Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, 
     FileSignature, FileEdit, RefreshCw, Filter, ChevronDown, ChevronUp, 
     X, RotateCcw, Calendar, UserCheck, Layers, Building2, ChevronLeft, ChevronRight,
-    Paperclip, CheckSquare, Square
+    Paperclip, CheckSquare, Square, ShieldAlert
 } from 'lucide-react';
 import { fetchContracts } from '../../services/api';
-import { saveRecord } from '../../services/apiRecords';
+import { saveRecord, deleteRecordApi, deleteRecordsBatchApi } from '../../services/apiRecords';
 import { findMatchingContract } from '../../utils/contractMatching';
 import RecordAttachmentModal from './RecordAttachmentModal';
+import DuplicateRecordsAuditModal from '../DuplicateRecordsAuditModal';
 
 interface DailyListProps {
   records: RecordFile[];
@@ -25,6 +26,8 @@ interface DailyListProps {
   onPreviewExcel: (wb: XLSX.WorkBook, name: string) => void;
   onEdit: (record: RecordFile) => void;
   onDelete: (record: RecordFile) => void;
+  onDeleteRecord?: (id: string) => Promise<boolean>;
+  onDeleteBatch?: (ids: string[]) => Promise<boolean>;
   onPrint: (record: RecordFile) => void;
   onCreateContract?: (record: RecordFile) => void;
   onHandOverRecords?: (recordIds: string[]) => Promise<void>;
@@ -42,6 +45,8 @@ const DailyList: React.FC<DailyListProps> = ({
   onPreviewExcel, 
   onEdit, 
   onDelete, 
+  onDeleteRecord,
+  onDeleteBatch,
   onPrint, 
   onCreateContract, 
   onHandOverRecords, 
@@ -58,6 +63,7 @@ const DailyList: React.FC<DailyListProps> = ({
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const [isDupAuditModalOpen, setIsDupAuditModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [attachmentRecord, setAttachmentRecord] = useState<RecordFile | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -667,6 +673,17 @@ const DailyList: React.FC<DailyListProps> = ({
                     </div>
 
 
+                    {/* Công cụ quét và xóa hồ sơ trùng lặp */}
+                    <button
+                        type="button"
+                        onClick={() => setIsDupAuditModalOpen(true)}
+                        className="p-2 bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                        title="Quét & Xóa Hồ Sơ Trùng Lặp (So sánh Mã hồ sơ, Mã HĐ & Tên Khách Hàng)"
+                    >
+                        <ShieldAlert size={16} className="text-purple-600" />
+                        <span className="hidden xl:inline">Quét hồ sơ trùng</span>
+                    </button>
+
                     {/* Excel Actions */}
                     <button 
                         onClick={handlePreview} 
@@ -901,6 +918,28 @@ const DailyList: React.FC<DailyListProps> = ({
             isOpen={!!attachmentRecord}
             onClose={() => setAttachmentRecord(null)}
             onUpdateRecordFiles={handleUpdateRecordFiles}
+        />
+
+        {/* Modal quét và xóa hồ sơ / hợp đồng trùng lặp */}
+        <DuplicateRecordsAuditModal
+            isOpen={isDupAuditModalOpen}
+            onClose={() => setIsDupAuditModalOpen(false)}
+            records={records}
+            contracts={contracts}
+            onDeleteRecord={onDeleteRecord || (async (id) => {
+                const target = records.find(r => r.id === id);
+                if (target) onDelete(target);
+                else await deleteRecordApi(id);
+                return true;
+            })}
+            onDeleteBatch={onDeleteBatch || (async (ids) => {
+                await deleteRecordsBatchApi(ids);
+                return true;
+            })}
+            onRefresh={async () => {
+                if (onSyncPending) await onSyncPending();
+                await loadContractsData();
+            }}
         />
     </div>
   );

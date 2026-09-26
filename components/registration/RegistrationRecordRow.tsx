@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { RecordFile, Employee, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
-import { getRegistrationWorkflowCategory, getProcedureByRecordType, getStepSlaInfo, getAppointmentInfo } from '../../utils/registrationWorkflows';
+import { getRegistrationWorkflowCategory, getProcedureByRecordType, getStepSlaInfo, getAppointmentInfo, getRecordSlaBadge } from '../../utils/registrationWorkflows';
 
 interface RegistrationRecordRowProps {
   record: RecordFile;
@@ -39,17 +39,7 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
   onAssign,
   employees = [],
 }) => {
-  const isOverdue = React.useMemo(() => {
-    if (
-      !record.deadline ||
-      record.status === RecordStatus.RETURNED ||
-      record.status === RecordStatus.HANDOVER
-    ) {
-      return false;
-    }
-    const today = new Date().toISOString().substring(0, 10);
-    return record.deadline < today;
-  }, [record.deadline, record.status]);
+  const slaBadge = React.useMemo(() => getRecordSlaBadge(record), [record]);
 
   const hasAttachments =
     (record.attachedFiles && record.attachedFiles.length > 0) ||
@@ -207,7 +197,7 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
                 className={`flex items-center gap-1 font-bold ${
                   appInfo.phase === 'tax_notice'
                     ? 'text-indigo-700'
-                    : isOverdue
+                    : slaBadge?.isOverdue
                     ? 'text-red-600'
                     : 'text-emerald-700'
                 }`}
@@ -223,8 +213,17 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
 
       {/* Trạng thái */}
       <td className="py-2.5 px-3 text-center">
-        <div className="flex flex-col items-center">
-          <StatusBadge status={record.status} />
+        <div className="flex flex-col items-center gap-1">
+          <StatusBadge 
+            status={record.status} 
+            isApproaching={slaBadge?.isApproaching}
+            isOverdue={slaBadge?.isOverdue}
+          />
+          {slaBadge && (slaBadge.isOverdue || slaBadge.isPaused) && slaBadge.label && (
+            <span className={`inline-block px-2 py-0.5 text-[10px] leading-tight rounded-md text-center max-w-[140px] shadow-2xs border ${slaBadge.badgeClass}`}>
+              {slaBadge.label}
+            </span>
+          )}
         </div>
       </td>
 

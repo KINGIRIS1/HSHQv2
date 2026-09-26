@@ -350,9 +350,26 @@ export const keepOnlyDateTime = (val: any): string | null => {
             const day = parseInt(dmyMatch[1], 10);
             const month = parseInt(dmyMatch[2], 10);
             const year = parseInt(dmyMatch[3], 10);
-            const hours = dmyMatch[4] ? parseInt(dmyMatch[4], 10) : 0;
-            const mins = dmyMatch[5] ? parseInt(dmyMatch[5], 10) : 0;
-            const secs = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
+            const hours = dmyMatch[4] !== undefined ? parseInt(dmyMatch[4], 10) : 7;
+            const mins = dmyMatch[5] !== undefined ? parseInt(dmyMatch[5], 10) : (dmyMatch[4] !== undefined ? 0 : 30);
+            const secs = dmyMatch[6] !== undefined ? parseInt(dmyMatch[6], 10) : 0;
+            if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
+            const d = new Date(year, month - 1, day, hours, mins, secs);
+            if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+                return null;
+            }
+            return d.toISOString();
+        }
+
+        // Kiểm tra dạng YYYY-MM-DD hoặc YYYY-MM-DD HH:mm(:ss)
+        const ymdMatch = cleanStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+        if (ymdMatch) {
+            const year = parseInt(ymdMatch[1], 10);
+            const month = parseInt(ymdMatch[2], 10);
+            const day = parseInt(ymdMatch[3], 10);
+            const hours = ymdMatch[4] !== undefined ? parseInt(ymdMatch[4], 10) : 7;
+            const mins = ymdMatch[5] !== undefined ? parseInt(ymdMatch[5], 10) : (ymdMatch[4] !== undefined ? 0 : 30);
+            const secs = ymdMatch[6] !== undefined ? parseInt(ymdMatch[6], 10) : 0;
             if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
             const d = new Date(year, month - 1, day, hours, mins, secs);
             if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {

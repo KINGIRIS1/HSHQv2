@@ -16,6 +16,7 @@ import {
   CreditCard,
   Printer,
   Settings,
+  BarChart3,
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus } from '../../types';
 import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
@@ -44,11 +45,15 @@ import { syncDangKyToVaoSo } from '../../services/apiArchive';
 interface RegistrationModuleViewProps {
   currentUser?: User | null;
   employees: Employee[];
+  setCurrentView?: (view: string) => void;
+  setReportMainTab?: (tab: 'measurement' | 'archive' | 'registration') => void;
 }
 
 export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   currentUser,
   employees,
+  setCurrentView,
+  setReportMainTab,
 }) => {
   const [records, setRecords] = useState<RecordFile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -196,22 +201,13 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     assignedDate: string,
     assignStep: 'appraisal' | 'tax_transfer'
   ) => {
-    const assignerName = currentUser?.name || 'Lãnh đạo';
-    await assignDangkyRecordsBatch(recordIds, assignedTo, assignedDate, assignStep, assignerName);
+    await assignDangkyRecordsBatch(recordIds, assignedTo, assignedDate, assignStep);
     const targetStatus = assignStep === 'tax_transfer' ? RecordStatus.TAX_TRANSFER : RecordStatus.APPRAISAL;
     const stepLabel = assignStep === 'tax_transfer' ? 'Chuyển thông tin thuế' : 'Thẩm định';
-    const nowIso = new Date().toISOString();
     setRecords((prev) =>
       prev.map((r) => {
         if (!recordIds.includes(r.id)) return r;
-        const updated: RecordFile = {
-          ...r,
-          assignedTo,
-          assignedDate,
-          assignedAt: nowIso,
-          assignedBy: assignerName,
-          status: targetStatus,
-        };
+        const updated: RecordFile = { ...r, assignedTo, assignedDate, status: targetStatus };
         if (assignStep === 'appraisal') updated.appraisalDate = assignedDate;
         if (assignStep === 'tax_transfer') updated.taxTransferDate = assignedDate;
         return updated;
@@ -357,6 +353,18 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              if (setReportMainTab) setReportMainTab('registration');
+              if (setCurrentView) setCurrentView('reports');
+            }}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <BarChart3 size={15} />
+            <span>📊 Báo cáo Cấp giấy</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsWorkflowModalOpen(true)}

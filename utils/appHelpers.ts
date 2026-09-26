@@ -217,19 +217,10 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     const matchedProcItem = fullConfig.procedureItems.find(p => p.code === lowerType || lowerType.includes(p.code));
     let daysToAdd = 3;
 
-    const isLuuTru = sourceTable === 'luutru_records' || lowerType.startsWith('1.') || lowerType.includes('1.');
-
     if (matchedProcItem) {
-        if (matchedProcItem.isNoSla) {
-            daysToAdd = 0;
-        } else {
-            const sumDays = matchedProcItem.steps.reduce((sum, s) => {
-                if (s.isNoSla) return sum;
-                return sum + (s.durationDays || 0);
-            }, 0);
-            daysToAdd = sumDays;
-        }
-    } else if (isLuuTru) {
+        const sumDays = matchedProcItem.steps.reduce((sum, s) => sum + (s.durationDays || 0), 0);
+        if (sumDays > 0) daysToAdd = sumDays;
+    } else if (isArchiveRecordType(rType)) {
         daysToAdd = 3;
     } else {
         // 3. Nhóm 2.x (Đo đạc)
@@ -909,30 +900,100 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 }
 
 // --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ (ID VS TÊN) ---
-export function getEmployeeName(idOrName?: string | null, employees: Employee[] = []): string {
+export function normalizeStaffCode(code?: string | null): string {
+    if (!code) return '';
+    const s = String(code).trim().toLowerCase();
+    const digits = s.replace(/\D/g, '');
+    if (digits) {
+        return String(parseInt(digits, 10));
+    }
+    return s;
+}
+
+export function findEmployeeMatch(idOrName?: string | null, employees: Employee[] = [], users: User[] = []): Employee | null {
+    if (!idOrName) return null;
+    const trimmed = String(idOrName).trim();
+    if (!trimmed) return null;
+    const lower = trimmed.toLowerCase();
+
+    // 1. Direct match on employee.id or employee.name
+    let emp = employees.find(e => (e.id && e.id.toLowerCase() === lower) || (e.name && e.name.toLowerCase() === lower));
+    if (emp) return emp;
+
+    // 2. Direct match on user.username, user.employeeId, user.name
+    if (users && users.length > 0) {
+        const matchedUser = users.find(u => 
+            (u.username && u.username.toLowerCase() === lower) ||
+            (u.employeeId && u.employeeId.toLowerCase() === lower) ||
+            (u.name && u.name.toLowerCase() === lower)
+        );
+        if (matchedUser) {
+            const userEmpId = (matchedUser.employeeId || matchedUser.username || '').toLowerCase();
+            const userEmpName = (matchedUser.name || '').toLowerCase();
+            emp = employees.find(e => 
+                (e.id && e.id.toLowerCase() === userEmpId) ||
+                (e.name && e.name.toLowerCase() === userEmpName)
+            );
+            if (emp) return emp;
+            if (matchedUser.name) {
+                return {
+                    id: matchedUser.employeeId || matchedUser.username,
+                    name: matchedUser.name,
+                    department: matchedUser.department || 'Nhân sự',
+                    position: matchedUser.position || 'Nhân viên',
+                    managedWards: matchedUser.managedWards || []
+                };
+            }
+        }
+    }
+
+    // 3. Normalized staff code match (e.g. NV001 <-> NV01 <-> 1)
+    const normCode = normalizeStaffCode(trimmed);
+    if (normCode) {
+        emp = employees.find(e => normalizeStaffCode(e.id) === normCode || normalizeStaffCode(e.name) === normCode);
+        if (emp) return emp;
+
+        if (users && users.length > 0) {
+            const uMatch = users.find(u => normalizeStaffCode(u.employeeId) === normCode || normalizeStaffCode(u.username) === normCode);
+            if (uMatch) {
+                const uEmpId = uMatch.employeeId || uMatch.username;
+                emp = employees.find(e => e.id.toLowerCase() === uEmpId.toLowerCase() || e.name.toLowerCase() === (uMatch.name || '').toLowerCase());
+                if (emp) return emp;
+                if (uMatch.name) {
+                    return {
+                        id: uMatch.employeeId || uMatch.username,
+                        name: uMatch.name,
+                        department: uMatch.department || 'Nhân sự',
+                        position: uMatch.position || 'Nhân viên',
+                        managedWards: uMatch.managedWards || []
+                    };
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
+export function getEmployeeName(idOrName?: string | null, employees: Employee[] = [], users: User[] = [], withDept: boolean = true): string {
     if (!idOrName) return 'Chưa giao';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return 'Chưa giao';
     
-    // 1. Tìm theo ID (không phân biệt hoa thường)
-    let emp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
-    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
+    const emp = findEmployeeMatch(trimmed, employees, users);
+    if (emp) {
+        return withDept ? `${emp.name} (${emp.department || 'Nhân sự'})` : emp.name;
+    }
     
-    // 2. Tìm theo Tên (không phân biệt hoa thường)
-    emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
-    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
-    
-    // 3. Nếu không tìm thấy trong danh mục, trả về chính chuỗi đang lưu (tránh mất tên nếu nhập tự do)
     return trimmed;
 }
 
-export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = []): string {
+export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = [], users: User[] = []): string {
     if (!idOrName) return '';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return '';
     
-    // Nếu truyền vào trùng ID hoặc Tên trong danh sách, quy đổi về ID chuẩn
-    const emp = employees.find(e => (e.id && e.id.toLowerCase() === trimmed.toLowerCase()) || (e.name && e.name.toLowerCase() === trimmed.toLowerCase()));
+    const emp = findEmployeeMatch(trimmed, employees, users);
     return emp ? emp.id : trimmed;
 }
 
@@ -1848,9 +1909,60 @@ export function getReceiptReceiverName(
         if (resolved) return resolved;
     }
 
-    // C. Nếu không thỏa mãn 2 điều kiện trên: Tuyệt đối để trống
     return '';
-}
+};
+
+// Chi tiết thời gian quá hạn chính xác theo quy tắc mới
+export const getOverdueDetails = (record: RecordFile) => {
+    if (
+      record.status === RecordStatus.HANDOVER ||
+      record.status === RecordStatus.RETURNED ||
+      record.status === RecordStatus.WITHDRAWN ||
+      record.status === RecordStatus.REJECTED ||
+      record.status === RecordStatus.SIGNED ||
+      record.exportBatch ||
+      record.exportDate ||
+      record.resultReturnedDate
+    ) {
+      return null;
+    }
+
+    if (!record.deadline) return null;
+
+    const deadline = parseSafeDate(record.deadline);
+    if (!deadline || isNaN(deadline.getTime())) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadline.setHours(0, 0, 0, 0);
+
+    const diffTime = today.getTime() - deadline.getTime();
+    if (diffTime <= 0) return null;
+
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    let text = "";
+    if (diffDays === 0) {
+      text = "Quá hạn hôm nay";
+    } else if (diffDays < 30) {
+      text = `Quá hạn ${diffDays} ngày`;
+    } else {
+      const months = Math.floor(diffDays / 30);
+      const days = diffDays % 30;
+      if (days === 0) {
+        text = `Quá hạn ${months} tháng`;
+      } else {
+        text = `Quá hạn ${months} tháng ${days} ngày`;
+      }
+    }
+
+    return {
+      isOverdue: true,
+      totalDays: diffDays,
+      text,
+    };
+};
+
 
 
 

@@ -4,6 +4,7 @@ import { X, MapPin, FileText, User as UserIcon, CheckCircle2, Circle, Send, File
 import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
 import { RecordStatus } from '../../types';
 import StatusBadge from '../StatusBadge';
+import { formatDateTimeVN } from '../../utils/appHelpers';
 
 interface ArchiveDetailModalProps {
     isOpen: boolean;
@@ -141,7 +142,7 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                 
                                 <div className="p-6 text-center border-b border-gray-100">
                                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Hạn trả kết quả</label>
-                                     <p className="text-2xl font-black text-gray-800">{formatDate(record.data?.hen_tra || record.ngay_thang)}</p>
+                                     <p className="text-2xl font-black text-gray-800">{formatDateTimeVN(record.data?.hen_tra || record.ngay_thang, 'deadline')}</p>
                                 </div>
 
                                 <div className="p-6 space-y-6 relative">
@@ -161,7 +162,7 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                                 </p>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`text-sm font-medium ${idx === history.length - 1 ? 'text-gray-800' : 'text-gray-500'}`}>
-                                                        {new Date(h.timestamp).toLocaleString('vi-VN')}
+                                                        {formatDateTimeVN(h.timestamp)}
                                                     </span>
                                                 </div>
                                                 <p className="text-[11px] text-indigo-600 mt-1 italic">Bởi: {h.user || 'Hệ thống'}</p>
