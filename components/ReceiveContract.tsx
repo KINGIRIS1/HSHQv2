@@ -7,6 +7,7 @@ import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
+import GetContractNumberModal from './GetContractNumberModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
 import saveAs from 'file-saver'; // Import saveAs
 
@@ -392,11 +393,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
       }
       if (success) {
           loadContracts(); // Reload list
-          if (activeModule === 'contract') {
-              setActiveModule('list');
-          } else if (activeModule === 'liquidation') {
-              setActiveModule('liquidation_list');
-          }
           return finalCode;
       }
       return null;
@@ -767,6 +763,43 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           onClose={() => setIsPreviewOpen(false)} 
           docxBlob={previewBlob} 
           fileName={previewFileName} 
+      />
+      <GetContractNumberModal
+          isOpen={isGetContractNumberOpen}
+          onClose={() => setIsGetContractNumberOpen(false)}
+          currentUser={currentUser}
+          onSelectCode={(selectedCode) => {
+              if (editingContract) {
+                  setEditingContract({ ...editingContract, code: selectedCode });
+              } else {
+                  setEditingContract({
+                      id: Math.random().toString(36).substr(2, 9),
+                      code: selectedCode,
+                      customerName: '',
+                      phoneNumber: '',
+                      address: '',
+                      ward: '',
+                      landPlot: '',
+                      mapSheet: '',
+                      area: 0,
+                      contractType: selectedCode.includes('HĐKT') ? 'Đo đạc' : 'Tách thửa',
+                      serviceType: '',
+                      areaType: '',
+                      plotCount: 1,
+                      markerCount: 1,
+                      quantity: 1,
+                      unitPrice: 0,
+                      vatRate: 8,
+                      vatAmount: 0,
+                      totalAmount: 0,
+                      deposit: 0,
+                      createdDate: new Date().toISOString(),
+                      status: 'PENDING'
+                  });
+              }
+              setActiveModule('contract');
+              setIsGetContractNumberOpen(false);
+          }}
       />
     </div>
   );
