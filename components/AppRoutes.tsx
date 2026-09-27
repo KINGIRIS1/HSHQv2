@@ -1901,7 +1901,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     key={r.id}
                     record={r}
                     employees={employees}
-                    users={users}
                     visibleColumns={props.visibleColumns}
                     columnOrder={props.columnOrder}
                     isSelected={props.selectedRecordIds.has(r.id)}

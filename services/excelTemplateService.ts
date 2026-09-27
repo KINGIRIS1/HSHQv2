@@ -70,6 +70,7 @@ export const generateExcelFromTemplate = (templateKey: string, dataRows: any[][]
         // 3. Xử lý Style cho các dòng dữ liệu mới thêm vào
         // Mặc định sheet_add_aoa không copy style dòng trên xuống.
         // Ta sẽ định dạng cơ bản: Border + Font Times New Roman
+        const range = XLSX.utils.decode_range(ws['!ref'] || "A1:G100");
         // Cập nhật lại range của sheet vì dữ liệu mới có thể dài hơn
         const lastDataRow = startRow + dataRows.length;
         

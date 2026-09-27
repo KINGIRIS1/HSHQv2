@@ -4,13 +4,13 @@ import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus, DossierC
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Paperclip, Eye, Download, ExternalLink, FolderOpen, Plus } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Paperclip, Eye, Download, ExternalLink, FolderOpen } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName, findMatchingEmployee, resolveEmployeeName } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
 import { previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isPreviewableFile } from '../services/attachmentStorage';
 import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
 
@@ -259,7 +259,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   };
 
   const getEmployeeName = (id?: string | null) => {
-    return getEmpNameHelper(id, employees, users);
+    return getEmpNameHelper(id, employees);
   };
 
   const handleSavePersonalNote = async () => {
@@ -621,16 +621,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {onCreateContract && !matchedContract && record && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-                    <button
-                        onClick={() => { onClose(); onCreateContract(record); }}
-                        className="p-1.5 text-purple-600 hover:bg-purple-50 active:bg-purple-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
-                        title="Lập hợp đồng cho hồ sơ này"
-                    >
-                        <FileSignature size={18} />
-                    </button>
-                )}
-
                 {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
@@ -822,7 +812,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                 <div className="text-left truncate">
                                                     <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng số:</span>
                                                     <p className="text-xs font-bold text-indigo-950 truncate">
-                                                        {matchedContract ? matchedContract.code : ''}
+                                                        {matchedContract ? matchedContract.code : 'Chưa có HĐ'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -913,8 +903,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={UserIcon}
                                 colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                                 subText={record.receivedBy ? (() => {
-                                    const emp = findMatchingEmployee(record.receivedBy, employees, users);
-                                    return emp ? `${emp.name} (${emp.position || 'Nhân viên'})` : record.receivedBy;
+                                    const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                                    const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                                    const name = receiver?.name || emp?.name || record.receivedBy;
+                                    return `${name} (${emp?.position || 'Nhân viên'})`;
                                 })() : undefined}
                             />
 
@@ -927,10 +919,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     icon={UserIcon}
                                     colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
                                     subText={record.surveyorId ? (() => {
-                                        const emp = findMatchingEmployee(record.surveyorId, employees, users);
+                                        const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
                                         return emp ? `${emp.name} (${emp.position || 'Chuyên viên Ngoại nghiệp'})` : record.surveyorId;
                                     })() : (record.assignedTo ? (() => {
-                                        const emp = findMatchingEmployee(record.assignedTo, employees, users);
+                                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
                                         return emp ? `${emp.name} (${emp.position || 'Chuyên viên'})` : record.assignedTo;
                                     })() : undefined)}
                                 />
@@ -941,10 +933,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     icon={UserIcon}
                                     colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
                                     subText={record.drafterId ? (() => {
-                                        const emp = findMatchingEmployee(record.drafterId, employees, users);
+                                        const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
                                         return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.drafterId;
                                     })() : (isPendingCheckActive && record.assignedTo ? (() => {
-                                        const emp = findMatchingEmployee(record.assignedTo, employees, users);
+                                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
                                         return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.assignedTo;
                                     })() : undefined)}
                                 />
@@ -957,7 +949,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                   icon={UserIcon}
                                   colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
                                   subText={(record.drafterId || record.assignedTo) ? (() => {
-                                      const emp = findMatchingEmployee(record.drafterId || record.assignedTo, employees, users);
+                                      const emp = employees.find(e => e.id === (record.drafterId || record.assignedTo) || e.name === (record.drafterId || record.assignedTo));
                                       return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : (record.drafterId || record.assignedTo);
                                   })() : undefined}
                               />
@@ -969,7 +961,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                   icon={UserIcon}
                                   colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
                                   subText={record.assignedTo ? (() => {
-                                      const emp = findMatchingEmployee(record.assignedTo, employees, users);
+                                      const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
                                       if (!emp) return record.assignedTo;
                                       return `${emp.name} (${emp.position || 'Chuyên viên'})`;
                                   })() : undefined}
@@ -986,9 +978,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
                                     subText={(() => {
                                         if (record.checkedBy) {
-                                            const checker = findMatchingEmployee(record.checkedBy, employees, users);
+                                            const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
+                                                          users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
                                             const name = checker?.name || record.checkedBy;
-                                            const pos = checker?.position || 'Người kiểm tra';
+                                            const pos = (checker as any)?.position || 'Người kiểm tra';
                                             return `${name} (${pos})`;
                                         }
                                         if (isPendingCheckActive) {
@@ -1006,8 +999,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={Send}
                                 colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
                                 subText={record.submittedTo ? (() => {
-                                    const emp = findMatchingEmployee(record.submittedTo, employees, users);
-                                    return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
+                                    const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
+                                    if (!director) {
+                                        const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
+                                        return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
+                                    }
+                                    const emp = employees.find(e => e.id === director.employeeId);
+                                    return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
                                 })() : undefined}
                             />
                             

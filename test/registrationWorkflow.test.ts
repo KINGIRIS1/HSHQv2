@@ -6,12 +6,17 @@
 import { RecordStatus, RecordFile } from '../types';
 import {
   calculateRegistrationDeadline,
+  getRegistrationWorkflowCategory,
+  getRegistrationWorkflow,
+  addWorkingDays,
+  addCalendarDays,
   calculateWorkingDaysBetween,
 } from '../utils/registrationWorkflows';
 import {
   validateCapGiayTransition,
   resumeFromSupplement,
   handleCapGiaySupplement,
+  isCapGiayStatus,
   CAP_GIAY_STATUSES,
 } from '../utils/capGiayStateMachine';
 
@@ -212,7 +217,7 @@ console.log('================================================================\n'
   assert(resUnc.deadline === '', 'Test 14.2: Thiếu recordType KHÔNG default deadline bừa bãi, trả về rỗng');
 
   // B. State machine: 14 trạng thái khép kín & chặn trạng thái Đo đạc/Lưu trữ
-  assert((CAP_GIAY_STATUSES.length as number) === 14 || (CAP_GIAY_STATUSES.length as number) === 16, 'Test 14.3: Module Cấp giấy có đủ các trạng thái khép kín');
+  assert(CAP_GIAY_STATUSES.length === 14, 'Test 14.3: Module Cấp giấy có đủ 14 trạng thái khép kín');
   const invalidTransition = validateCapGiayTransition(
     RecordStatus.RECEIVED,
     'ASSIGNED_SURVEYOR' as any, // Trạng thái của Đo đạc

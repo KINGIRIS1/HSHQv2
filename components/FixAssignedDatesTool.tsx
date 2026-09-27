@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-    RefreshCw, Play, Pause, Square, 
-    ArrowRight, Check, Search, 
-    ChevronLeft, ChevronRight, Sparkles, Terminal} from 'lucide-react';
-import { RecordFile } from '../types';
+    AlertTriangle, CheckCircle2, RefreshCw, Play, Pause, Square, 
+    Layers, Clock, ArrowRight, ShieldAlert, Check, Search, 
+    Filter, FileText, ChevronLeft, ChevronRight, Download, Sparkles, Terminal, Info
+} from 'lucide-react';
+import { RecordFile, RecordStatus } from '../types';
 import { getShortRecordType } from '../constants';
 import { isFieldWorkProcedure, isOfficeOnlySurveyProcedure, parseSafeDate, confirmAction } from '../utils/appHelpers';
 import { keepOnlyDate } from '../services/apiCore';

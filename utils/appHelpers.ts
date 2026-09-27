@@ -1,6 +1,6 @@
 
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificateRecordType, isSurveyRecordType, isArchiveRecord, MOCK_EMPLOYEES } from '../constants';
+import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificateRecordType, isSurveyRecordType, isArchiveRecord } from '../constants';
 import { CAP_GIAY_STEP_ORDER, getCapGiayWorkflowStage } from './capGiayStateMachine';
 import { getDodacWorkflowStage } from './dodacStateMachine';
 import { getLuuTruWorkflowStage } from './luuTruStateMachine';
@@ -441,8 +441,8 @@ export function processAssignmentTimelineCheck(
     return `${day}/${month}/${year}`;
   };
 
-  const oldEmp = findMatchingEmployee(record.assignedTo, employees);
-  const newEmp = findMatchingEmployee(newEmployeeId, employees);
+  const oldEmp = employees.find(e => e.id === record.assignedTo);
+  const newEmp = employees.find(e => e.id === newEmployeeId);
 
   const oldEmpName = oldEmp ? oldEmp.name : (record.assignedTo || 'Chưa phân công');
   const newEmpName = newEmp ? newEmp.name : newEmployeeId;
@@ -901,155 +901,31 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     return { migratedRecords, hasChanges };
 }
 
-// --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ ĐA TẦNG (ID VS TÊN VS MÃ SỐ TỰ DO) ---
-
-/**
- * Tìm kiếm nhân viên linh hoạt từ danh sách nhân sự, danh sách tài khoản hoặc danh bạ chuẩn.
- * Hỗ trợ khớp chính xác, khớp theo mã số tự do (ví dụ: '9' <-> 'NV9' <-> 'NV009'),
- * khớp tên đăng nhập (username), và khớp họ tên.
- */
-export function findMatchingEmployee(
-    idOrName?: string | null,
-    employees: Employee[] = [],
-    users: User[] = []
-): Employee | null {
-    if (!idOrName) return null;
-    const trimmed = String(idOrName).trim();
-    if (!trimmed) return null;
-    const lower = trimmed.toLowerCase();
-
-    // 1. Khớp chính xác ID hoặc Tên trong danh sách employees
-    let emp = employees.find(e => 
-        (e.id && e.id.toLowerCase() === lower) || 
-        (e.name && e.name.toLowerCase() === lower)
-    );
-    if (emp) return emp;
-
-    // 2. Khớp linh hoạt theo số (Ví dụ: "9" khớp "NV9", "NV09", "NV009"; "6" khớp "NV6", "NV006")
-    const digitsOnly = lower.replace(/\D/g, '');
-    if (digitsOnly !== '') {
-        const numVal = parseInt(digitsOnly, 10);
-        if (!isNaN(numVal)) {
-            emp = employees.find(e => {
-                if (!e.id) return false;
-                const empDigits = e.id.replace(/\D/g, '');
-                return empDigits !== '' && parseInt(empDigits, 10) === numVal;
-            });
-            if (emp) return emp;
-        }
-    }
-
-    // 3. Khớp qua danh sách người dùng (users)
-    if (users && users.length > 0) {
-        const matchedUser = users.find(u => {
-            if (!u) return false;
-            const uId = (u.id || '').trim().toLowerCase();
-            const uUsername = (u.username || '').trim().toLowerCase();
-            const uName = (u.name || '').trim().toLowerCase();
-            const uEmpId = (u.employeeId || '').trim().toLowerCase();
-
-            if (uId === lower || uUsername === lower || uName === lower || uEmpId === lower) return true;
-
-            if (digitsOnly !== '') {
-                const numVal = parseInt(digitsOnly, 10);
-                if (uEmpId) {
-                    const uEmpDigits = uEmpId.replace(/\D/g, '');
-                    if (uEmpDigits && parseInt(uEmpDigits, 10) === numVal) return true;
-                }
-                if (uUsername) {
-                    const uUserDigits = uUsername.replace(/\D/g, '');
-                    if (uUserDigits && parseInt(uUserDigits, 10) === numVal) return true;
-                }
-            }
-            return false;
-        });
-
-        if (matchedUser) {
-            if (matchedUser.employeeId) {
-                const foundEmp = findMatchingEmployee(matchedUser.employeeId, employees, []);
-                if (foundEmp) return foundEmp;
-            }
-            return {
-                id: matchedUser.employeeId || matchedUser.username || matchedUser.id || lower,
-                name: matchedUser.name || matchedUser.username,
-                department: (matchedUser as any).department || 'Nhân sự',
-                position: (matchedUser as any).position || 'Nhân viên',
-                managedWards: (matchedUser as any).managedWards || []
-            };
-        }
-    }
-
-    // 4. Dự phòng đối soát với MOCK_EMPLOYEES (nếu danh sách nhân viên từ CSDL thiếu hoặc chưa nạp)
-    if (Array.isArray(MOCK_EMPLOYEES) && MOCK_EMPLOYEES.length > 0) {
-        emp = MOCK_EMPLOYEES.find(e => 
-            (e.id && e.id.toLowerCase() === lower) || 
-            (e.name && e.name.toLowerCase() === lower)
-        );
-        if (emp) return emp;
-
-        if (digitsOnly !== '') {
-            const numVal = parseInt(digitsOnly, 10);
-            if (!isNaN(numVal)) {
-                emp = MOCK_EMPLOYEES.find(e => {
-                    if (!e.id) return false;
-                    const empDigits = e.id.replace(/\D/g, '');
-                    return empDigits !== '' && parseInt(empDigits, 10) === numVal;
-                });
-                if (emp) return emp;
-            }
-        }
-    }
-
-    return null;
-}
-
-/**
- * Trả về Tên hiển thị chuẩn của nhân viên từ ID, Mã số hoặc Tên tự do.
- * Kết quả trả về họ tên sạch sẽ (ví dụ: "Phạm Trí Hiếu", "Lê Duy Linh").
- */
-export function resolveEmployeeName(
-    idOrName?: string | null,
-    employees: Employee[] = [],
-    users: User[] = []
-): string {
-    if (!idOrName) return '';
-    const trimmed = String(idOrName).trim();
-    if (!trimmed) return '';
-
-    const emp = findMatchingEmployee(trimmed, employees, users);
-    if (emp && emp.name) return emp.name;
-
-    return trimmed;
-}
-
-export function getEmployeeName(
-    idOrName?: string | null, 
-    employees: Employee[] = [], 
-    users: User[] = [],
-    includeDept: boolean = false
-): string {
+// --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ (ID VS TÊN) ---
+export function getEmployeeName(idOrName?: string | null, employees: Employee[] = []): string {
     if (!idOrName) return 'Chưa giao';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return 'Chưa giao';
     
-    const emp = findMatchingEmployee(trimmed, employees, users);
-    if (emp && emp.name) {
-        return includeDept ? `${emp.name} (${emp.department || 'Nhân sự'})` : emp.name;
-    }
+    // 1. Tìm theo ID (không phân biệt hoa thường)
+    let emp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
+    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
     
+    // 2. Tìm theo Tên (không phân biệt hoa thường)
+    emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
+    
+    // 3. Nếu không tìm thấy trong danh mục, trả về chính chuỗi đang lưu (tránh mất tên nếu nhập tự do)
     return trimmed;
 }
 
-export function resolveEmployeeId(
-    idOrName?: string | null, 
-    employees: Employee[] = [], 
-    users: User[] = []
-): string {
+export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = []): string {
     if (!idOrName) return '';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return '';
     
-    const emp = findMatchingEmployee(trimmed, employees, users);
+    // Nếu truyền vào trùng ID hoặc Tên trong danh sách, quy đổi về ID chuẩn
+    const emp = employees.find(e => (e.id && e.id.toLowerCase() === trimmed.toLowerCase()) || (e.name && e.name.toLowerCase() === trimmed.toLowerCase()));
     return emp ? emp.id : trimmed;
 }
 

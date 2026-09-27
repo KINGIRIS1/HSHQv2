@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ShieldAlert, CheckCircle2, Wrench, Download, Upload, RefreshCw, Database, FileText, Check, ArrowRight, Sparkles } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Wrench, Download, Upload, RefreshCw, AlertTriangle, Database, Users, Calendar, FileText, Check, ArrowRight, Sparkles, Filter } from 'lucide-react';
 import { RecordFile, Employee, NotifyFunction, RecordStatus } from '../../types';
 import { deriveActualSurveyStatus, confirmAction } from '../../utils/appHelpers';
 import { STATUS_LABELS, isArchiveRecordType } from '../../constants';
@@ -507,7 +507,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredMismatched.map((item) => {
+                                        filteredMismatched.map((item, idx) => {
                                             const r = item.record;
                                             const isChecked = selectedNormalizeIds.has(r.id);
                                             return (
@@ -680,7 +680,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                                             </td>
                                         </tr>
                                     ) : (
-                                        missingCheckRecords.map((r) => {
+                                        missingCheckRecords.map((r, idx) => {
                                             const isChecked = selectedMissingIds.has(r.id);
                                             return (
                                                 <tr key={r.id} className={`hover:bg-slate-50 transition-colors ${isChecked ? 'bg-blue-50/50' : ''}`}>

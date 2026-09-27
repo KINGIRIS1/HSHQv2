@@ -130,7 +130,7 @@ const AREA_RULES: Record<string, AreaRuleSegment[]> = {
 // INIT: Tính toán các giá trị baseAtLower
 function initRules() {
   // Edge Rules
-  for (const [, segs] of Object.entries(EDGE_RULES)) {
+  for (const [scale, segs] of Object.entries(EDGE_RULES)) {
     let lastUpperTol: number | null = null;
     for (let i = 0; i < segs.length; i++) {
       const seg = segs[i];
@@ -148,7 +148,7 @@ function initRules() {
   }
 
   // Area Rules
-  for (const [, segs] of Object.entries(AREA_RULES)) {
+  for (const [scale, segs] of Object.entries(AREA_RULES)) {
     let lastUpperTol: number | null = null;
     for (let i = 0; i < segs.length; i++) {
       const seg = segs[i];

@@ -5,7 +5,7 @@ import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRec
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet } from 'lucide-react';
-import { confirmAction, toTitleCase, resolveEmployeeName } from '../../utils/appHelpers';
+import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
@@ -358,7 +358,8 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     // Helper để lấy tên nhân viên từ ID
     const getEmployeeName = (id?: string) => {
         if (!id) return '-';
-        return resolveEmployeeName(id, employees) || id;
+        const emp = employees.find(e => e.id === id);
+        return emp ? emp.name : id;
     };
 
     const generateLTHoSoCode = (recordsList: ArchiveRecord[]) => {

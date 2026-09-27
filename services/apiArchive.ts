@@ -1,6 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, CACHE_KEYS, isTransientError } from './apiCore';
-import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated, resolveRecordRouting } from './apiRecords';
+import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated } from './apiRecords';
 import { addPendingRecord, getPendingRecords } from './syncQueueService';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
@@ -163,47 +163,28 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
     };
 };
 
-export const isStatusEligibleForVaoSo = (status: any): boolean => {
-    if (!status) return false;
-    const st = String(status).toUpperCase().trim();
-    return (
-        st === 'PENDING_HANDOVER' ||
-        st === 'CHO_BAN_GIAO' ||
-        st === 'CHỜ BÀN GIAO' ||
-        st === 'HANDOVER' ||
-        st === 'DA_BAN_GIAO' ||
-        st === 'ĐÃ GIAO 1 CỬA' ||
-        st === 'RETURNED' ||
-        st === 'DA_TRA_KET_QUA' ||
-        st === 'ĐÃ TRẢ KẾT QUẢ'
-    );
-};
-
 export const isVaoSoRecord = (row: any): boolean => {
     if (!row) return false;
-    const code = String(row.code || row.so_hieu || row.id || '').toUpperCase();
-    // Bất kỳ hồ sơ nào bắt đầu bằng mã LT- (mã lưu trữ) hoặc thuộc bảng luutru_records tuyệt đối KHÔNG phải là Vào sổ GCN
-    if (code.startsWith('LT-')) return false;
-    if (row.sourceTable === 'luutru_records') return false;
-
-    // KHÓA CỨNG: Tuyệt đối chỉ nhận hồ sơ đã hoàn thành ký duyệt và đạt từ bước Chờ bàn giao trở đi
-    const rawSt = row.data?.status || row.status || (row as any).stage;
-    if (!isStatusEligibleForVaoSo(rawSt)) return false;
-
     const rowType = String(row.type || '').toLowerCase();
     const dataType = String(row.data?.type || '').toLowerCase();
     const recType = String(row.recordType || row.content || '').toLowerCase();
-    const isCapGiay = row.group === '3. Đăng ký đất đai, cấp GCN' || 
-                      row.sourceTable === 'dangky_records' || 
-                      (row.data && (row.data.sourceTable === 'dangky_records' || row.data.group === '3. Đăng ký đất đai, cấp GCN'));
+    const dataStage = String(row.data?.stage || '').toLowerCase();
+    const entryNum = String(row.entryNumber || row.data?.so_vao_so || row.data?.entryNumber || '').trim();
+    const dataStatus = String(row.data?.status || '').toLowerCase();
+    const group = String(row.group || '').toLowerCase();
 
     return (
         rowType === 'vaoso' ||
         dataType === 'vaoso' ||
-        isCapGiay ||
         recType.includes('vào sổ') ||
         recType.includes('vao so') ||
-        recType.includes('vaoso')
+        recType.includes('vaoso') ||
+        dataStage === 'vao_so' ||
+        entryNum.length > 0 ||
+        dataStatus.includes('vào sổ') ||
+        dataStatus.includes('vao so') ||
+        group.includes('cấp gcn') ||
+        group.includes('đăng ký đất đai')
     );
 };
 
@@ -307,24 +288,7 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
 export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
     const d = (typeof r.data === 'object' && r.data !== null) ? r.data : {};
     const code = r.code || r.so_hieu || d.ma_ho_so || r.id || '';
-    let customerName = r.customerName || r.noi_nhan_gui || d.ten_chu_su_dung || '';
-
-    // Trích xuất danh sách Chủ hồ sơ (Người đứng tên Giấy chứng nhận)
-    let certOwners: any[] = [];
-    const rawCert = r.certificateOwners || r.certificate_owners || d.certificateOwners || d.certificate_owners;
-    if (Array.isArray(rawCert)) {
-      certOwners = rawCert;
-    } else if (typeof rawCert === 'string') {
-      try { certOwners = JSON.parse(rawCert); } catch { certOwners = []; }
-    }
-
-    if (certOwners.length > 0) {
-      const allNames = certOwners.map((o: any) => o?.name ? String(o.name).trim() : '').filter(Boolean);
-      if (allNames.length > 0) {
-        customerName = allNames.join(', ');
-      }
-    }
-
+    const customerName = r.customerName || r.noi_nhan_gui || d.ten_chu_su_dung || '';
     const recordType = r.recordType || r.content || r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận';
     const ward = r.ward || d.dia_danh || d.xa_phuong || '';
     const mapSheet = r.mapSheet || d.so_to || d.to_ban_do || '';
@@ -350,12 +314,8 @@ export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
 
     const mergedData = {
         ...d,
-        status: r.status || d.status || '',
-        rawStatus: r.status || d.status || '',
         ma_ho_so: code,
         ten_chu_su_dung: customerName,
-        certificateOwners: certOwners,
-        certificate_owners: certOwners,
         loai_bien_dong: recordType,
         loai_gcn: d.loai_gcn || 'GCN mới',
         dia_danh: ward,
@@ -756,82 +716,6 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
     const cacheKey = getArchiveCacheKey(type);
 
     const promise = (async () => {
-        // XỬ LÝ ĐỘC LẬP MODULE VÀO SỔ GCN (vaoso): Chỉ lấy từ dangky_records, tuyệt đối không lấy từ luutru_records
-        if (type === 'vaoso') {
-            const cachedVaoso = getFromCache<ArchiveRecord[]>(cacheKey, []);
-            const cleanCached = cachedVaoso.filter(r => {
-                const code = String(r.so_hieu || r.id || '').toUpperCase();
-                if (code.startsWith('LT-') || (r as any).sourceTable === 'luutru_records') return false;
-                const recStatus = r.data?.status || r.data?.rawStatus || r.status;
-                return isStatusEligibleForVaoSo(recStatus);
-            });
-            if (cleanCached.length !== cachedVaoso.length) {
-                saveToCache(cacheKey, cleanCached);
-                memoryArchiveTypeCaches.set('vaoso', cleanCached);
-            }
-
-            if (!isConfigured) {
-                return cleanCached;
-            }
-
-            try {
-                let allDangky: ArchiveRecord[] = [];
-                let page = 0;
-                const pageSize = 1000;
-                let hasMore = true;
-
-                while (hasMore) {
-                    const { data, error } = await supabase
-                        .from('dangky_records')
-                        .select('*')
-                        .order('createdAt', { ascending: false })
-                        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-                    if (error) {
-                        console.warn(`Lỗi khi fetch dangky_records (vaoso):`, error);
-                        break;
-                    }
-
-                    if (data && data.length > 0) {
-                        // KHÓA CỨNG: CHỈ lấy hồ sơ đã hoàn thành ký duyệt và chuyển sang:
-                        // PENDING_HANDOVER (Chờ bàn giao), HANDOVER (Đã giao 1 cửa), RETURNED (Đã trả kết quả).
-                        // Tuyệt đối KHÔNG lấy hồ sơ ở các bước trước: Tiếp nhận, Thẩm định, Chờ niêm yết, Chờ chuyển thuế, Chờ thuế KV7, Chờ GNT, Chờ in GCN, Chờ kiểm tra, Chờ ký duyệt.
-                        const eligibleData = data.filter(item => {
-                            const code = String(item.code || item.id || '').toUpperCase();
-                            if (code.startsWith('LT-')) return false;
-
-                            const recStatus = item.status || (item.data && item.data.status);
-                            return isStatusEligibleForVaoSo(recStatus);
-                        });
-
-                        const mapped = eligibleData.map(item => mapDangkyRecordToArchiveRecord(item));
-                        allDangky = [...allDangky, ...mapped];
-                        if (data.length < pageSize) hasMore = false;
-                        else page++;
-                    } else {
-                        hasMore = false;
-                    }
-                }
-
-                const uniqueMap = new Map<string, ArchiveRecord>();
-                allDangky.forEach(r => {
-                    if (r && (r.id || r.so_hieu)) {
-                        const code = String(r.so_hieu || r.id || '').toUpperCase();
-                        if (!code.startsWith('LT-')) {
-                            uniqueMap.set(r.id || r.so_hieu, r);
-                        }
-                    }
-                });
-                const result = Array.from(uniqueMap.values());
-                saveToCache(cacheKey, result);
-                memoryArchiveTypeCaches.set('vaoso', result);
-                return result;
-            } catch (err) {
-                console.warn("[fetchArchiveRecords:vaoso] Lỗi tải dangky_records:", err);
-                return cleanCached;
-            }
-        }
-
         if (!isConfigured) {
             const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
             if (cached.length > 0) return cached.filter(r => r.type === type);
@@ -840,6 +724,53 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             return MOCK_ARCHIVE.filter(r => r.type === type);
         }
         try {
+            // Khi lấy dữ liệu Vào sổ GCN: ưu tiên truy vấn trực tiếp từ bảng dangky_records
+            if (type === 'vaoso') {
+                let allDangky: ArchiveRecord[] = [];
+                try {
+                    let page = 0;
+                    const pageSize = 1000;
+                    let hasMore = true;
+
+                    while (hasMore) {
+                        const { data, error } = await supabase
+                            .from('dangky_records')
+                            .select('*')
+                            .order('createdAt', { ascending: false })
+                            .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                        if (error) {
+                            console.warn(`Lỗi khi fetch dangky_records (vaoso):`, error);
+                            break;
+                        }
+
+                        if (data && data.length > 0) {
+                            const mapped = data.map(item => mapDangkyRecordToArchiveRecord(item));
+                            allDangky = [...allDangky, ...mapped];
+                            if (data.length < pageSize) hasMore = false;
+                            else page++;
+                        } else {
+                            hasMore = false;
+                        }
+                    }
+                } catch (fetchErr) {
+                    console.warn("Lỗi fetch dangky_records:", fetchErr);
+                }
+
+                if (allDangky.length > 0) {
+                    const uniqueMap = new Map<string, ArchiveRecord>();
+                    allDangky.forEach(r => {
+                        if (r && (r.id || r.so_hieu)) {
+                            const key = r.id || r.so_hieu;
+                            uniqueMap.set(key, r);
+                        }
+                    });
+                    const result = Array.from(uniqueMap.values());
+                    saveToCache(cacheKey, result);
+                    memoryArchiveTypeCaches.set(type, result);
+                    return result;
+                }
+            }
 
             let allData: ArchiveRecord[] = [];
             let page = 0;
@@ -912,9 +843,6 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
 
 export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise<SaveArchiveResult> => {
     let fullRecord = { ...record };
-    const isVaoSo = record.type === 'vaoso' || isVaoSoRecord(record);
-    const offlineTargetTable = isVaoSo ? 'dangky_records' : 'luutru_records';
-
     if (!isConfigured) {
         if (record.id) {
             const idx = MOCK_ARCHIVE.findIndex(r => r.id === record.id);
@@ -934,7 +862,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 MOCK_ARCHIVE[idx] = merged;
                 saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
                 const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(merged));
-                await addPendingRecord(recFile, 'UPDATE', offlineTargetTable);
+                await addPendingRecord(recFile, 'UPDATE', 'luutru_records');
                 return { success: true, persisted: false, queued: true, offline: true, record: merged };
             }
         } else {
@@ -946,37 +874,30 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             MOCK_ARCHIVE.unshift(newRec);
             saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
             const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(newRec));
-            await addPendingRecord(recFile, 'CREATE', offlineTargetTable);
+            await addPendingRecord(recFile, 'CREATE', 'luutru_records');
             return { success: true, persisted: false, queued: true, offline: true, record: newRec };
         }
         return { success: false, persisted: false, queued: false, offline: true, errorCode: 'OFFLINE_NOT_FOUND', message: 'Record not found in offline memory' };
     }
 
-    // Nếu là hồ sơ Vào sổ GCN: LƯU DUY NHẤT VÀO BẢNG dangky_records, KHÔNG đồng bộ/lưu sang luutru_records
+    // Nếu là hồ sơ Vào sổ GCN: ưu tiên lưu trực tiếp vào bảng dangky_records
     if (record.type === 'vaoso' || isVaoSoRecord(record)) {
         try {
             const d = record.data || {};
-            const code = d.ma_ho_so || record.so_hieu || (record as any).code || record.id || '';
-            // Ưu tiên cao nhất thông tin tên chủ sử dụng mà người dùng trực tiếp sửa trên ô ten_chu_su_dung
-            const customerName = d.ten_chu_su_dung !== undefined ? (d.ten_chu_su_dung || '') : (record.noi_nhan_gui || (record as any).customerName || '');
+            const code = record.so_hieu || d.ma_ho_so || (record as any).code || record.id || '';
+            const customerName = record.noi_nhan_gui || d.ten_chu_su_dung || (record as any).customerName || 'Chưa xác định';
             const ward = d.dia_danh || d.xa_phuong || (record as any).ward || '';
             const mapSheet = d.so_to || d.to_ban_do || (record as any).mapSheet || '';
             const landPlot = d.so_thua || d.thua_dat || (record as any).landPlot || '';
             const area = parseFloat(d.tong_dien_tich || d.area) || (record as any).area || 0;
             const residentialArea = parseFloat(d.dien_tich_tho_cu || d.residentialArea) || (record as any).residentialArea || 0;
-            
-            // Xử lý giá trị số vào sổ & số phát hành: nếu người dùng xóa trắng ('') thì gán null để cập nhật sạch trong DB
-            const rawEntry = d.so_vao_so !== undefined ? d.so_vao_so : (record as any).entryNumber;
-            const entryNumber = (rawEntry && String(rawEntry).trim() !== '') ? String(rawEntry).trim() : null;
-
-            const rawIssue = d.so_phat_hanh !== undefined ? d.so_phat_hanh : (record as any).issueNumber;
-            const issueNumber = (rawIssue && String(rawIssue).trim() !== '') ? String(rawIssue).trim() : null;
-
+            const entryNumber = d.so_vao_so || (record as any).entryNumber || d.entryNumber || null;
+            const issueNumber = d.so_phat_hanh || (record as any).issueNumber || d.issueNumber || null;
             const approvalDate = d.ngay_ky_gcn || (record as any).approvalDate || (record as any).issueDate || null;
             const issueDate = d.ngay_ky_gcn || (record as any).issueDate || (record as any).approvalDate || null;
             const receivedDate = d.ngay_nhan || record.ngay_thang || (record as any).receivedDate || null;
-            const recordType = d.loai_bien_dong || record.trich_yeu || (record as any).recordType || 'Cấp Giấy chứng nhận';
-            const notes = d.ghi_chu !== undefined ? d.ghi_chu : ((record as any).notes || '');
+            const recordType = record.trich_yeu || d.loai_bien_dong || (record as any).recordType || 'Cấp Giấy chứng nhận';
+            const notes = d.ghi_chu || (record as any).notes || '';
 
             const dangkyPayload: Record<string, any> = {
                 id: record.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9)),
@@ -995,8 +916,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 recordType,
                 content: recordType,
                 notes,
-                status: (record as any).status || 'PENDING_HANDOVER',
-                pendingHandoverDate: (record as any).pendingHandoverDate || d.pendingHandoverDate || null,
+                status: (record as any).status || 'DA_KY',
                 data: d,
                 updatedAt: new Date().toISOString()
             };
@@ -1016,21 +936,8 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 clearArchiveMemoryCaches('vaoso');
                 return { success: true, persisted: true, queued: false, offline: false, record: resRec };
             }
-
-            if (error) {
-                console.error("[saveArchiveRecord:vaoso] Lỗi upsert dangky_records:", error);
-                throw error;
-            }
-        } catch (dangkyErr: any) {
-            console.error("[saveArchiveRecord] Lỗi lưu hồ sơ vào sổ GCN:", dangkyErr);
-            return {
-                success: false,
-                persisted: false,
-                queued: false,
-                offline: false,
-                errorCode: 'VAOSO_SAVE_ERROR',
-                message: dangkyErr?.message || 'Không thể lưu hồ sơ vào sổ GCN'
-            };
+        } catch (dangkyErr) {
+            console.warn("[saveArchiveRecord] Lỗi lưu vào dangky_records, tiếp tục lưu luutru_records dự phòng:", dangkyErr);
         }
     }
 
@@ -1224,7 +1131,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
     }
 };
 
-export const deleteArchiveRecord = async (id: string, record?: Partial<RecordFile>): Promise<boolean> => {
+export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
     if (!isConfigured) {
         const idx = MOCK_ARCHIVE.findIndex(r => r.id === id);
         if (idx !== -1) MOCK_ARCHIVE.splice(idx, 1);
@@ -1232,36 +1139,10 @@ export const deleteArchiveRecord = async (id: string, record?: Partial<RecordFil
         return true;
     }
     try {
-        let targetTable = 'luutru_records';
-        if (record) {
-            const res = resolveRecordRouting(record);
-            if (res.expectedTable) targetTable = res.expectedTable;
-        } else {
-            const { data: dk } = await supabase.from('dangky_records').select('id, code').eq('id', id).maybeSingle();
-            if (dk) {
-                targetTable = 'dangky_records';
-            } else {
-                const { data: land } = await supabase.from('land_records').select('id, code').eq('id', id).maybeSingle();
-                if (land) {
-                    targetTable = 'land_records';
-                } else {
-                    const { data: lt } = await supabase.from('luutru_records').select('id, code').eq('id', id).maybeSingle();
-                    if (lt) {
-                        const res = resolveRecordRouting(lt);
-                        targetTable = res.expectedTable || 'luutru_records';
-                    }
-                }
-            }
-        }
-
-        if (targetTable === 'dangky_records') {
-            await supabase.from('dangky_records').delete().eq('id', id);
-        } else if (targetTable === 'land_records') {
-            await supabase.from('land_records').delete().eq('id', id);
-        } else {
-            await supabase.from('luutru_records').delete().eq('id', id);
-        }
-
+        await Promise.allSettled([
+            supabase.from('dangky_records').delete().eq('id', id),
+            supabase.from('luutru_records').delete().eq('id', id)
+        ]);
         clearArchiveMemoryCaches();
         return true;
     } catch (error) {
@@ -1315,7 +1196,7 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
                     recordType: r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận',
                     content: r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận',
                     notes: d.ghi_chu || '',
-                    status: (r as any).status || d.status || 'PENDING_HANDOVER',
+                    status: 'DA_KY',
                     data: d,
                     updatedAt: new Date().toISOString()
                 };
@@ -1527,11 +1408,8 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
                 if (checkData && checkData.length > 0) {
                     const currentDbUpdatedAt = checkData[0].updated_at;
                     if (currentDbUpdatedAt !== previousUpdatedAt) {
-                        console.warn(`[MUTATION][CONCURRENCY_SYNC] Auto-resolving batch concurrency for Archive Record ID ${payload.id}. DB: ${currentDbUpdatedAt}, Prev: ${previousUpdatedAt}. Retrying update with fresh snapshot.`);
-                        const forceRes = await supabase.from('luutru_records').update(payload).eq('id', payload.id).select();
-                        if (forceRes.data && forceRes.data.length > 0) {
-                            data = forceRes.data;
-                        }
+                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Archive Record ID ${payload.id} in batch was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                        throw new Error(`CONCURRENCY_CONFLICT: Archive Record with ID ${payload.id} was modified by another user or session. Please refresh.`);
                     }
                 }
                 // Upsert fallback if 0 rows modified
@@ -1792,103 +1670,237 @@ export const createArchiveBatch = async (
 };
 
 /**
- * Cấp số vào sổ GCN nguyên tử (Atomic), chống trùng 100% bằng cách kiểm tra số đã tồn tại.
- * Tôn trọng tuyệt đối số bắt đầu người dùng cấu hình (exactStartingNumber), không để hồ sơ cũ đè số mới.
+ * Cấp số vào sổ GCN nguyên tử (Atomic), chống trùng 100% bằng Supabase RPC hoặc quét MAX toàn diện.
+ * Có cơ chế tự động đồng bộ (Self-healing) và fallback an toàn quét cả client memory, settings và DB.
  */
 export const allocateNextVaoSoNumbers = async (
-    prefix: string = 'CN',
+    prefix: string,
     count: number = 1,
     padLength: number = 5,
-    minBaseNumber?: number,
-    exactStartingNumber?: number
+    minBaseNumber?: number
 ): Promise<string[]> => {
-    const cleanPrefix = (prefix || 'CN').trim();
+    let maxVal = typeof minBaseNumber === 'number' && !isNaN(minBaseNumber) ? minBaseNumber : 0;
 
-    // Thu thập tất cả các số vào sổ đã tồn tại để tránh trùng lặp
-    const existingNumbers = new Set<string>();
     const extractNum = (val: any) => {
         if (!val) return;
         const str = String(val).trim();
-        if (str) existingNumbers.add(str.toUpperCase());
+        const matches = str.match(/\d+/g);
+        if (matches) {
+            matches.forEach(m => {
+                const num = parseInt(m, 10);
+                if (!isNaN(num) && num > maxVal) maxVal = num;
+            });
+        }
     };
 
-    // Quét từ cache client
+    // Quét số lớn nhất từ bộ nhớ cache client
     const cachedVaoso = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE_VAOSO, []);
-    cachedVaoso.forEach(r => {
-        extractNum(r.data?.so_vao_so);
-        extractNum(r.data?.entryNumber);
-        extractNum(r.so_hieu);
+    const cachedArchive = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+    [...cachedVaoso, ...cachedArchive].forEach(r => {
+        if (r.type === 'vaoso' || isVaoSoRecord(r)) {
+            extractNum(r.data?.so_vao_so);
+            extractNum(r.data?.entryNumber);
+            extractNum(r.so_hieu);
+        }
     });
 
-    if (isConfigured) {
-        try {
-            const { data } = await supabase.from('dangky_records').select('entryNumber, data');
-            (data || []).forEach(r => {
-                extractNum(r.entryNumber);
-                extractNum((r as any)?.data?.so_vao_so);
-                extractNum((r as any)?.data?.entryNumber);
-            });
-        } catch (e) {
-            console.warn("Lỗi đọc dangky_records để kiểm tra trùng số:", e);
-        }
-    }
-
-    // 1. Nếu người dùng chỉ định số bắt đầu cụ thể (exactStartingNumber)
-    if (typeof exactStartingNumber === 'number' && !isNaN(exactStartingNumber) && exactStartingNumber > 0) {
-        let candidate = exactStartingNumber;
+    if (!isConfigured) {
+        // Fallback offline / demo mode
         const results: string[] = [];
-        while (results.length < count) {
-            const candidateStr = `${cleanPrefix} ${String(candidate).padStart(padLength, '0')}`;
-            if (!existingNumbers.has(candidateStr.toUpperCase())) {
-                results.push(candidateStr);
-                existingNumbers.add(candidateStr.toUpperCase());
-            }
-            candidate++;
+        for (let i = 1; i <= count; i++) {
+            const nextNum = maxVal + i;
+            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
         }
         return results;
     }
 
-    // 2. Nếu không chỉ định exactStartingNumber, tính toán dựa trên số lớn nhất hiện tại
-    let maxVal = typeof minBaseNumber === 'number' && !isNaN(minBaseNumber) ? minBaseNumber : 0;
-    existingNumbers.forEach(str => {
-        const matches = str.match(/\d+/g);
-        if (matches) {
-            matches.forEach(m => {
-                const n = parseInt(m, 10);
-                if (!isNaN(n) && n > maxVal) maxVal = n;
-            });
-        }
-    });
+    try {
+        // 1. Quét số MAX thực tế từ DB trước để đảm bảo không bao giờ bị lùi số
+        const [dangkyRes, luutruRes] = await Promise.all([
+            supabase.from('dangky_records').select('entryNumber, data'),
+            supabase.from('luutru_records').select('entryNumber, data, recordType')
+        ]);
 
-    const results: string[] = [];
-    for (let i = 1; i <= count; i++) {
-        const nextNum = maxVal + i;
-        results.push(`${cleanPrefix} ${String(nextNum).padStart(padLength, '0')}`);
+        (dangkyRes.data || []).forEach(r => {
+            extractNum(r.entryNumber);
+            extractNum((r as any)?.data?.so_vao_so);
+            extractNum((r as any)?.data?.entryNumber);
+        });
+        (luutruRes.data || []).forEach(r => {
+            extractNum(r.entryNumber);
+            extractNum((r as any)?.data?.so_vao_so);
+            extractNum((r as any)?.data?.entryNumber);
+        });
+
+        // 2. Thử gọi RPC nếu có
+        try {
+            const { data, error } = await supabase.rpc('allocate_next_vao_so_numbers', {
+                p_prefix: prefix,
+                p_count: count,
+                p_pad_length: padLength
+            });
+
+            if (!error && data && Array.isArray(data)) {
+                const rpcNums = data.map((d: any) => d.allocated_number);
+                let rpcMax = 0;
+                rpcNums.forEach((n: string) => {
+                    const matches = String(n).match(/\d+/g);
+                    if (matches) {
+                        matches.forEach(m => {
+                            const num = parseInt(m, 10);
+                            if (!isNaN(num) && num > rpcMax) rpcMax = num;
+                        });
+                    }
+                });
+
+                // Nếu số RPC trả về lớn hơn maxVal thực tế, sử dụng kết quả RPC
+                if (rpcMax > maxVal) {
+                    return rpcNums;
+                }
+            }
+        } catch {
+            // RPC lỗi hoặc không tồn tại, sẽ sử dụng kết quả quét DB + bộ đệm
+        }
+
+        // 3. Sử dụng kết quả quét MAX toàn diện (DB + Cache + Memory state)
+        const results: string[] = [];
+        for (let i = 1; i <= count; i++) {
+            const nextNum = maxVal + i;
+            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+        }
+        return results;
+    } catch (err) {
+        console.warn("[VaoSo API Warning] Lỗi khi cấp số vào sổ, sử dụng bộ đệm:", err);
+        const results: string[] = [];
+        for (let i = 1; i <= count; i++) {
+            const nextNum = maxVal + i;
+            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+        }
+        return results;
     }
-    return results;
 };
 
 /**
- * Ánh xạ và đồng bộ tự động hồ sơ Đăng ký/Cấp giấy đã ký sang Module Vào sổ GCN
- * Độc lập 100% trong bảng dangky_records, KHÔNG đưa bản ghi vào bảng luutru_records
+ * Ánh xạ và đồng bộ tự động hồ sơ Đăng ký/Cấp giấy đã ký sang Module Vào sổ GCN (luutru_records type = 'vaoso')
+ * Đảm bảo Idempotency (không trùng, không lặp bản ghi khi bấm duyệt lại)
  */
 export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean> => {
     if (!records || records.length === 0) return true;
 
-    // KHÓA CỨNG: CHỈ đồng bộ những hồ sơ đã ký duyệt và chuyển sang: PENDING_HANDOVER, HANDOVER, RETURNED
-    const eligibleRecords = records.filter(rec => {
-        const recStatus = rec.status || (rec.data && rec.data.status);
-        return isStatusEligibleForVaoSo(recStatus);
-    });
-
-    if (eligibleRecords.length === 0) return true;
-
     try {
-        // Làm mới cache module Vào sổ GCN để nạp danh sách mới nhất từ dangky_records
+        const nowIso = new Date().toISOString();
+        const promises = records.map(async (rec) => {
+            // Xác định các trường bổ sung chi tiết theo thiết kế
+            const extraData = {
+                ...(typeof rec.data === 'object' && rec.data !== null ? rec.data : {}),
+                ma_ho_so: rec.code,
+                code: rec.code,
+                so_hieu: rec.code,
+                ten_chu_su_dung: rec.customerName,
+                customerName: rec.customerName,
+                cccd: rec.cccd,
+                phoneNumber: rec.phoneNumber,
+                customerAddress: rec.customerAddress,
+                recordType: rec.recordType || 'Vào sổ GCN',
+                receivedDate: rec.receivedDate,
+                deadline: rec.deadline,
+                thua_dat: rec.landPlot,
+                landPlot: rec.landPlot,
+                to_ban_do: rec.mapSheet,
+                mapSheet: rec.mapSheet,
+                area: rec.area,
+                address: rec.address,
+                dia_danh: rec.ward,
+                ward: rec.ward,
+                so_phat_hanh: rec.issueNumber || '',
+                so_vao_so: rec.entryNumber || '',
+                ngay_ky_gcn: rec.approvalDate || nowIso,
+                stage: 'vao_so',
+                ghi_chu: rec.notes || '',
+                is_scanned: false
+            };
+
+            const luutruPayload: any = {
+                id: rec.id, // Sử dụng luôn ID của hồ sơ đăng ký để đảm bảo 1-1 và chống trùng lắp hoàn toàn!
+                code: rec.code,
+                so_hieu: rec.code,
+                customerName: rec.customerName,
+                content: rec.content || rec.recordType || 'Vào sổ GCN',
+                receivedDate: rec.receivedDate || nowIso.split('T')[0],
+                receivedBy: rec.receivedBy || null,
+                ward: rec.ward || null,
+                mapSheet: rec.mapSheet || null,
+                landPlot: rec.landPlot || null,
+                area: rec.area || null,
+                address: rec.address || null,
+                group: '3. Đăng ký đất đai, cấp GCN',
+                recordType: 'Vào sổ GCN',
+                status: RecordStatus.PENDING_HANDOVER,
+                approvalDate: rec.approvalDate || nowIso.split('T')[0],
+                notes: rec.notes || null,
+                phoneNumber: rec.phoneNumber || null,
+                cccd: rec.cccd || null,
+                customerAddress: rec.customerAddress || null,
+                entryNumber: rec.entryNumber || null,
+                issueNumber: rec.issueNumber || null,
+                isHandedOver: false,
+                data: extraData
+            };
+
+            if (!isConfigured) {
+                // Offline demo update
+                const idx = MOCK_ARCHIVE.findIndex(a => a.id === rec.id);
+                const archRec: ArchiveRecord = {
+                    id: rec.id,
+                    type: 'vaoso',
+                    status: 'draft',
+                    so_hieu: rec.code,
+                    trich_yeu: rec.recordType || 'Vào sổ GCN',
+                    ngay_thang: rec.receivedDate || nowIso.split('T')[0],
+                    noi_nhan_gui: rec.customerName,
+                    data: extraData
+                };
+                if (idx !== -1) {
+                    MOCK_ARCHIVE[idx] = archRec;
+                } else {
+                    MOCK_ARCHIVE.push(archRec);
+                }
+                const vaosoList = MOCK_ARCHIVE.filter(a => a.type === 'vaoso');
+                saveToCache(CACHE_KEY_ARCHIVE_VAOSO, vaosoList);
+                memoryArchiveTypeCaches.set('vaoso', vaosoList);
+                return;
+            }
+
+            // Gọi Upsert trực tiếp bằng ID duy nhất để đảm bảo không bao giờ nhân bản bản ghi
+            let { error } = await supabase.from('luutru_records').upsert(luutruPayload);
+            if (error && (error.code === '42703' || String(error.message || '').includes('column') || error.code === 'PGRST204')) {
+                const fallbackPayload = { ...luutruPayload };
+                OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                const retryRes = await supabase.from('luutru_records').upsert(fallbackPayload);
+                error = retryRes.error;
+            }
+            if (error) {
+                console.error(`[VaoSo Sync] Không thể đồng bộ hồ sơ ${rec.code} sang Vào sổ GCN:`, error);
+                throw error;
+            }
+        });
+
+        await Promise.all(promises);
+
+        // Khởi động lại cache local sau khi upsert thành công
         clearArchiveMemoryCaches('vaoso');
+        if (isConfigured) {
+            const { data } = await supabase.from('luutru_records').select('*');
+            if (data) {
+                const mapped = data.map(item => mapLuutruDbToArchiveRecord(item));
+                const vaosoRecords = mapped.filter(r => r.type === 'vaoso');
+                saveToCache(CACHE_KEY_ARCHIVE_VAOSO, vaosoRecords);
+                memoryArchiveTypeCaches.set('vaoso', vaosoRecords);
+            }
+        }
         return true;
     } catch (err) {
-        console.error("[VaoSo Sync] Lỗi đồng bộ:", err);
+        console.error("[VaoSo Sync] Lỗi đồng bộ hàng loạt:", err);
         return false;
     }
 };

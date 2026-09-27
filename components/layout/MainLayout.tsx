@@ -236,8 +236,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 />
 
                 {/* CONTENT */}
-                <div className="flex-1 flex flex-col min-w-0 bg-[#f0f2f5] overflow-y-auto">
-                    <main className="flex-1 p-4 relative">
+                <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f0f2f5]">
+                    <main className="flex-1 p-4 overflow-hidden relative">
                         {children}
                     </main>
                 </div>

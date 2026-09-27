@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { DetailModal } from '../DetailModal';
 import { ExtendDeadlineModal } from '../ExtendDeadlineModal';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, getBatchDisplayParts, formatDateTimeVN, getVietnamNowISO } from '../../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, getBatchDisplayParts } from '../../utils/appHelpers';
 import { hasRecordActionPermission } from '../../utils/permissionUtils';
 
 interface RecordSearchProps {
@@ -515,7 +515,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
         if (!selectedExtendRecord) return;
         try {
             const userLabel = currentUser?.name || currentUser?.username || 'Cán bộ';
-            const nowStr = formatDateTimeVN(getVietnamNowISO());
+            const nowStr = new Date().toLocaleString('vi-VN');
             const extensionLog = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(selectedExtendRecord.deadline)} -> Hạn mới: ${formatDate(newDeadline)}. Lý do: ${reason.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
             
             const existingPrivateNotes = selectedExtendRecord.privateNotes || '';

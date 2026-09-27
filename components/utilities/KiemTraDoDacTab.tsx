@@ -22,7 +22,7 @@ import {
     Trash2
 } from 'lucide-react';
 import { RecordFile, Employee, NotifyFunction, RecordStatus } from '../../types';
-import { getDepartmentForRecord, formatDateDDMMYYYY, parseSafeDate, confirmAction, resolveEmployeeName } from '../../utils/appHelpers';
+import { getDepartmentForRecord, formatDateDDMMYYYY, parseSafeDate, confirmAction } from '../../utils/appHelpers';
 import { getShortRecordType } from '../../constants';
 import * as XLSX from 'xlsx-js-style';
 
@@ -819,7 +819,8 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
 
         const getEmployeeName = (idOrName: string | null | undefined): string => {
             if (!idOrName) return '';
-            return resolveEmployeeName(idOrName, employees);
+            const emp = employees.find(e => e.id === idOrName || e.name === idOrName);
+            return emp ? emp.name : idOrName;
         };
 
         const dataRows: any[] = [];

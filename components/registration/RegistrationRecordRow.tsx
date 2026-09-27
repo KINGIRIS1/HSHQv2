@@ -12,10 +12,9 @@ import {
   Eye,
   AlertTriangle,
 } from 'lucide-react';
-import { RecordFile, Employee, User as AppUser, RecordStatus, DossierComponentItem } from '../../types';
+import { RecordFile, Employee, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
 import { getRegistrationWorkflowCategory, getStepSlaInfo, getAppointmentInfo } from '../../utils/registrationWorkflows';
-import { resolveEmployeeName } from '../../utils/appHelpers';
 
 interface RegistrationRecordRowProps {
   record: RecordFile;
@@ -27,7 +26,6 @@ interface RegistrationRecordRowProps {
   onDelete?: (record: RecordFile) => void;
   onAssign?: (record: RecordFile) => void;
   employees?: Employee[];
-  users?: AppUser[];
 }
 
 export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
@@ -40,7 +38,6 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
   onDelete,
   onAssign,
   employees = [],
-  users = [],
 }) => {
   const isOverdue = React.useMemo(() => {
     if (
@@ -164,8 +161,12 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
       <td className="py-2.5 px-3">
         {record.assignedTo ? (
           (() => {
-            const displayName = resolveEmployeeName(record.assignedTo, employees, users);
-
+            const cleanKey = (record.assignedTo || '').trim().toLowerCase();
+            const emp = (employees || []).find(e => 
+              (e.id || '').trim().toLowerCase() === cleanKey || 
+              (e.name || '').trim().toLowerCase() === cleanKey
+            );
+            const displayName = emp && emp.name ? emp.name : record.assignedTo;
             return (
               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-medium">
                 <User size={11} className="text-slate-500" />

@@ -33,13 +33,11 @@ import { syncDangKyToVaoSo } from '../../services/apiArchive';
 interface RegistrationModuleViewProps {
   currentUser?: User | null;
   employees: Employee[];
-  users?: User[];
 }
 
 export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   currentUser,
   employees,
-  users = [],
 }) => {
   const [records, setRecords] = useState<RecordFile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -573,7 +571,6 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
                         setIsAssignOpen(true);
                       }}
                       employees={employees}
-                      users={users}
                     />
                   ))
                 )}

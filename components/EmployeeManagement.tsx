@@ -8,7 +8,7 @@ import { DEPARTMENTS, POSITIONS } from '../constants';
 
 interface EmployeeManagementProps {
   employees: Employee[];
-  onSaveEmployee: (employee: Employee, originalId?: string) => void;
+  onSaveEmployee: (employee: Employee) => void;
   onDeleteEmployee: (id: string) => void;
   wards: string[]; 
   currentUser: User | null; 
@@ -23,7 +23,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'detail'>('list');
   const [editingEmployee, setEditingEmployee] = useState<Partial<Employee>>({ id: '', name: '', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: [] });
-  const [originalId, setOriginalId] = useState<string>('');
   const [isNew, setIsNew] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
@@ -48,7 +47,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
   const handleEditClick = (emp: Employee) => {
       setEditingEmployee({ ...emp });
-      setOriginalId(emp.id);
       setIsNew(false);
       setActiveTab('detail');
   };
@@ -61,7 +59,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
           position: 'Nhân viên',
           managedWards: [] 
       });
-      setOriginalId('');
       setIsNew(true);
       setActiveTab('detail');
   };
@@ -80,7 +77,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         return;
     }
     const newEmp = editingEmployee as Employee;
-    onSaveEmployee(newEmp, originalId);
+    onSaveEmployee(newEmp);
     alert(isNew ? 'Đã thêm nhân viên mới!' : 'Đã cập nhật thông tin!');
     setActiveTab('list');
   };

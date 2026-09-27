@@ -1,8 +1,8 @@
 import { supabase } from './supabaseClient';
 import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, RecordStatus } from '../types';
 import { connectionManager } from './connectionService';
-import { isBlankRecord, keepOnlyDate, keepOnlyDateTime, sanitizePayloadForDateErrors } from './apiCore';
-import { getTargetTable } from './apiRecords';
+import { sanitizeData, isBlankRecord, keepOnlyDate, keepOnlyDateTime, sanitizePayloadForDateErrors } from './apiCore';
+import { getTargetTable, RECORD_DB_COLUMNS } from './apiRecords';
 import { calculateRegistrationDeadline, addCalendarDays } from '../utils/registrationWorkflows';
 
 /**

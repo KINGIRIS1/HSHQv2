@@ -201,8 +201,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
   };
 
   // --- LOGIC TÍNH HẠN TRẢ ---
-  const calculateDeadline = (type: string, receivedDateStr: string, fullRecord?: Partial<RecordFile>) => {
-      return calculateDeadlineHelper(type, receivedDateStr, holidays, fullRecord);
+  const calculateDeadline = (type: string, receivedDateStr: string) => {
+      return calculateDeadlineHelper(type, receivedDateStr, holidays);
   };
 
   // ... (Phần logic in ấn và render giữ nguyên)
@@ -445,8 +445,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
                 onPreviewExcel={handlePreviewExcel}
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}
-                onDeleteRecord={onDelete}
-                onDeleteBatch={onDeleteBatch}
                 onPrint={handlePreviewDocx}
                 onCreateContract={onCreateContract}
                 onHandOverRecords={onHandOverRecords}

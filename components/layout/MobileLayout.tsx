@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { User, UserRole, RecordFile } from '../../types';
-import { NotificationBell } from '../NotificationBell';
+import { User, UserRole } from '../../types';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -37,10 +36,6 @@ interface MobileLayoutProps {
   unreadMessages: number;
   activeRemindersCount: number;
   onOpenRecordModal?: () => void;
-  records?: RecordFile[];
-  onViewRecord?: (record: RecordFile) => void;
-  onClearReminder?: (recordId: string) => void;
-  onClearAllReminders?: () => void;
 }
 
 const MobileLayout: React.FC<MobileLayoutProps> = ({
@@ -51,11 +46,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
   children,
   unreadMessages,
   activeRemindersCount,
-  onOpenRecordModal,
-  records = [],
-  onViewRecord,
-  onClearReminder,
-  onClearAllReminders
+  onOpenRecordModal
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
@@ -84,21 +75,14 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
             <h1 className="font-bold text-base sm:text-lg tracking-tight truncate">QLHS Mobile</h1>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <NotificationBell 
-              records={records}
-              currentUser={currentUser}
-              onViewRecord={(r) => {
-                if (onViewRecord) {
-                  onViewRecord(r);
-                }
-              }}
-              onClearReminder={(id) => {
-                if (onClearReminder) {
-                  onClearReminder(id);
-                }
-              }}
-              onClearAllReminders={onClearAllReminders}
-            />
+            <button className="relative min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-full transition-colors cursor-pointer">
+              <Bell size={20} />
+              {activeRemindersCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-[10px] flex items-center justify-center rounded-full border-2 border-blue-700 font-bold">
+                  {activeRemindersCount}
+                </span>
+              )}
+            </button>
             
             <div className="relative">
               <button 

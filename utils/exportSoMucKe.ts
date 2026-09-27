@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType, AlignmentType, VerticalAlign } from "docx";
+import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType, AlignmentType, VerticalAlign, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
 import { ArchiveRecord } from "../services/apiArchive";

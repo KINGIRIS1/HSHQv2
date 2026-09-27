@@ -1,17 +1,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { RecordFile, Employee, User, UserRole, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
+import { RecordFile, Employee, User, UserRole, RecordStatus, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, deleteRecordsBatchApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting,
-    enrichUsersList, enrichUserWithEmployees, RECENTLY_UPDATED_RECORDS, migrateEmployeeIdInAllTables} from '../services/api';
+    enrichUsersList, enrichUserWithEmployees, RECENTLY_UPDATED_RECORDS, markRecordsRecentlyUpdated
+} from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
 import { fetchAllArchiveRecordsAsRecordFiles } from '../services/apiArchive';
 import { getIndexedDBItem } from '../services/storageService';
 import { getPendingSyncCount, syncPendingRecordsToCloud, generateStandardUUID } from '../services/syncQueueService';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
-import { migrateUnbatchedRecords, deduplicateRecords, normalizeEmployeeId } from '../utils/appHelpers';
+import { migrateUnbatchedRecords, deduplicateRecords } from '../utils/appHelpers';
 import { connectionManager } from '../services/connectionService';
 import { syncGoogleDriveConfigFromCloud } from '../services/attachmentStorage';
 
@@ -54,7 +55,7 @@ const reconcileWithProtectedRecords = (incomingRecords: RecordFile[], currentPre
     });
 };
 
-export const useAppData = (_currentUser?: any) => {
+export const useAppData = (currentUser: User | null) => {
     // Khởi tạo danh sách hồ sơ ban đầu (sẽ được nạp tức thì từ IndexedDB & Cloud)
     const [records, setRecords] = useState<RecordFile[]>([]);
     const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
@@ -156,7 +157,7 @@ export const useAppData = (_currentUser?: any) => {
             }
 
             // GIAI ĐOẠN 2: Nạp ngầm Hồ sơ công việc sau khi hệ thống & nhân sự đã sẵn sàng
-            fetchRecords((_tier, partialList) => {
+            fetchRecords((tier, partialList, isComplete) => {
                 if (Array.isArray(partialList) && partialList.length > 0) {
                     setRecords(prev => {
                         if (!prev || prev.length === 0) {
@@ -727,6 +728,7 @@ export const useAppData = (_currentUser?: any) => {
 
     const handleBatchUpdate = async (updatedRecords: RecordFile[]) => {
         // Optimistic update
+        const updatedIds = updatedRecords.map(r => r.id);
         setRecords(prev => prev.map(r => {
             const found = updatedRecords.find(u => u.id === r.id);
             return found ? found : r;
@@ -734,59 +736,19 @@ export const useAppData = (_currentUser?: any) => {
     };
 
     // --- Employee Handlers ---
-    const handleSaveEmployee = async (emp: Employee, originalId?: string) => {
-        const normEmpId = normalizeEmployeeId(emp.id);
-        const cleanEmp = { ...emp, id: normEmpId };
-        
-        const hasIdChanged = originalId && normalizeEmployeeId(originalId) !== normEmpId;
-        const exists = employees.find(e => {
-            const lookId = originalId ? normalizeEmployeeId(originalId) : normEmpId;
-            return normalizeEmployeeId(e.id) === lookId;
-        });
-
-        const savedEmp = await saveEmployeeApi(cleanEmp, !!exists, originalId);
+    const handleSaveEmployee = async (emp: Employee) => {
+        const exists = employees.find(e => e.id === emp.id);
+        const savedEmp = await saveEmployeeApi(emp, !!exists);
         if (savedEmp) {
-            let nextEmps = employees;
-            if (hasIdChanged && originalId) {
-                const normOldId = normalizeEmployeeId(originalId);
-                nextEmps = employees.filter(e => normalizeEmployeeId(e.id) !== normOldId);
-            }
-            
-            const matchExists = nextEmps.find(e => normalizeEmployeeId(e.id) === normEmpId);
-            nextEmps = matchExists
-                ? nextEmps.map(e => normalizeEmployeeId(e.id) === normEmpId ? savedEmp : e)
-                : [...nextEmps, savedEmp];
-
+            const nextEmps = exists
+                ? employees.map(e => e.id === savedEmp.id ? savedEmp : e)
+                : [...employees, savedEmp];
             setEmployees(nextEmps);
 
             // Tự động re-enrich danh sách users dựa trên danh sách nhân viên mới
             enrichUsersList(users, nextEmps).then(enrichedUsers => {
                 setUsers(enrichedUsers);
             });
-
-            // Nếu ID nhân viên bị thay đổi, tiến hành đồng bộ ngầm toàn bộ mã nhân sự cũ trong các bảng hồ sơ sang mã nhân sự mới
-            if (hasIdChanged && originalId) {
-                const normOldId = normalizeEmployeeId(originalId);
-                
-                // 1. Cập nhật ngầm trên Supabase Cloud
-                migrateEmployeeIdInAllTables(normOldId, normEmpId).catch(err => {
-                    console.error("Lỗi đồng bộ mã nhân viên hàng loạt trên Cloud DB:", err);
-                });
-
-                // 2. Cập nhật tức thời trong state local (RAM) để thay đổi hiển thị ngay lập tức
-                setRecords(prev => prev.map(r => {
-                    let changed = false;
-                    const rUpdated = { ...r };
-                    const fields = ['assignedTo', 'receivedBy', 'surveyorId', 'drafterId', 'checkedBy', 'submittedTo', 'returnedBy'] as const;
-                    fields.forEach(f => {
-                        if (rUpdated[f] && normalizeEmployeeId(rUpdated[f]) === normOldId) {
-                            (rUpdated as any)[f] = normEmpId;
-                            changed = true;
-                        }
-                    });
-                    return changed ? rUpdated : r;
-                }));
-            }
         }
     };
 

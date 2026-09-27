@@ -94,8 +94,6 @@ ALTER TABLE land_records ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "privateNotes" TEXT;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "personalNotes" TEXT;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "dossierComponents" JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS certificate_owners JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "certificateOwners" JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "attachedFiles" JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "statusLogs" JSONB DEFAULT '[]'::jsonb;
 

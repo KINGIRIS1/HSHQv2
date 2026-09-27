@@ -1,40 +1,40 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, User, UserRole } from '../types';
 import { updateRecordFieldsApi } from '../services/api';
-import { addInAppNotificationForUser, isUserRelatedToRecord } from '../services/inAppNotificationService';
 
 const REMINDER_INTERVAL = 60000; // Kiểm tra mỗi 1 phút
 const REPEAT_HOURS = 2; // Nhắc lại mỗi 2 giờ
+
+// Helper gửi thông báo hệ thống (Notification API)
+const triggerSystemNotification = (title: string, body: string) => {
+    if (window.electronAPI && window.electronAPI.showNotification) {
+        window.electronAPI.showNotification(title, body);
+    } else if (Notification.permission === 'granted') {
+        new Notification(title, { body });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                new Notification(title, { body });
+            }
+        });
+    }
+};
 
 export const useReminderSystem = (
     records: RecordFile[], 
     onUpdateRecord: (id: string, fields: Partial<RecordFile>) => void,
     currentUser: User | null
 ) => {
-    // 1. Phân luồng tính toán số lượng nhắc nhở active theo tài khoản đăng nhập
+    // Tính toán số lượng nhắc nhở active bằng useMemo thay vì useEffect + useState
     const activeRemindersCount = useMemo(() => {
-        if (!currentUser) return 0;
         const now = Date.now();
-        
         return records.filter(r => {
             if (!r.reminderDate) return false;
-            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED) {
-                return false;
-            }
-            
-            // Phân luồng nghiêm ngặt theo tài khoản: Nhân viên chỉ thấy hồ sơ thuộc trách nhiệm của mình
-            const isRelated = isUserRelatedToRecord(r, currentUser);
-            const isManager = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
-            
-            // Nếu không phải quản trị viên, chỉ đếm hồ sơ của chính mình
-            if (!isManager && !isRelated) {
-                return false;
-            }
-
+            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) return false;
             const reminderTime = new Date(r.reminderDate).getTime();
             return reminderTime <= now;
         }).length;
-    }, [records, currentUser]);
+    }, [records]);
 
     // Dùng ref để tránh việc effect chạy lại mỗi khi records thay đổi
     const recordsRef = useRef(records);
@@ -42,18 +42,19 @@ export const useReminderSystem = (
         recordsRef.current = records;
     }, [records]);
 
-    // Cập nhật ref cho onUpdateRecord
+    // Cập nhật ref cho onUpdateRecord để tránh khởi động lại useEffect liên tục
     const onUpdateRef = useRef(onUpdateRecord);
     useEffect(() => {
         onUpdateRef.current = onUpdateRecord;
     }, [onUpdateRecord]);
 
-    // Set lưu trữ các id đã nhắc nhở trong phiên này
+    // Set lưu trữ các id đã nhắc nhở trong phiên này để tránh phụ thuộc hoàn toàn vào DB (đề phòng thiếu cột)
     const remindedIds = useRef<Set<string>>(new Set());
 
-    // 2. Tự động gom các sự kiện phân công, trình ký, trả về vào Thông báo nội bộ (Hoàn toàn trong phần mềm)
+    // 1. Tích hợp gửi thông báo hệ thống khi hồ sơ đổi trạng thái
     const prevRecordsRef = useRef<RecordFile[]>([]);
     useEffect(() => {
+        // Nếu lần đầu tiên load hoặc danh sách rỗng thì chưa so sánh trạng thái
         if (prevRecordsRef.current.length === 0) {
             prevRecordsRef.current = records;
             return;
@@ -63,70 +64,61 @@ export const useReminderSystem = (
             const prevR = prevRecordsRef.current.find(p => p.id === r.id);
             if (prevR && prevR.status !== r.status) {
                 const newStatus = r.status;
+                const isAssignedEmployee = currentUser && currentUser.employeeId === r.assignedTo;
 
-                // A. 'Chờ ký duyệt' -> RecordStatus.PENDING_SIGN
+                // A. 'Đang chờ ký' -> RecordStatus.PENDING_SIGN
                 if (newStatus === RecordStatus.PENDING_SIGN) {
-                    const targetSupervisor = r.submittedTo || 'admin';
-                    addInAppNotificationForUser(targetSupervisor, {
-                        type: 'PENDING_SIGN',
-                        recordId: r.id,
-                        recordCode: r.code,
-                        customerName: r.customerName,
-                        title: `Yêu cầu Trình ký mới: ${r.code}`,
-                        message: `Hồ sơ khách hàng ${r.customerName} đã được trình ký duyệt. Vui lòng kiểm tra!`,
-                    });
+                    const isRelevantSupervisor = currentUser && (
+                        currentUser.role === UserRole.ADMIN ||
+                        currentUser.role === UserRole.SUBADMIN ||
+                        currentUser.employeeId === r.submittedTo
+                    );
 
-                    // Báo lại cho nhân viên phụ trách hồ sơ
-                    if (r.assignedTo && r.assignedTo !== targetSupervisor) {
-                        addInAppNotificationForUser(r.assignedTo, {
-                            type: 'STATUS_CHANGE',
-                            recordId: r.id,
-                            recordCode: r.code,
-                            customerName: r.customerName,
-                            title: `Hồ sơ đã được trình ký: ${r.code}`,
-                            message: `Hồ sơ khách hàng ${r.customerName} đã chuyển sang trạng thái chờ ký duyệt.`,
-                        });
+                    if (isRelevantSupervisor) {
+                        triggerSystemNotification(
+                            `Yêu cầu Trình ký mới: ${r.code}`,
+                            `Hồ sơ của khách hàng ${r.customerName} đã được trình ký duyệt. Vui lòng kiểm tra!`
+                        );
+                    } else if (isAssignedEmployee) {
+                        triggerSystemNotification(
+                            `Hồ sơ đã được trình ký: ${r.code}`,
+                            `Hồ sơ của khách hàng ${r.customerName} đã chuyển sang trạng thái chờ ký duyệt.`
+                        );
                     }
                 }
 
-                // B. 'Hồ sơ trả về' -> RecordStatus.REJECTED
+                // B. 'Đã trả về' -> RecordStatus.REJECTED (trả về nhân viên)
                 if (newStatus === RecordStatus.REJECTED) {
-                    const targets = [r.assignedTo, r.surveyorId, r.drafterId, r.receivedBy].filter(Boolean) as string[];
-                    const uniqueTargets = Array.from(new Set(targets));
-                    for (const target of uniqueTargets) {
-                        addInAppNotificationForUser(target, {
-                            type: 'REJECTED',
-                            recordId: r.id,
-                            recordCode: r.code,
-                            customerName: r.customerName,
-                            title: `Hồ sơ bị trả về: ${r.code}`,
-                            message: `Hồ sơ khách hàng ${r.customerName} đã bị trả về. Ghi chú: ${r.notes || 'Không có ghi chú'}`,
-                        });
+                    const isOneDoor = currentUser && currentUser.role === UserRole.ONEDOOR;
+                    if (isAssignedEmployee) {
+                        triggerSystemNotification(
+                            `Hồ sơ bị trả về: ${r.code}`,
+                            `Hồ sơ khách hàng ${r.customerName} đã bị trả về. Ghi chú: ${r.notes || 'Không có ghi chú chi tiết'}`
+                        );
+                    } else if (isOneDoor) {
+                        triggerSystemNotification(
+                            `Hồ sơ lỗi trả về một cửa: ${r.code}`,
+                            `Hồ sơ ${r.code} (khách hàng ${r.customerName}) đã bị trả về một cửa.`
+                        );
                     }
                 }
 
-                // C. 'Giao nhân viên' -> Phân công hồ sơ mới
-                if (newStatus === RecordStatus.ASSIGNED || newStatus === RecordStatus.FIELD_WORK || newStatus === RecordStatus.OFFICE_WORK) {
-                    const targets = [r.assignedTo, r.surveyorId, r.drafterId].filter(Boolean) as string[];
-                    const uniqueTargets = Array.from(new Set(targets));
-                    for (const target of uniqueTargets) {
-                        addInAppNotificationForUser(target, {
-                            type: 'ASSIGNED',
-                            recordId: r.id,
-                            recordCode: r.code,
-                            customerName: r.customerName,
-                            title: `Giao hồ sơ mới: ${r.code}`,
-                            message: `Bạn được phân công xử lý hồ sơ ${r.code} (${r.customerName}).`,
-                        });
+                // C. 'Giao giải quyết' -> RecordStatus.ASSIGNED
+                if (newStatus === RecordStatus.ASSIGNED) {
+                    if (isAssignedEmployee) {
+                        triggerSystemNotification(
+                            `Giao hồ sơ mới: ${r.code}`,
+                            `Bạn đã được phân công xử lý hồ sơ ${r.code} cho khách hàng ${r.customerName}.`
+                        );
                     }
                 }
             }
         }
 
         prevRecordsRef.current = records;
-    }, [records]);
+    }, [records, currentUser]);
 
-    // 3. Logic Polling kiểm tra nhắc hẹn làm việc (CHỈ ĐƯA VÀO QUẢ CHUÔNG NỘI BỘ, KHÔNG BẮN RA NGOÀI PHẦN MỀM)
+    // Logic Polling để bắn thông báo nhắc lịch hẹn
     useEffect(() => {
         let isCancelled = false;
 
@@ -137,14 +129,13 @@ export const useReminderSystem = (
             for (const r of recordsRef.current) {
                 if (isCancelled) break;
 
+                // --- KIỂM TRA NHẮC LỊCH HẸN THƯỜNG ---
                 if (r.reminderDate) {
-                    const isFinished = r.status === RecordStatus.HANDOVER || 
-                                       r.status === RecordStatus.WITHDRAWN || 
-                                       r.status === RecordStatus.REJECTED || 
-                                       r.status === RecordStatus.RETURNED;
+                    const isFinished = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
                     const reminderTime = new Date(r.reminderDate).getTime();
                     
                     if (!isFinished && reminderTime <= now) {
+                        // Kiểm tra điều kiện nhắc lại (2 tiếng)
                         let shouldNotify = false;
                         if (!r.lastRemindedAt) {
                             if (!remindedIds.current.has(r.id)) {
@@ -161,25 +152,10 @@ export const useReminderSystem = (
                         if (shouldNotify) {
                             remindedIds.current.add(r.id);
                             
-                            // Phân luồng đưa vào thông báo nội bộ cho đúng người phụ trách hồ sơ
-                            const responsibleUsers = [r.assignedTo, r.surveyorId, r.drafterId, r.receivedBy]
-                                .filter(Boolean) as string[];
-                            
-                            const targetUsers = responsibleUsers.length > 0 
-                                ? Array.from(new Set(responsibleUsers)) 
-                                : [currentUser?.username || 'admin'];
-
-                            for (const targetUser of targetUsers) {
-                                addInAppNotificationForUser(targetUser, {
-                                    type: 'REMINDER',
-                                    recordId: r.id,
-                                    recordCode: r.code,
-                                    customerName: r.customerName,
-                                    title: `Nhắc hẹn hồ sơ: ${r.code}`,
-                                    message: `Đã đến giờ hẹn xử lý hồ sơ khách hàng: ${r.customerName}.`,
-                                    reminderDate: r.reminderDate
-                                });
-                            }
+                            triggerSystemNotification(
+                                `Nhắc nhở hồ sơ: ${r.code}`,
+                                `Đã đến giờ hẹn xử lý hồ sơ khách hàng: ${r.customerName}. Vui lòng kiểm tra!`
+                            );
 
                             const nextLastRemindedAt = new Date().toISOString();
                             onUpdateRef.current(r.id, { lastRemindedAt: nextLastRemindedAt });

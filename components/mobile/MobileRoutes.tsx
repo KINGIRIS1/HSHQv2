@@ -78,7 +78,6 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
         <MobileRecordList 
           records={records} 
           employees={employees}
-          users={users}
           currentUser={currentUser}
           wards={wards}
           onViewRecord={props.handleViewRecord}

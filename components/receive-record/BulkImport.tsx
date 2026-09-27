@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType } from '../../constants';

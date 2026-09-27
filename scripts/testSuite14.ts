@@ -19,11 +19,11 @@ const mockStorage: Record<string, string> = {};
 
 // Mock IndexedDB
 const mockIndexedDB = {
-    open: () => {
+    open: (name: string, version: number) => {
         const req: any = {
             result: {
                 objectStoreNames: { contains: () => true },
-                transaction: () => {
+                transaction: (storeName: string, mode: string) => {
                     const tx: any = {
                         objectStore: () => ({
                             get: (key: string) => {
@@ -99,11 +99,14 @@ async function runTestSuite() {
         getPendingSyncItems,
         savePendingSyncItems,
         addPendingRecord,
+        removePendingRecord,
+        syncPendingRecordsToCloud,
         withMutationLock
     } = await import('../services/syncQueueService');
     const {
         createRecordApi,
         updateRecordApi,
+        updateRecordFieldsApi,
         deleteRecordApi,
         updateRecordsBatchById,
         deleteRecordsBatchApi,

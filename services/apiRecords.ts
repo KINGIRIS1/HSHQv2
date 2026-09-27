@@ -35,7 +35,7 @@ export const RECORD_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
-    'attachedFiles', 'dossierComponents', 'certificateOwners',
+    'attachedFiles', 'dossierComponents',
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
     'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
 ];
@@ -57,7 +57,7 @@ export const LAND_RECORDS_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
-    'attachedFiles', 'dossierComponents', 'certificateOwners',
+    'attachedFiles', 'dossierComponents',
     'updated_at'
 ];
 
@@ -76,7 +76,7 @@ export const DANGKY_RECORDS_DB_COLUMNS = [
     'price', 'advancePayment', 'isHandedOver',
     'returnBatch', 'returnBatchDate', 'returnHandoverDept',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
-    'attachedFiles', 'dossierComponents', 'certificateOwners',
+    'attachedFiles', 'dossierComponents',
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
     'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate',
     'updated_at'
@@ -97,7 +97,7 @@ export const LUUTRU_RECORDS_DB_COLUMNS = [
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
-    'attachedFiles', 'dossierComponents', 'certificateOwners',
+    'attachedFiles', 'dossierComponents',
     'type', 'so_hieu', 'trich_yeu', 'ngay_thang', 'noi_nhan_gui', 'created_by',
     'updated_at'
 ];
@@ -135,9 +135,7 @@ export const sanitizeRecordPayloadForTable = (
         normalized.handoverWard = normalized.data.handoverWard;
     }
 
-    let sanitized = sanitizeData(normalized, allowedColumns);
-    sanitized = sanitizePayloadFor22P02(sanitized);
-    sanitized = sanitizePayloadForDateErrors(sanitized);
+    const sanitized = sanitizeData(normalized, allowedColumns);
     // Loại bỏ triệt để 'data' và các trường runtime ngoại lai
     delete (sanitized as any).data;
     delete (sanitized as any).sourceTable;
@@ -395,8 +393,12 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
  * Chỉ coi là xung đột thật sự nếu DB có updated_at mới hơn bản ghi của client trên 2000ms.
  */
 export const isConcurrencyConflict = (dbUpdatedAt?: string | null, clientUpdatedAt?: string | null): boolean => {
-    // Tắt kiểm tra xung đột phiên ghi nghiêm ngặt để đảm bảo các thao tác cập nhật trạng thái/tiến độ luôn thành công mượt mà
-    return false;
+    if (!dbUpdatedAt || !clientUpdatedAt) return false;
+    const dbTime = new Date(dbUpdatedAt).getTime();
+    const clientTime = new Date(clientUpdatedAt).getTime();
+    if (isNaN(dbTime) || isNaN(clientTime)) return false;
+    // Xung đột chỉ xảy ra khi DB thật sự có bản ghi mới hơn client quá 2 giây (> 2000ms)
+    return (dbTime - clientTime) > 2000;
 };
 
 export interface MergeResult {
@@ -468,8 +470,12 @@ export const mergeRecordSafely = (
             } else if (localVal === null || localVal === undefined || localVal === '' || (Array.isArray(localVal) && localVal.length === 0)) {
                 merged[key] = serverVal;
             } else {
-                // Ưu tiên giá trị local thay vì báo conflict để đảm bảo các thao tác cập nhật (status, assignedTo...) không bao giờ bị chặn
-                merged[key] = localVal;
+                const criticalFields = ['status', 'assignedTo', 'deadline', 'exportBatch', 'isHandedOver', 'hasDefect'];
+                if (criticalFields.includes(key)) {
+                    conflictFields.push(key);
+                } else {
+                    merged[key] = localVal;
+                }
             }
         }
     }
@@ -493,216 +499,6 @@ export const mergeRecordSafely = (
     };
 };
 
-export const RECORD_CODE_ROUTING_REGISTRY = {
-    LT: {
-        prefix: "LT-",
-        module: "LUU_TRU",
-        table: "luutru_records" as const
-    },
-    TK: {
-        prefix: "TK-",
-        module: "DO_DAC",
-        table: "land_records" as const
-    },
-    TQ: {
-        prefix: "TQ-",
-        module: "DO_DAC",
-        table: "land_records" as const
-    },
-    MD: {
-        prefix: "MD-",
-        module: "DO_DAC",
-        table: "land_records" as const
-    },
-    TH: {
-        prefix: "TH-",
-        module: "DO_DAC",
-        table: "land_records" as const
-    },
-    H19: {
-        prefix: "H19.151.11.22-",
-        module: "DANG_KY",
-        table: "dangky_records" as const
-    }
-} as const;
-
-export const PROCEDURE_TABLE_REGISTRY = {
-    GROUP_1_LUU_TRU: {
-        groupPrefix: "1.",
-        module: "LUU_TRU",
-        table: "luutru_records" as const
-    },
-    GROUP_2_DO_DAC: {
-        groupPrefix: "2.",
-        module: "DO_DAC",
-        table: "land_records" as const
-    },
-    GROUP_3_CAP_GIAY: {
-        groupPrefix: "3.",
-        module: "DANG_KY",
-        table: "dangky_records" as const
-    },
-    MODULE_VAO_SO_GCN: {
-        module: "VAO_SO_GCN",
-        table: "dangky_records" as const,
-        sourceModule: "DANG_KY"
-    },
-    MODULE_HOP_DONG: {
-        module: "HOP_DONG",
-        table: "contracts" as const,
-        parentModule: "DO_DAC"
-    }
-} as const;
-
-export interface RecordRoutingResult {
-    recordId?: string;
-    code: string;
-    prefix?: string;
-    procedureCode: string;
-    module: string;
-    expectedTable: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts';
-    actualTable?: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts' | null;
-    routingStatus: 'ROUTING_VALID' | 'ROUTING_CONFLICT' | 'ROUTING_UNRESOLVED';
-    hasMissingProcedureCode: boolean;
-    routingReason?: string;
-}
-
-export const resolveRecordRouting = (
-    record: Partial<RecordFile>,
-    actualTable?: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts' | null
-): RecordRoutingResult => {
-    const recordId = record.id || (record as any)?.data?.id;
-    const code = String(record.code || (record as any)?.data?.code || '').trim();
-    const upperCode = code.toUpperCase();
-
-    const rawPCode = String(
-        (record as any)?.procedureCode ||
-        (record as any)?.data?.procedureCode ||
-        (record as any)?.data?.ma_thu_tuc ||
-        ''
-    ).trim();
-
-    let expectedTable: 'dangky_records' | 'land_records' | 'luutru_records' | 'contracts' | null = null;
-    let moduleName = '';
-    let matchedPrefix = '';
-
-    const rawType = String(record.recordType || record.content || '').trim();
-
-    // 1. Priority 1: Explicit Archive Procedure Type (1.x = LUU_TRU) or LT-/CV- prefix or keywords
-    const lowerType = rawType.toLowerCase();
-    if (
-        /^1\.\d+/i.test(rawType) || 
-        /^1\./i.test(rawPCode) || 
-        isArchiveRecordType(rawType) || 
-        upperCode.startsWith('LT-') || 
-        upperCode.startsWith('CV-') ||
-        lowerType.includes('sao lục') ||
-        lowerType.includes('công văn') ||
-        lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('cung cấp thông tin')
-    ) {
-        moduleName = 'LUU_TRU';
-        expectedTable = 'luutru_records';
-    } else if (
-        /^3\.\d+/i.test(rawType) || 
-        /^3\./i.test(rawPCode) || 
-        isCertificateRecordType(record) ||
-        upperCode.startsWith('H19.151.11.22-')
-    ) {
-        moduleName = 'DANG_KY';
-        expectedTable = 'dangky_records';
-    } else if (
-        /^2\.\d+/i.test(rawType) || 
-        /^2\./i.test(rawPCode) || 
-        isSurveyRecordType(rawType) || 
-        (record.content && isSurveyRecordType(record.content))
-    ) {
-        moduleName = 'DO_DAC';
-        expectedTable = 'land_records';
-    }
-
-    // 2. Priority 2: Official Record Code Prefix for Survey & Registration
-    if (!expectedTable) {
-        if (upperCode.startsWith('TK-') || upperCode.startsWith('TQ-') || upperCode.startsWith('MD-') || upperCode.startsWith('TH-')) {
-            matchedPrefix = upperCode.slice(0, 3);
-            moduleName = 'DO_DAC';
-            expectedTable = 'land_records';
-        } else if (upperCode.startsWith('H19.151.11.22-')) {
-            matchedPrefix = 'H19.151.11.22-';
-            moduleName = 'DANG_KY';
-            expectedTable = 'dangky_records';
-        }
-    }
-
-    // 4. Priority 4: Other business metadata (so_vao_so / entryNumber)
-    if (!expectedTable && ((record as any)?.data?.so_vao_so || record.entryNumber)) {
-        moduleName = 'VAO_SO_GCN';
-        expectedTable = 'dangky_records';
-    }
-
-    const hasMissingProcedureCode = !rawPCode;
-
-    if (!expectedTable) {
-        return {
-            recordId,
-            code,
-            prefix: matchedPrefix,
-            procedureCode: rawPCode,
-            module: 'UNRESOLVED',
-            expectedTable: (actualTable as any) || 'dangky_records',
-            actualTable,
-            routingStatus: 'ROUTING_UNRESOLVED',
-            hasMissingProcedureCode,
-            routingReason: 'Cannot resolve expected table from code prefix, procedureCode, or recordType'
-        };
-    }
-
-    let routingStatus: 'ROUTING_VALID' | 'ROUTING_CONFLICT' | 'ROUTING_UNRESOLVED' = 'ROUTING_VALID';
-    let routingReason = '';
-
-    if (actualTable && actualTable !== expectedTable) {
-        routingStatus = 'ROUTING_CONFLICT';
-        routingReason = `Record code '${code}' expects table '${expectedTable}' but actual table is '${actualTable}'`;
-    }
-
-    return {
-        recordId,
-        code,
-        prefix: matchedPrefix,
-        procedureCode: rawPCode,
-        module: moduleName,
-        expectedTable,
-        actualTable,
-        routingStatus,
-        hasMissingProcedureCode,
-        routingReason
-    };
-};
-
-export interface ProcedureRoutingResult {
-    procedureCode: string;
-    group: string;
-    module: string;
-    expectedTable: 'dangky_records' | 'land_records' | 'luutru_records';
-    status: 'ROUTING_VALID' | 'ROUTING_UNRESOLVED' | 'ROUTING_CONFLICT';
-    reason?: string;
-}
-
-export const resolveProcedureRouting = (
-    record: Partial<RecordFile>,
-    actualTable?: 'dangky_records' | 'land_records' | 'luutru_records' | null
-): ProcedureRoutingResult => {
-    const res = resolveRecordRouting(record, actualTable as any);
-    return {
-        procedureCode: res.procedureCode,
-        group: res.prefix || (res.module === 'LUU_TRU' ? '1' : res.module === 'DO_DAC' ? '2' : '3'),
-        module: res.module,
-        expectedTable: res.expectedTable === 'contracts' ? 'land_records' : res.expectedTable,
-        status: res.routingStatus,
-        reason: res.routingReason
-    };
-};
-
 export interface RoutingValidationResult {
     valid: boolean;
     targetTable: 'dangky_records' | 'land_records' | 'luutru_records';
@@ -721,12 +517,11 @@ export const validateRecordRouting = (
     record: Partial<RecordFile>,
     targetTableToMutate?: 'dangky_records' | 'land_records' | 'luutru_records'
 ): RoutingValidationResult => {
-    const routingResult = resolveProcedureRouting(record, targetTableToMutate);
-    const targetTable = routingResult.expectedTable;
+    const targetTable = getTargetTable(record);
 
-    if (routingResult.status === 'ROUTING_CONFLICT') {
-        console.error(`[ROUTING] recordId=${record.id || 'N/A'} procedure=${routingResult.procedureCode} expectedTable=${routingResult.expectedTable} actualTable=${targetTableToMutate} decision=BLOCK reason=${routingResult.reason}`);
-        throw new Error(`ROUTING_CONFLICT: Record procedure '${routingResult.procedureCode}' expects '${routingResult.expectedTable}' but target table is specified as '${targetTableToMutate}'. Mutation blocked.`);
+    if (targetTableToMutate && targetTableToMutate !== targetTable) {
+        console.error(`[ROUTING_GUARD][CONFLICT] Record ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}: target table '${targetTableToMutate}' conflicts with resolved target table '${targetTable}'`);
+        throw new Error(`ROUTING_CONFLICT: Record code/group/type indicates '${targetTable}' but target table is specified as '${targetTableToMutate}'. Mutation blocked.`);
     }
 
     return {
@@ -2952,15 +2747,16 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
             
             const previousUpdatedAt = r.updated_at || (r as any).updatedAt;
 
-            // Kiểm tra và tự động cập nhật snapshot nếu có previousUpdatedAt
+            // Kiểm tra xung đột trước khi update nếu có previousUpdatedAt
             if (previousUpdatedAt && r.id && isOnline()) {
                 try {
                     const { data: curData } = await supabase.from(targetTable).select('updated_at').eq('id', r.id).maybeSingle();
                     if (curData && curData.updated_at && isConcurrencyConflict(curData.updated_at, previousUpdatedAt)) {
-                        console.warn(`[MUTATION][CONCURRENCY_SYNC] Auto-resolving bulk update concurrency for Record ID ${r.id} in ${targetTable}. DB: ${curData.updated_at}, Prev: ${previousUpdatedAt}`);
+                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${r.id} in bulkUpdate was updated by another session. DB: ${curData.updated_at}, Expected: ${previousUpdatedAt}`);
+                        throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${r.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
                     }
                 } catch (confErr: any) {
-                    console.warn(`[MUTATION][CONCURRENCY_SYNC] Non-blocking check for Record ID ${r.id}:`, confErr);
+                    if (String(confErr?.message || '').includes('CONCURRENCY_CONFLICT')) throw confErr;
                 }
             }
 
@@ -3002,11 +2798,8 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
                     if (checkData && checkData.length > 0) {
                         const currentDbUpdatedAt = checkData[0].updated_at;
                         if (isConcurrencyConflict(currentDbUpdatedAt, previousUpdatedAt)) {
-                            console.warn(`[MUTATION][CONCURRENCY_SYNC] Auto-resolving bulk update recovery for Record ID ${r.id} in ${targetTable}. DB: ${currentDbUpdatedAt}, Prev: ${previousUpdatedAt}`);
-                            const forceRes = await supabase.from(targetTable).update(payload).eq('id', r.id).select();
-                            if (forceRes.data && forceRes.data.length > 0) {
-                                data = forceRes.data;
-                            }
+                            console.error(`[MUTATION][CONCURRENCY_CONFLICT] Record ID ${r.id} in bulkUpdate was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
+                            throw new Error(`CONCURRENCY_CONFLICT: Record with ID ${r.id} in table ${targetTable} was modified by another user or session. Please refresh.`);
                         }
                     }
                     console.warn(`[bulkUpdateDangKyRecordsApi] Attempting upsert recovery on ${targetTable} for ID: ${r.id}`);

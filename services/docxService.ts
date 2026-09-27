@@ -1,7 +1,8 @@
 
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { saveSystemSetting } from './api';
+import saveAs from 'file-saver';
+import { saveSystemSetting, getSystemSetting } from './api';
 import { supabase } from './supabaseClient';
 
 // Khóa lưu trữ trong LocalStorage

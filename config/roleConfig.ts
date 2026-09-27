@@ -97,7 +97,19 @@ export function isViewAllowedForUser(
 ): boolean {
   if (!user) return false;
 
+  const isUserDodac = (u: any, emps: any[]) => {
+    if (!u.employeeId || !emps) return false;
+    const emp = emps.find(e => e.id === u.employeeId);
+    if (!emp || !emp.department) return false;
+    return matchDepartmentKey('đo đạc', emp.department) && !matchDepartmentKey('lưu trữ', emp.department);
+  };
 
+  const isUserLuutru = (u: any, emps: any[]) => {
+    if (!u.employeeId || !emps) return false;
+    const emp = emps.find(e => e.id === u.employeeId);
+    if (!emp || !emp.department) return false;
+    return matchDepartmentKey('lưu trữ', emp.department) && !matchDepartmentKey('đo đạc', emp.department);
+  };
 
   // Admin luôn có toàn quyền truy cập tất cả các view/tab, không bị giới hạn bởi Tổ chuyên môn
   if (user.role === UserRole.ADMIN) return true;
@@ -165,6 +177,18 @@ export function isViewAllowedForUser(
 
     // Bộ quyền con thuộc từng phân hệ chính
     const ONEDOOR_CHILD_PERMS = ['receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS', 'EXPORT_RECORDS'];
+    const DODAC_CHILD_PERMS = [
+      'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
+      'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 
+      'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 
+      'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_BTN_ADVANCE_STATUS'
+    ];
+    const LUUTRU_CHILD_PERMS = [
+      'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
+      'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 
+      'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 
+      'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_BTN_ADVANCE_STATUS'
+    ];
     const CONTRACT_CHILD_PERMS = [
       'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'DELETE_CONTRACTS', 'EXPORT_CONTRACTS'
     ];
@@ -195,7 +219,7 @@ export function isViewAllowedForUser(
       case 'test_records':
         return activePerms.includes('test_records');
       case 'vao_so':
-        return activePerms.includes('vao_so') || activePerms.includes('VAO_SO_GCN') || activePerms.includes('VAO_SO_GCN_VIEW') || activePerms.includes('archive_records') || activePerms.includes('test_records') || activePerms.includes('VIEW_ARCHIVE');
+        return activePerms.includes('vao_so') || activePerms.includes('archive_records') || activePerms.includes('test_records') || activePerms.includes('VIEW_ARCHIVE');
       case 'receive_contract':
         return activePerms.includes('receive_contract') || activePerms.includes('VIEW_CONTRACTS') || activePerms.includes('ADD_CONTRACTS');
 

@@ -18,11 +18,11 @@ const mockStorage: Record<string, string> = {};
 
 // Mock IndexedDB
 const mockIndexedDB = {
-    open: () => {
+    open: (name: string, version: number) => {
         const req: any = {
             result: {
                 objectStoreNames: { contains: () => true },
-                transaction: () => {
+                transaction: (storeName: string, mode: string) => {
                     const tx: any = {
                         objectStore: () => ({
                             get: (key: string) => {
@@ -99,7 +99,10 @@ async function runDangKyTestSuite() {
     const {
         getPendingSyncItems,
         savePendingSyncItems,
-        addPendingRecord    } = await import('../services/syncQueueService');
+        addPendingRecord,
+        removePendingRecord,
+        withMutationLock
+    } = await import('../services/syncQueueService');
     const {
         createRecordApi,
         updateRecordApi,
@@ -107,7 +110,9 @@ async function runDangKyTestSuite() {
         updateRecordsBatchById,
         deleteRecordsBatchApi,
         createRecordsBatchApi,
-        validateRecordRouting    } = await import('../services/apiRecords');
+        validateRecordRouting,
+        getTargetTable
+    } = await import('../services/apiRecords');
     const { RecordStatus } = await import('../types');
 
     interface TestResult {

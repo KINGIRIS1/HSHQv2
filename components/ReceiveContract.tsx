@@ -679,6 +679,11 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
         {/* UTILITY BUTTONS */}
         <div className="flex gap-2 shrink-0">
+            {activeModule !== 'liquidation' && (
+                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" title="Lấy số Hợp đồng Tự động">
+                    <Hash size={18} />
+                </button>
+            )}
             <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-xs" title="Cấu hình Bảng giá Dịch vụ">
                 <Settings2 size={18} />
             </button>
@@ -701,6 +706,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='contract'
                     contracts={contracts}
+                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 
@@ -715,6 +721,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='liquidation'
                     contracts={contracts}
+                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 

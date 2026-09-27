@@ -6,7 +6,7 @@ import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCH
 import { extractRecordSequence, checkRecordCodeExistsInDb } from '../services/apiRecords';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
-import { fetchContracts, updateContractApi } from '../services/api';
+import { fetchContracts } from '../services/api';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile, isPreviewableFile } from '../services/attachmentStorage';
 import DossierComponentSection from './receive-record/DossierComponentSection';
 
@@ -250,39 +250,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isManualCode, setIsManualCode] = useState<boolean>(false);
-
-  const [availableContracts, setAvailableContracts] = useState<any[]>([]);
-  const [selectedContractId, setSelectedContractId] = useState<string>('');
-
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedContractId('');
-      fetchContracts().then(data => {
-        // Lấy danh sách hợp đồng chưa liên kết với hồ sơ (customerAddress rỗng hoặc không có dạng HS-...)
-        const unassigned = data.filter(c => !c.customerAddress || c.customerAddress.trim() === '' || !c.customerAddress.trim().includes('HS-'));
-        setAvailableContracts(unassigned);
-      }).catch(err => console.error("Lỗi khi tải hợp đồng chưa liên kết:", err));
-    }
-  }, [isOpen]);
-
-  const handleSelectContract = (contractId: string) => {
-    setSelectedContractId(contractId);
-    const selected = availableContracts.find(c => c.id === contractId);
-    if (selected) {
-      setFormData(prev => ({
-        ...prev,
-        customerName: selected.customerName || prev.customerName,
-        phoneNumber: selected.phoneNumber || prev.phoneNumber,
-        ward: selected.ward || prev.ward,
-        landPlot: selected.landPlot || prev.landPlot,
-        mapSheet: selected.mapSheet || prev.mapSheet,
-        area: selected.area || prev.area,
-        address: selected.address || prev.address,
-        price: selected.totalAmount || prev.price,
-        returnedPrice: selected.totalAmount || prev.returnedPrice,
-      }));
-    }
-  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -752,21 +719,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     }
 
     onSubmit(cleanData as any);
-    
-    // Nếu có chọn hợp đồng liên kết lúc tiếp nhận
-    if (selectedContractId) {
-        fetchContracts().then(async (fetchedContracts) => {
-            const foundContract = fetchedContracts.find(c => c.id === selectedContractId);
-            if (foundContract) {
-                const updatedContract = {
-                    ...foundContract,
-                    customerAddress: finalCode // Liên kết 2 chiều với hồ sơ mới
-                };
-                await updateContractApi(updatedContract);
-            }
-        }).catch(err => console.error("Lỗi cập nhật liên kết hợp đồng tại Tiếp nhận:", err));
-    }
-
     onClose();
 
     // Đồng bộ tệp ngầm trong nền lên Google Drive (Background Sync - 0ms delay cho UI)
@@ -936,13 +888,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.group = norm;
         }
       }
-      if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy' || field === 'ward' || field === 'postingDate' || field === 'taxPaymentDate') {
+      if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy' || field === 'ward') {
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
         const rRecBy = field === 'receivedBy' ? value : prev.receivedBy;
         const rWard = field === 'ward' ? value : prev.ward;
         if (rType && rDate) {
-          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], updated);
+          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
         } else if (!rType) {
           updated.deadline = '';
           updated.price = undefined;
@@ -984,10 +936,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const showMsr = !isArchive && !isCapGiay && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
   const showExc = !isArchive && !isCapGiay && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
 
-  const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
-
   const statusSelectOptions = isCapGiay
-    ? CAP_GIAY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.PENDING_POSTING || isLostCertType)
+    ? CAP_GIAY_SELECTABLE_STATUSES
     : isArchive
     ? ARCHIVE_SELECTABLE_STATUSES
     : SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS);
@@ -1079,9 +1029,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 {!isCongVan && (
                                     <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} /></div>
                                 )}
-                                {isCapGiay && (
-                                    <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50/50 text-teal-800" value={dateVal(formData.appraisalDate)} onChange={(e) => handleChange('appraisalDate', e.target.value)} /></div>
-                                )}
                                 {(() => {
                                     const statusFlow = [
                                         RecordStatus.RECEIVED,
@@ -1097,36 +1044,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         RecordStatus.RETURNED
                                     ];
                                     const currentIdx = formData.status ? statusFlow.indexOf(formData.status) : -1;
-                                    const capGiayStatusFlow = [
-                                        RecordStatus.RECEIVED,
-                                        RecordStatus.APPRAISAL,
-                                        RecordStatus.PENDING_POSTING,
-                                        RecordStatus.TAX_TRANSFER,
-                                        RecordStatus.PENDING_TAX_KV7,
-                                        RecordStatus.PENDING_TAX_PAYMENT,
-                                        RecordStatus.PENDING_PRINT_CERT,
-                                        RecordStatus.PENDING_CHECK,
-                                        RecordStatus.PENDING_SIGN,
-                                        RecordStatus.SIGNED,
-                                        RecordStatus.PENDING_HANDOVER,
-                                        RecordStatus.HANDOVER,
-                                        RecordStatus.RETURNED
-                                    ];
-                                    const cgIdx = formData.status ? capGiayStatusFlow.indexOf(formData.status) : -1;
                                     const isFieldWork = isFieldWorkProcedure(formData.recordType);
                                     const isOfficeOnly = isOfficeOnlySurveyProcedure(formData.recordType);
-                                    const hasAssigned = !isCapGiay;
-                                    const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate || !!formData.checkedDate);
-                                    const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
-                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.HANDOVER) || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED || !!formData.completedDate;
-
-                                    // ĐIỀU KIỆN ẨN/HIỆN MỐC NGÀY CHO MODULE CẤP GIẤY
-                                    const isLostCertType = Boolean(formData.recordType?.includes('3.3.1') || formData.recordType?.includes('3.3.2') || formData.recordType?.toLowerCase().includes('cấp lại'));
-                                    const hasPosting = isCapGiay && isLostCertType && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_POSTING) || !!formData.postingDate || cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.APPRAISAL));
-                                    const hasTaxTransfer = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.TAX_TRANSFER) || !!formData.taxTransferDate);
-                                    const hasTaxKv7 = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_KV7) || !!formData.taxKv7Date);
-                                    const hasTaxPayment = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_TAX_PAYMENT) || !!formData.taxPaymentDate);
-                                    const hasPrintCert = isCapGiay && (cgIdx >= capGiayStatusFlow.indexOf(RecordStatus.PENDING_PRINT_CERT) || !!formData.printCertDate);
+                                    const hasAssigned = true; // Luôn hiển thị ô Ngày giao NV / Ngày đo đạc / Ngày Biên tập cho tất cả hồ sơ kể cả tiếp nhận mới
+                                    const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate || !!formData.checkedDate);
+                                    const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
+                                    const hasApproval = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || !!formData.approvalDate;
+                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED || !!formData.completedDate;
                                     const assignedLabel = isFieldWork ? 'Ngày đo đạc' : isOfficeOnly ? 'Ngày Biên tập' : 'Ngày giao NV';
 
                                     return (
@@ -1169,43 +1093,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                             {hasSubmission && (
                                                 <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50/50 text-purple-800" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value)} /></div>
                                             )}
-                                            {/* CÁC MỐC NGÀY CHUYÊN BIỆT DÀNH CHO CẤP GIẤY (3.X) */}
-                                            {hasPosting && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-amber-700 mb-1">Ngày Niêm yết (UBND xã)</label>
-                                                    <input type="date" className="w-full border border-amber-300 rounded-md px-3 py-2 bg-amber-50/50 text-amber-800" value={dateVal(formData.postingDate)} onChange={(e) => handleChange('postingDate', e.target.value)} />
-                                                </div>
-                                            )}
-                                            {hasTaxTransfer && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày Chuyển Thuế</label>
-                                                    <input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50/50 text-indigo-800" value={dateVal(formData.taxTransferDate)} onChange={(e) => handleChange('taxTransferDate', e.target.value)} />
-                                                </div>
-                                            )}
-                                            {hasTaxKv7 && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-cyan-700 mb-1">Ngày Thuế KV7 nhận</label>
-                                                    <input type="date" className="w-full border border-cyan-300 rounded-md px-3 py-2 bg-cyan-50/50 text-cyan-800" value={dateVal(formData.taxKv7Date)} onChange={(e) => handleChange('taxKv7Date', e.target.value)} />
-                                                </div>
-                                            )}
-                                            {hasTaxPayment && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày TBT (Thông báo thuế)</label>
-                                                    <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50/50 text-emerald-800 font-semibold" value={dateVal(formData.taxNoticeDate || formData.taxPaymentDate)} onChange={(e) => handleChange('taxNoticeDate', e.target.value)} />
-                                                </div>
-                                            )}
-                                            {hasPrintCert && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-blue-700 mb-1">Ngày In GCN</label>
-                                                    <input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50/50 text-blue-800" value={dateVal(formData.printCertDate)} onChange={(e) => handleChange('printCertDate', e.target.value)} />
-                                                </div>
+                                            {hasApproval && (
+                                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50/50 text-indigo-800" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value)} /></div>
                                             )}
                                             {hasHandover && (
                                                 <div>
-                                                    <label className="block text-xs font-bold text-emerald-700 mb-1">
-                                                        {formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành'}
-                                                    </label>
-                                                    <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50/50 font-semibold text-emerald-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} />
+                                                    <label className="block text-xs font-bold text-green-700 mb-1">
+                                                        {formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành (Giao 1 cửa)'}
+                                                     </label>
+                                                    <input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50/50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} />
                                                 </div>
                                             )}
                                         </>
@@ -1252,54 +1148,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         </div>
                                     </div>
                                 )}
-                                {isCapGiay && formData.appraisalDate && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-teal-700 mb-1">Ngày Thẩm định</label>
-                                        <div className="w-full border border-teal-100 rounded-md px-3 py-2 bg-teal-50/50 text-sm font-semibold text-teal-800">
-                                            {formatDate(formData.appraisalDate)}
-                                        </div>
-                                    </div>
-                                )}
-                                {isCapGiay && formData.postingDate && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-amber-700 mb-1">Ngày Niêm yết (UBND xã)</label>
-                                        <div className="w-full border border-amber-100 rounded-md px-3 py-2 bg-amber-50/50 text-sm font-semibold text-amber-800">
-                                            {formatDate(formData.postingDate)}
-                                        </div>
-                                    </div>
-                                )}
-                                {isCapGiay && formData.taxTransferDate && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày Chuyển Thuế</label>
-                                        <div className="w-full border border-indigo-100 rounded-md px-3 py-2 bg-indigo-50/50 text-sm font-semibold text-indigo-800">
-                                            {formatDate(formData.taxTransferDate)}
-                                        </div>
-                                    </div>
-                                )}
-                                {isCapGiay && formData.taxKv7Date && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-cyan-700 mb-1">Ngày Thuế KV7 nhận</label>
-                                        <div className="w-full border border-cyan-100 rounded-md px-3 py-2 bg-cyan-50/50 text-sm font-semibold text-cyan-800">
-                                            {formatDate(formData.taxKv7Date)}
-                                        </div>
-                                    </div>
-                                )}
-                                {isCapGiay && formData.taxPaymentDate && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày Có Giấy nộp tiền</label>
-                                        <div className="w-full border border-emerald-100 rounded-md px-3 py-2 bg-emerald-50/50 text-sm font-semibold text-emerald-800">
-                                            {formatDate(formData.taxPaymentDate)}
-                                        </div>
-                                    </div>
-                                )}
-                                {isCapGiay && formData.printCertDate && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-blue-700 mb-1">Ngày In GCN</label>
-                                        <div className="w-full border border-blue-100 rounded-md px-3 py-2 bg-blue-50/50 text-sm font-semibold text-blue-800">
-                                            {formatDate(formData.printCertDate)}
-                                        </div>
-                                    </div>
-                                )}
                                 {formData.pendingCheckDate && (
                                     <div>
                                         <label className="block text-xs font-bold text-blue-700 mb-1">Ngày trình kiểm tra</label>
@@ -1339,8 +1187,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                     </div>
                 </div>
 
-
-
                 {/* 2. CHỦ SỬ DỤNG HOẶC THÔNG TIN GỬI NHẬN */}
                 <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm">
                     <h3 className="text-sm font-bold text-blue-800 uppercase mb-4 flex items-center gap-2 border-b pb-2">
@@ -1354,34 +1200,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            {!isEdit && (
-                                <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 animate-fade-in">
-                                    <div className="min-w-0">
-                                        <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block mb-0.5">Liên kết Hợp đồng kinh tế</span>
-                                        <p className="text-xs text-slate-600 font-medium">Chọn hợp đồng để tự động điền toàn bộ thông tin (Chủ sử dụng, SĐT, Xã, Thửa, Tờ, Diện tích, Đơn giá).</p>
-                                    </div>
-                                    <select
-                                        className="w-full md:w-80 border border-indigo-200 rounded-md px-3 py-1.5 bg-white text-xs font-bold text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 cursor-pointer"
-                                        value={selectedContractId}
-                                        onChange={(e) => handleSelectContract(e.target.value)}
-                                    >
-                                        <option value="">-- Chưa chọn liên kết HĐ --</option>
-                                        {availableContracts.map(c => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.code} - {c.customerName || 'Chưa rõ tên'}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Tên chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
-                                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chủ sử dụng</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Tên chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
+                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chủ sử dụng</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
                         </div>
                     )}
                 </div>
@@ -1418,11 +1241,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
                                 </select>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:col-span-2">
+                            <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Diện tích (m2)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} /></div>
-                                <div><label className="block text-xs font-bold text-emerald-700 mb-1">Đất ở (m2)</label><input type="number" className="w-full border border-emerald-300 bg-emerald-50/40 rounded-md px-3 py-2 text-right font-bold text-emerald-900" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value === '' ? null : parseFloat(e.target.value))} /></div>
                             </div>
                             <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Số phát hành</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="VD: CD 123456" value={val(formData.issueNumber)} onChange={(e) => handleChange('issueNumber', e.target.value)} /></div>
