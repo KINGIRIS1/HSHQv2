@@ -194,8 +194,6 @@ export function getDodacWorkflowStage(record: Partial<RecordFile>): { stageIndex
   }
 }
 
-import { loadRegistrationSlaFullConfig } from '../components/registration/RegistrationSlaStatusView';
-
 export function getDodacWorkflow(procedureCode?: string | null): {
   code: string;
   name: string;
@@ -216,10 +214,10 @@ export function getDodacWorkflow(procedureCode?: string | null): {
       hasFieldWork: !!matchedItem.hasFieldWork,
       standardDays: totalDays,
       steps: matchedItem.steps.map(s => ({
-        stepNumber: s.stepNumber,
+        stepNumber: s.stepNumber ?? 1,
         name: s.name,
-        durationDays: s.durationDays,
-        durationHours: s.durationHours,
+        durationDays: s.durationDays ?? 1,
+        durationHours: s.durationHours || 8,
       })),
     };
   }

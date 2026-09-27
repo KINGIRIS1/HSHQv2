@@ -35,7 +35,7 @@ export const RECORD_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
-    'attachedFiles', 'dossierComponents',
+    'attachedFiles', 'dossierComponents', 'certificateOwners',
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
     'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
 ];
@@ -57,7 +57,7 @@ export const LAND_RECORDS_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
-    'attachedFiles', 'dossierComponents',
+    'attachedFiles', 'dossierComponents', 'certificateOwners',
     'updated_at'
 ];
 
@@ -76,7 +76,7 @@ export const DANGKY_RECORDS_DB_COLUMNS = [
     'price', 'advancePayment', 'isHandedOver',
     'returnBatch', 'returnBatchDate', 'returnHandoverDept',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
-    'attachedFiles', 'dossierComponents',
+    'attachedFiles', 'dossierComponents', 'certificateOwners',
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
     'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate',
     'updated_at'
@@ -97,7 +97,7 @@ export const LUUTRU_RECORDS_DB_COLUMNS = [
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
-    'attachedFiles', 'dossierComponents',
+    'attachedFiles', 'dossierComponents', 'certificateOwners',
     'type', 'so_hieu', 'trich_yeu', 'ngay_thang', 'noi_nhan_gui', 'created_by',
     'updated_at'
 ];

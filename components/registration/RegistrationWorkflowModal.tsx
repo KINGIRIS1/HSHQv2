@@ -59,10 +59,10 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
 
   // Nạp dữ liệu cấu hình khi mở modal
   useEffect(() => {
-    const loaded = loadProceduresConfig();
+    const loaded = loadProceduresConfig() as RegistrationProcedureConfig[];
     setProcedures(loaded);
     if (loaded.length > 0) {
-      setSelectedProcId(loaded[0].id);
+      setSelectedProcId(loaded[0].id || '');
     }
     setWorkingHours(loadWorkingHoursConfig());
     setHasChanges(false);
@@ -89,7 +89,10 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
     const newProc: RegistrationProcedureConfig = {
       id: `proc-${Date.now()}`,
       code: newCode,
+      title: `${newCode} Thủ tục mới`,
       name: `${newCode} Thủ tục mới`,
+      category: 'unclassified',
+      standardDays: 10,
       totalDays: 10,
       steps: [
         {
@@ -122,7 +125,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
       ],
     };
     setProcedures((prev) => [...prev, newProc]);
-    setSelectedProcId(newProc.id);
+    setSelectedProcId(newProc.id || '');
     setHasChanges(true);
     showToast('success', `Đã tạo thủ tục mới: ${newProc.code}`);
   };
@@ -138,7 +141,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
     if (confirm(`Anh/Chị có chắc chắn muốn xóa thủ tục "${target.name}" không?`)) {
       const remaining = procedures.filter((p) => p.id !== procId);
       setProcedures(remaining);
-      setSelectedProcId(remaining[0].id);
+      setSelectedProcId(remaining[0]?.id || '');
       setHasChanges(true);
       showToast('success', `Đã xóa thủ tục ${target.code}`);
     }
@@ -147,9 +150,9 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
   // Khôi phục bộ mẫu chuẩn 15 thủ tục
   const handleResetDefaults = () => {
     if (confirm('Khôi phục toàn bộ 15 quy trình chuẩn 3.x và khung giờ làm việc mặc định? Các tùy biến chưa lưu sẽ bị xóa.')) {
-      const defs = resetProceduresToDefault();
+      const defs = resetProceduresToDefault() as RegistrationProcedureConfig[];
       setProcedures(defs);
-      setSelectedProcId(defs[0].id);
+      setSelectedProcId(defs[0]?.id || '');
       setWorkingHours(loadWorkingHoursConfig());
       setHasChanges(false);
       showToast('success', 'Đã nạp lại toàn bộ 15 quy trình chuẩn 3.x!');
@@ -222,12 +225,12 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
   const filteredProcedures = procedures.filter((p) => {
     if (!searchTerm.trim()) return true;
     const s = searchTerm.toLowerCase().trim();
-    return p.code.toLowerCase().includes(s) || p.name.toLowerCase().includes(s);
+    return (p.code || '').toLowerCase().includes(s) || (p.name || p.title || '').toLowerCase().includes(s);
   });
 
   // Tính tổng thời gian các bước của thủ tục hiện tại
-  const totalStepMinutes = selectedProcedure
-    ? selectedProcedure.steps.reduce((acc, s) => acc + (s.isSlaPaused ? 0 : s.totalMinutes), 0)
+  const totalStepMinutes = selectedProcedure && selectedProcedure.steps
+    ? selectedProcedure.steps.reduce((acc, s) => acc + (s.isSlaPaused ? 0 : (s.totalMinutes || 0)), 0)
     : 0;
 
   return (
@@ -342,7 +345,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                 return (
                   <div
                     key={proc.id}
-                    onClick={() => setSelectedProcId(proc.id)}
+                    onClick={() => setSelectedProcId(proc.id || '')}
                     className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${
                       isSelected
                         ? 'bg-blue-50/80 border-blue-300 text-blue-900 shadow-2xs font-bold'
@@ -354,12 +357,12 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                         <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-600 text-white">
                           {proc.code}
                         </span>
-                        <span className="text-xs truncate font-bold text-slate-900" title={proc.name}>
-                          {proc.name}
+                        <span className="text-xs truncate font-bold text-slate-900" title={proc.name || proc.title}>
+                          {proc.name || proc.title}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-500 mt-0.5">
-                        {proc.steps.length} bước • {proc.totalDays} ngày định mức
+                        {(proc.steps || []).length} bước • {proc.totalDays || proc.standardDays} ngày định mức
                       </span>
                     </div>
 
@@ -369,7 +372,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteProcedure(proc.id);
+                            handleDeleteProcedure(proc.id || '');
                           }}
                           title="Xóa thủ tục"
                           className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
@@ -495,8 +498,8 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                               </span>
                               <input
                                 type="text"
-                                value={step.name}
-                                onChange={(e) => handleUpdateStep(step.id, { name: e.target.value })}
+                                value={step.name || step.label || ''}
+                                onChange={(e) => handleUpdateStep(step.id || '', { name: e.target.value })}
                                 placeholder="Tên bước luân chuyển..."
                                 className="flex-1 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
                               />
@@ -525,7 +528,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                               {selectedProcedure.steps.length > 1 && (
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteStep(step.id)}
+                                  onClick={() => handleDeleteStep(step.id || '')}
                                   title="Xóa bước này"
                                   className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer ml-1"
                                 >
@@ -545,7 +548,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                               <select
                                 value={step.statusKey}
                                 onChange={(e) =>
-                                  handleUpdateStep(step.id, { statusKey: e.target.value as RecordStatus })
+                                  handleUpdateStep(step.id || '', { statusKey: e.target.value as RecordStatus })
                                 }
                                 className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white"
                               >
@@ -570,7 +573,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                                     max="240"
                                     value={step.durationHours}
                                     onChange={(e) =>
-                                      handleUpdateStep(step.id, { durationHours: Number(e.target.value) || 0 })
+                                      handleUpdateStep(step.id || '', { durationHours: Number(e.target.value) || 0 })
                                     }
                                     disabled={isPaused}
                                     className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white disabled:opacity-40"
@@ -586,7 +589,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                                     step="5"
                                     value={step.durationMinutes || 0}
                                     onChange={(e) =>
-                                      handleUpdateStep(step.id, { durationMinutes: Number(e.target.value) || 0 })
+                                      handleUpdateStep(step.id || '', { durationMinutes: Number(e.target.value) || 0 })
                                     }
                                     disabled={isPaused}
                                     className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white disabled:opacity-40"
@@ -604,7 +607,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                               <input
                                 type="text"
                                 value={step.department || ''}
-                                onChange={(e) => handleUpdateStep(step.id, { department: e.target.value })}
+                                onChange={(e) => handleUpdateStep(step.id || '', { department: e.target.value })}
                                 placeholder="Tổ Cấp giấy..."
                                 className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 outline-none focus:bg-white"
                               />
@@ -617,7 +620,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                                   type="checkbox"
                                   checked={isPaused}
                                   onChange={(e) =>
-                                    handleUpdateStep(step.id, {
+                                    handleUpdateStep(step.id || '', {
                                       isSlaPaused: e.target.checked,
                                       pauseReason: e.target.checked ? 'Chờ thực hiện nghĩa vụ' : undefined,
                                     })
@@ -634,7 +637,7 @@ export const RegistrationWorkflowModal: React.FC<RegistrationWorkflowModalProps>
                             <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-slate-700">
                               <span className="text-slate-400">Xem trước Tiêu đề Bước:</span>
                               <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-900 border border-slate-200">
-                                Bước {idx + 1}: {step.name.toUpperCase()} | Định mức: {formatDurationShort(step.totalMinutes || 0)} | {isPaused ? '[⏸️ Tạm dừng tính SLA (Chờ nộp tiền)]' : '[⏱️ Còn lại 3 giờ 45 phút]'}
+                                Bước {idx + 1}: {(step.name || step.label || '').toUpperCase()} | Định mức: {formatDurationShort(step.totalMinutes || 0)} | {isPaused ? '[⏸️ Tạm dừng tính SLA (Chờ nộp tiền)]' : '[⏱️ Còn lại 3 giờ 45 phút]'}
                               </span>
                             </div>
                           </div>

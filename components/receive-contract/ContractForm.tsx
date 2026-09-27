@@ -15,14 +15,13 @@ interface ContractFormProps {
   generateCode: (contractType?: string, customYear?: number) => Promise<string>;
   mode: 'contract' | 'liquidation'; // New prop
   contracts?: Contract[];
-  onOpenGetNumberModal?: () => void;
 }
 
 function _nd(s: string | undefined | null): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts, onOpenGetNumberModal }) => {
+const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts }) => {
   const [activeTab, setActiveTab] = useState<'dd' | 'tt' | 'cm' | 'tl'>('dd');
   const [tachThuaItems, setTachThuaItems] = useState<SplitItem[]>([]);
   const [searchCode, setSearchCode] = useState('');
@@ -868,24 +867,15 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         {mode !== 'liquidation' && (
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className={labelClass}>Mã Hợp Đồng (Nhập tay / Tự động)</label>
-                                    {onOpenGetNumberModal && (
-                                        <button
-                                            type="button"
-                                            onClick={onOpenGetNumberModal}
-                                            className="text-[11px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1 transition-all"
-                                        >
-                                            <Wand2 size={12} /> Lấy số
-                                        </button>
-                                    )}
+                                    <label className={labelClass}>Mã Hợp Đồng (Tự động cấp theo năm)</label>
                                 </div>
                                 <div>
                                     <input 
                                         type="text" 
-                                        className={`${inputClass} font-mono font-bold text-purple-700 bg-white border-purple-300 focus:border-purple-500`} 
+                                        readOnly={true}
+                                        className={`${inputClass} font-mono font-bold text-slate-500 bg-slate-100 border-slate-200 cursor-not-allowed select-none`} 
                                         value={formData.code ?? ''} 
-                                        onChange={e => handleChange('code', e.target.value)}
-                                        placeholder="Để trống để tự động cấp số..."
+                                        placeholder="Hệ thống tự động cấp số tăng dần theo năm..."
                                     />
                                 </div>
                             </div>

@@ -7,7 +7,6 @@ import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
-import GetContractNumberModal from './GetContractNumberModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
 import saveAs from 'file-saver'; // Import saveAs
 
@@ -393,6 +392,11 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
       }
       if (success) {
           loadContracts(); // Reload list
+          if (activeModule === 'contract') {
+              setActiveModule('list');
+          } else if (activeModule === 'liquidation') {
+              setActiveModule('liquidation_list');
+          }
           return finalCode;
       }
       return null;
@@ -679,11 +683,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
         {/* UTILITY BUTTONS */}
         <div className="flex gap-2 shrink-0">
-            {activeModule !== 'liquidation' && (
-                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" title="Lấy số Hợp đồng Tự động">
-                    <Hash size={18} />
-                </button>
-            )}
             <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-xs" title="Cấu hình Bảng giá Dịch vụ">
                 <Settings2 size={18} />
             </button>
@@ -706,7 +705,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='contract'
                     contracts={contracts}
-                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 
@@ -721,7 +719,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='liquidation'
                     contracts={contracts}
-                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 
@@ -770,43 +767,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           onClose={() => setIsPreviewOpen(false)} 
           docxBlob={previewBlob} 
           fileName={previewFileName} 
-      />
-      <GetContractNumberModal
-          isOpen={isGetContractNumberOpen}
-          onClose={() => setIsGetContractNumberOpen(false)}
-          currentUser={currentUser}
-          onSelectCode={(selectedCode) => {
-              if (editingContract) {
-                  setEditingContract({ ...editingContract, code: selectedCode });
-              } else {
-                  setEditingContract({
-                      id: Math.random().toString(36).substr(2, 9),
-                      code: selectedCode,
-                      customerName: '',
-                      phoneNumber: '',
-                      address: '',
-                      ward: '',
-                      landPlot: '',
-                      mapSheet: '',
-                      area: 0,
-                      contractType: selectedCode.includes('HĐKT') ? 'Đo đạc' : 'Tách thửa',
-                      serviceType: '',
-                      areaType: '',
-                      plotCount: 1,
-                      markerCount: 1,
-                      quantity: 1,
-                      unitPrice: 0,
-                      vatRate: 8,
-                      vatAmount: 0,
-                      totalAmount: 0,
-                      deposit: 0,
-                      createdDate: new Date().toISOString(),
-                      status: 'PENDING'
-                  });
-              }
-              setActiveModule('contract');
-              setIsGetContractNumberOpen(false);
-          }}
       />
     </div>
   );

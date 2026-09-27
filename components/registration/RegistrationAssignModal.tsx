@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { RecordFile, Employee } from '../../types';
-import { removeVietnameseTones } from '../../utils/appHelpers';
+import { removeVietnameseTones, getVietnamDateString } from '../../utils/appHelpers';
 
 interface RegistrationAssignModalProps {
   isOpen: boolean;
@@ -37,9 +37,7 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
 }) => {
   const [assignStep, setAssignStep] = useState<'appraisal' | 'tax_transfer'>('appraisal');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
-  const [assignedDate, setAssignedDate] = useState<string>(
-    new Date().toISOString().substring(0, 10)
-  );
+  const [assignedDate, setAssignedDate] = useState<string>(() => getVietnamDateString());
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const isSubmittingRef = useRef<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');

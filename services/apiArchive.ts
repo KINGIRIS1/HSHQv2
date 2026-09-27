@@ -1,6 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, CACHE_KEYS, isTransientError } from './apiCore';
-import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated } from './apiRecords';
+import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated, resolveRecordRouting } from './apiRecords';
 import { addPendingRecord, getPendingRecords } from './syncQueueService';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
@@ -307,7 +307,24 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
 export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
     const d = (typeof r.data === 'object' && r.data !== null) ? r.data : {};
     const code = r.code || r.so_hieu || d.ma_ho_so || r.id || '';
-    const customerName = r.customerName || r.noi_nhan_gui || d.ten_chu_su_dung || '';
+    let customerName = r.customerName || r.noi_nhan_gui || d.ten_chu_su_dung || '';
+
+    // Trích xuất danh sách Chủ hồ sơ (Người đứng tên Giấy chứng nhận)
+    let certOwners: any[] = [];
+    const rawCert = r.certificateOwners || r.certificate_owners || d.certificateOwners || d.certificate_owners;
+    if (Array.isArray(rawCert)) {
+      certOwners = rawCert;
+    } else if (typeof rawCert === 'string') {
+      try { certOwners = JSON.parse(rawCert); } catch { certOwners = []; }
+    }
+
+    if (certOwners.length > 0) {
+      const allNames = certOwners.map((o: any) => o?.name ? String(o.name).trim() : '').filter(Boolean);
+      if (allNames.length > 0) {
+        customerName = allNames.join(', ');
+      }
+    }
+
     const recordType = r.recordType || r.content || r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận';
     const ward = r.ward || d.dia_danh || d.xa_phuong || '';
     const mapSheet = r.mapSheet || d.so_to || d.to_ban_do || '';
@@ -337,6 +354,8 @@ export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
         rawStatus: r.status || d.status || '',
         ma_ho_so: code,
         ten_chu_su_dung: customerName,
+        certificateOwners: certOwners,
+        certificate_owners: certOwners,
         loai_bien_dong: recordType,
         loai_gcn: d.loai_gcn || 'GCN mới',
         dia_danh: ward,
@@ -893,6 +912,9 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
 
 export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise<SaveArchiveResult> => {
     let fullRecord = { ...record };
+    const isVaoSo = record.type === 'vaoso' || isVaoSoRecord(record);
+    const offlineTargetTable = isVaoSo ? 'dangky_records' : 'luutru_records';
+
     if (!isConfigured) {
         if (record.id) {
             const idx = MOCK_ARCHIVE.findIndex(r => r.id === record.id);
@@ -912,7 +934,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 MOCK_ARCHIVE[idx] = merged;
                 saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
                 const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(merged));
-                await addPendingRecord(recFile, 'UPDATE', 'luutru_records');
+                await addPendingRecord(recFile, 'UPDATE', offlineTargetTable);
                 return { success: true, persisted: false, queued: true, offline: true, record: merged };
             }
         } else {
@@ -924,7 +946,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             MOCK_ARCHIVE.unshift(newRec);
             saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
             const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(newRec));
-            await addPendingRecord(recFile, 'CREATE', 'luutru_records');
+            await addPendingRecord(recFile, 'CREATE', offlineTargetTable);
             return { success: true, persisted: false, queued: true, offline: true, record: newRec };
         }
         return { success: false, persisted: false, queued: false, offline: true, errorCode: 'OFFLINE_NOT_FOUND', message: 'Record not found in offline memory' };
@@ -1202,7 +1224,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
     }
 };
 
-export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
+export const deleteArchiveRecord = async (id: string, record?: Partial<RecordFile>): Promise<boolean> => {
     if (!isConfigured) {
         const idx = MOCK_ARCHIVE.findIndex(r => r.id === id);
         if (idx !== -1) MOCK_ARCHIVE.splice(idx, 1);
@@ -1210,10 +1232,36 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
         return true;
     }
     try {
-        await Promise.allSettled([
-            supabase.from('dangky_records').delete().eq('id', id),
-            supabase.from('luutru_records').delete().eq('id', id)
-        ]);
+        let targetTable = 'luutru_records';
+        if (record) {
+            const res = resolveRecordRouting(record);
+            if (res.expectedTable) targetTable = res.expectedTable;
+        } else {
+            const { data: dk } = await supabase.from('dangky_records').select('id, code').eq('id', id).maybeSingle();
+            if (dk) {
+                targetTable = 'dangky_records';
+            } else {
+                const { data: land } = await supabase.from('land_records').select('id, code').eq('id', id).maybeSingle();
+                if (land) {
+                    targetTable = 'land_records';
+                } else {
+                    const { data: lt } = await supabase.from('luutru_records').select('id, code').eq('id', id).maybeSingle();
+                    if (lt) {
+                        const res = resolveRecordRouting(lt);
+                        targetTable = res.expectedTable || 'luutru_records';
+                    }
+                }
+            }
+        }
+
+        if (targetTable === 'dangky_records') {
+            await supabase.from('dangky_records').delete().eq('id', id);
+        } else if (targetTable === 'land_records') {
+            await supabase.from('land_records').delete().eq('id', id);
+        } else {
+            await supabase.from('luutru_records').delete().eq('id', id);
+        }
+
         clearArchiveMemoryCaches();
         return true;
     } catch (error) {
@@ -1838,18 +1886,6 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
     try {
         // Làm mới cache module Vào sổ GCN để nạp danh sách mới nhất từ dangky_records
         clearArchiveMemoryCaches('vaoso');
-
-        if (isConfigured) {
-            // Dọn dẹp an toàn các bản ghi dangky_records từng bị ghi nhầm vào bảng luutru_records
-            try {
-                const ids = eligibleRecords.map(r => r.id).filter(Boolean);
-                if (ids.length > 0) {
-                    await supabase.from('luutru_records').delete().in('id', ids);
-                }
-            } catch (cleanupErr) {
-                console.warn("[VaoSo Sync] Bỏ qua dọn dẹp luutru_records cũ:", cleanupErr);
-            }
-        }
         return true;
     } catch (err) {
         console.error("[VaoSo Sync] Lỗi đồng bộ:", err);

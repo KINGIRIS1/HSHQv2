@@ -60,17 +60,18 @@ export const CAP_GIAY_FORBIDDEN_STATUSES = [
 
 // Luồng chuyển trạng thái chính tuần tự (Strict Sequential Main Flow)
 export const CAP_GIAY_MAIN_FLOW: CapGiayStatus[] = [
-  RecordStatus.RECEIVED,             // Bước 1
-  RecordStatus.APPRAISAL,            // Bước 2
-  RecordStatus.PENDING_POSTING,      // Bước 2b
-  RecordStatus.TAX_TRANSFER,         // Bước 3
-  RecordStatus.PENDING_TAX_KV7,      // Bước 4
-  RecordStatus.PENDING_TAX_NOTICE,   // Bước 5 (Ngày TBT)
-  RecordStatus.PENDING_PRINT_CERT,   // Bước 6
-  RecordStatus.PENDING_CHECK,        // Bước 7
-  RecordStatus.PENDING_HANDOVER,     // Bước 8 (Hoàn thành)
-  RecordStatus.HANDOVER,             // Bước 9
-  RecordStatus.RETURNED              // Bước 10 (Hoàn tất)
+  RecordStatus.RECEIVED,             // Bước 1: Tiếp nhận hồ sơ
+  RecordStatus.APPRAISAL,            // Bước 2: Chờ thẩm định
+  RecordStatus.PENDING_POSTING,      // Bước 2b: Niêm yết tại xã
+  RecordStatus.TAX_TRANSFER,         // Bước 3: Chờ chuyển thuế
+  RecordStatus.PENDING_TAX_KV7,      // Bước 4: Chờ thuế khu vực 7
+  RecordStatus.PENDING_TAX_NOTICE,   // Bước 5: Ngày TBT (Thông báo thuế)
+  RecordStatus.PENDING_PRINT_CERT,   // Bước 6: Chờ in giấy chứng nhận
+  RecordStatus.PENDING_CHECK,        // Bước 7: Chờ kiểm tra
+  RecordStatus.PENDING_SIGN,         // Bước 8: Chờ ký duyệt (Trình ký)
+  RecordStatus.PENDING_HANDOVER,     // Bước 9: Hoàn thành (Chờ bàn giao)
+  RecordStatus.HANDOVER,             // Bước 10: Đã giao 1 cửa
+  RecordStatus.RETURNED              // Bước 11: Đã trả kết quả
 ];
 
 // Danh mục trạng thái chọn lựa cho Select/Dropdown của Module Cấp giấy
@@ -137,12 +138,12 @@ export const CAP_GIAY_STEP_ORDER: Record<string, number> = {
   [RecordStatus.PENDING_PRINT_CERT]: 6,
   [RecordStatus.PENDING_CHECK]: 7,
   [RecordStatus.PENDING_SIGN]: 8,
-  [RecordStatus.PENDING_HANDOVER]: 8,
-  [RecordStatus.HANDOVER]: 9,
-  [RecordStatus.RETURNED]: 10,
-  [RecordStatus.PENDING_SUPPLEMENT]: 11,
-  [RecordStatus.WITHDRAWN]: 12,
-  [RecordStatus.REJECTED]: 13
+  [RecordStatus.PENDING_HANDOVER]: 9,
+  [RecordStatus.HANDOVER]: 10,
+  [RecordStatus.RETURNED]: 11,
+  [RecordStatus.PENDING_SUPPLEMENT]: 99,
+  [RecordStatus.WITHDRAWN]: 99,
+  [RecordStatus.REJECTED]: 99
 };
 
 export const getCapGiayNextMainStatus = getNextCapGiayStatus;

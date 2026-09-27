@@ -254,8 +254,11 @@ export const executeAtomicRoutingMigration = async (
         .maybeSingle();
 
       if (targetCheck) {
-        // Record already present in target table, abort or resolve conflict
-        console.warn(`[MIGRATION] Record ${id} already present in target table ${expectedTable}`);
+        recordRes.status = 'MIGRATION_FAILED';
+        recordRes.reason = `TARGET_ALREADY_EXISTS: Record ${id} already exists in target table ${expectedTable}`;
+        failCount++;
+        results.push(recordRes);
+        continue;
       }
 
       // Prepare mapped payload for target table

@@ -6,7 +6,7 @@ import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCH
 import { extractRecordSequence, checkRecordCodeExistsInDb } from '../services/apiRecords';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
-import { fetchContracts } from '../services/api';
+import { fetchContracts, updateContractApi } from '../services/api';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile, isPreviewableFile } from '../services/attachmentStorage';
 import DossierComponentSection from './receive-record/DossierComponentSection';
 
@@ -250,6 +250,39 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isManualCode, setIsManualCode] = useState<boolean>(false);
+
+  const [availableContracts, setAvailableContracts] = useState<any[]>([]);
+  const [selectedContractId, setSelectedContractId] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedContractId('');
+      fetchContracts().then(data => {
+        // Lấy danh sách hợp đồng chưa liên kết với hồ sơ (customerAddress rỗng hoặc không có dạng HS-...)
+        const unassigned = data.filter(c => !c.customerAddress || c.customerAddress.trim() === '' || !c.customerAddress.trim().includes('HS-'));
+        setAvailableContracts(unassigned);
+      }).catch(err => console.error("Lỗi khi tải hợp đồng chưa liên kết:", err));
+    }
+  }, [isOpen]);
+
+  const handleSelectContract = (contractId: string) => {
+    setSelectedContractId(contractId);
+    const selected = availableContracts.find(c => c.id === contractId);
+    if (selected) {
+      setFormData(prev => ({
+        ...prev,
+        customerName: selected.customerName || prev.customerName,
+        phoneNumber: selected.phoneNumber || prev.phoneNumber,
+        ward: selected.ward || prev.ward,
+        landPlot: selected.landPlot || prev.landPlot,
+        mapSheet: selected.mapSheet || prev.mapSheet,
+        area: selected.area || prev.area,
+        address: selected.address || prev.address,
+        price: selected.totalAmount || prev.price,
+        returnedPrice: selected.totalAmount || prev.returnedPrice,
+      }));
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -719,6 +752,21 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     }
 
     onSubmit(cleanData as any);
+    
+    // Nếu có chọn hợp đồng liên kết lúc tiếp nhận
+    if (selectedContractId) {
+        fetchContracts().then(async (fetchedContracts) => {
+            const foundContract = fetchedContracts.find(c => c.id === selectedContractId);
+            if (foundContract) {
+                const updatedContract = {
+                    ...foundContract,
+                    customerAddress: finalCode // Liên kết 2 chiều với hồ sơ mới
+                };
+                await updateContractApi(updatedContract);
+            }
+        }).catch(err => console.error("Lỗi cập nhật liên kết hợp đồng tại Tiếp nhận:", err));
+    }
+
     onClose();
 
     // Đồng bộ tệp ngầm trong nền lên Google Drive (Background Sync - 0ms delay cho UI)
@@ -1306,11 +1354,34 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Tên chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
-                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chủ sử dụng</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
+                        <div className="space-y-4">
+                            {!isEdit && (
+                                <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 animate-fade-in">
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block mb-0.5">Liên kết Hợp đồng kinh tế</span>
+                                        <p className="text-xs text-slate-600 font-medium">Chọn hợp đồng để tự động điền toàn bộ thông tin (Chủ sử dụng, SĐT, Xã, Thửa, Tờ, Diện tích, Đơn giá).</p>
+                                    </div>
+                                    <select
+                                        className="w-full md:w-80 border border-indigo-200 rounded-md px-3 py-1.5 bg-white text-xs font-bold text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 cursor-pointer"
+                                        value={selectedContractId}
+                                        onChange={(e) => handleSelectContract(e.target.value)}
+                                    >
+                                        <option value="">-- Chưa chọn liên kết HĐ --</option>
+                                        {availableContracts.map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.code} - {c.customerName || 'Chưa rõ tên'}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Tên chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
+                                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chủ sử dụng</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
+                            </div>
                         </div>
                     )}
                 </div>

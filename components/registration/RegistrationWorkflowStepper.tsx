@@ -18,11 +18,13 @@ import { RecordFile, RecordStatus } from '../../types';
 import {
   getProcedureByRecordType,
   calculateRecordStepSla,
+  getWorkflowStepIndex,
   formatDurationShort,
   formatMinutesToVietnamese,
   RegistrationProcedureConfig,
   RegistrationStepConfig,
   StepSlaResult,
+  WorkflowStep,
 } from '../../utils/registrationWorkflows';
 import { CAP_GIAY_SELECTABLE_STATUSES } from '../../constants';
 
@@ -58,13 +60,25 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
   }, [record.recordType]);
 
   // Tìm bước hiện tại của hồ sơ trong quy trình
-  const steps = procedure.steps || [];
-  const currentStepIndex = steps.findIndex((s) => s.statusKey === record.status);
+  const rawSteps = procedure.steps || [];
+  const steps: WorkflowStep[] = rawSteps.map((s: any) => ({
+      key: s.name,
+      label: s.name,
+      shortLabel: s.name,
+      description: s.description || s.name,
+      badgeColor: 'bg-blue-100 text-blue-800',
+      durationHours: s.durationHours || 8,
+      durationDays: s.durationDays || 1,
+      durationLabel: `${s.durationDays || 1} ngày`,
+      id: s.id,
+      name: s.name,
+      statusKey: s.statusKey
+  }));
+  const currentStepIndex = getWorkflowStepIndex(record.status, steps);
   const activeIndex = currentStepIndex >= 0 ? currentStepIndex : 0;
   const currentStep = steps[activeIndex] || steps[0];
 
-  // Tính SLA cho bước hiện tại
-  const slaResult: StepSlaResult = calculateRecordStepSla(record, currentStep, procedure);
+  const slaResult: StepSlaResult = calculateRecordStepSla(record);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
@@ -77,11 +91,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-sm text-slate-100">
-                Bước {activeIndex + 1}/{steps.length}: {currentStep ? currentStep.name.toUpperCase() : 'TIẾP NHẬN'}
-              </span>
-              <span className="text-slate-400 text-xs">|</span>
-              <span className="text-xs font-semibold text-slate-300">
-                Định mức: <strong className="text-white">{slaResult.durationLabel}</strong>
+                Bước {activeIndex + 1}/{steps.length}: {currentStep ? ((currentStep.name || currentStep.label || 'TIẾP NHẬN').toUpperCase()) : 'TIẾP NHẬN'}
               </span>
             </div>
           </div>
@@ -92,22 +102,17 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
           {slaResult.isPaused ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5 shadow-2xs">
               <Pause size={13} className="shrink-0 animate-pulse" />
-              <span>{slaResult.stepHeaderText.split('|')[2] || `Tạm dừng tính SLA (${slaResult.pauseReason})`}</span>
+              <span>{slaResult.stepHeaderText ? (slaResult.stepHeaderText.split('|')[2] || slaResult.stepHeaderText) : `Tạm dừng tính SLA (${slaResult.pauseReason || 'Theo luật'})`}</span>
             </span>
           ) : slaResult.isOverdue ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-400/40 flex items-center gap-1.5 shadow-2xs animate-pulse">
               <AlertTriangle size={13} className="shrink-0" />
               <span>🚨 Trễ hạn {slaResult.overdueLabel}</span>
             </span>
-          ) : slaResult.isWarning ? (
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5 shadow-2xs">
-              <Clock size={13} className="shrink-0" />
-              <span>⚠️ Cảnh báo: Còn lại {slaResult.remainingLabel}</span>
-            </span>
           ) : (
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center gap-1.5 shadow-2xs">
-              <Clock size={13} className="shrink-0" />
-              <span>⏱️ Còn lại {slaResult.remainingLabel}</span>
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5 shadow-2xs">
+              <Clock size={13} className="shrink-0 text-emerald-400" />
+              <span>Định mức: {currentStep.durationHours || 8}h {slaResult.remainingLabel ? `(Còn lại ${slaResult.remainingLabel})` : ''}</span>
             </span>
           )}
 
@@ -156,15 +161,15 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="truncate max-w-[130px]" title={step.name}>
-                      {step.name}
+                    <span className="truncate max-w-[130px]" title={step.name || step.label}>
+                      {step.name || step.label}
                     </span>
                     <span
                       className={`text-[10px] font-normal ${
                         isCurrent ? 'text-blue-100' : isCompleted ? 'text-emerald-700' : 'text-slate-400'
                       }`}
                     >
-                      {step.isSlaPaused ? 'Tạm dừng SLA' : formatDurationShort(step.totalMinutes)}
+                      {isCompleted ? 'Đã hoàn tất' : isCurrent ? 'Đang thực hiện' : 'Chờ thực hiện'}
                     </span>
                   </div>
                 </div>
@@ -191,12 +196,12 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
               if (idx === activeIndex) return null;
               return (
                 <button
-                  key={step.id}
+                  key={step.id || idx}
                   type="button"
-                  onClick={() => onChangeStatus(step.statusKey)}
+                  onClick={() => onChangeStatus((step.statusKey || step.key || RecordStatus.RECEIVED) as RecordStatus)}
                   className="px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <span>➔ Bước {idx + 1}: {step.name}</span>
+                  <span>➔ Bước {idx + 1}: {step.name || step.label}</span>
                 </button>
               );
             })}

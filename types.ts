@@ -325,6 +325,15 @@ export interface RecordFile {
 
   updated_at?: string | null;
   updatedAt?: string | null;
+  
+  certificateOwners?: CertificateOwnerItem[] | null;
+}
+
+export interface CertificateOwnerItem {
+  fullName: string;
+  cccd: string;
+  phone?: string | null;
+  address?: string | null;
 }
 
 export type AttachmentDocType = 'GCN' | 'DON' | 'VBUQ' | 'BANVE' | 'BIENBAN' | 'TAICHINH' | 'PHIEU_KT' | 'TO_TRINH' | 'TLKHAC';

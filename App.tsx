@@ -134,6 +134,7 @@ function App() {
   // Tự động kiểm tra và thực hiện sao lưu hàng tuần cho admin đã tắt theo yêu cầu
 
   const [currentView, setCurrentView] = useState('dashboard');
+  const [reportMainTab, setReportMainTab] = useState<'measurement' | 'archive' | 'registration'>('measurement');
   const [receiveRecordResetKey, setReceiveRecordResetKey] = useState(0);
 
   const handleSetCurrentView = useCallback((viewId: string) => {
@@ -1262,18 +1263,22 @@ function App() {
           return;
       }
 
-      if (record.status === RecordStatus.RECEIVED) { 
+      const isArchive = isArchiveRecordType(record.recordType) || (getDepartmentForRecord(record).toLowerCase().includes('lưu trữ'));
+      const effectiveStatus = (!isArchive && record.status === RecordStatus.IN_PROGRESS)
+          ? (isOfficeOnlySurveyProcedure(record.recordType) || record.officeAssignedDate || record.drafterId ? RecordStatus.OFFICE_WORK : RecordStatus.FIELD_WORK)
+          : record.status;
+
+      if (effectiveStatus === RecordStatus.RECEIVED) { 
           setAssignTargetRecords([record]); 
           setIsAssignModalOpen(true); 
           return; 
       }
-      if (record.status === RecordStatus.FIELD_WORK) {
+      if (effectiveStatus === RecordStatus.FIELD_WORK) {
           setHandoverOfficeTargetRecords([record]);
           setIsHandoverOfficeModalOpen(true);
           return;
       }
-      const isArchive = isArchiveRecordType(record.recordType) || (getDepartmentForRecord(record).toLowerCase().includes('lưu trữ'));
-      if (record.status === RecordStatus.OFFICE_WORK || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
+      if (effectiveStatus === RecordStatus.OFFICE_WORK || record.status === RecordStatus.ASSIGNED) {
           if (isArchive) {
               // Module Lưu trữ bỏ qua bước Trình kiểm tra -> Đi thẳng sang Trình ký!
               setSubmitTargetRecords([record]);
@@ -2457,6 +2462,8 @@ function App() {
             currentView={currentView}
             rolePermissions={rolePermissions}
             departmentPermissions={departmentPermissions}
+            reportMainTab={reportMainTab}
+            setReportMainTab={setReportMainTab}
         />
 
         <BulkSignConfirmModal 

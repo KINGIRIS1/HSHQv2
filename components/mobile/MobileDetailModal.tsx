@@ -9,15 +9,15 @@ import {
   CalendarClock, FileCheck, Calculator, Loader2, StickyNote, 
   Save, Bell, Printer, Pencil, Trash2, Info, ChevronLeft,
   Phone, Calendar, Hash, FileDown, Clock, ShieldAlert,
-  Paperclip, Eye, Download
+  Paperclip, Eye, Download, Plus, FolderOpen
 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
-import { updateRecordApi, fetchContracts } from '../../services/api';
+import { updateRecordApi, fetchContracts, updateContractApi } from '../../services/api';
 import { previewAttachment, downloadAttachment, isPreviewableFile } from '../../services/attachmentStorage';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../../utils/appHelpers';
+import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName, formatDateTimeVN, getVietnamNowISO } from '../../utils/appHelpers';
 import { getRegistrationWorkflowCategory, getRegistrationWorkflow, getWorkflowStepIndex, getStepSlaInfo } from '../../utils/registrationWorkflows';
 import { checkUserPermission, hasRecordActionPermission } from '../../utils/permissionUtils';
 
@@ -158,6 +158,72 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   const [isAnnexModalOpen, setIsAnnexModalOpen] = useState(false);
   const [contracts, setContracts] = useState<any[]>([]);
   const [matchedContract, setMatchedContract] = useState<any | null>(null);
+  const [showContractPicker, setShowContractPicker] = useState(false);
+  const [contractSearchQuery, setContractSearchQuery] = useState('');
+  const [isLinkingContract, setIsLinkingContract] = useState(false);
+
+  const handleLinkContract = async (selectedContract: any) => {
+      if (!record) return;
+      setIsLinkingContract(true);
+      try {
+          const updatedContract = {
+              ...selectedContract,
+              customerAddress: record.code,
+              customerName: selectedContract.customerName || record.customerName,
+              phoneNumber: selectedContract.phoneNumber || record.phoneNumber,
+              ward: selectedContract.ward || record.ward,
+              landPlot: selectedContract.landPlot || record.landPlot,
+              mapSheet: selectedContract.mapSheet || record.mapSheet,
+              area: selectedContract.area || record.area || 0,
+              address: selectedContract.address || record.address,
+          };
+          
+          const success = await updateContractApi(updatedContract);
+          if (success) {
+              const fetchedContracts = await fetchContracts();
+              setContracts(fetchedContracts);
+              const match = fetchedContracts.find(c => c.id === selectedContract.id);
+              if (match) {
+                  setMatchedContract(match);
+                  setContractPrice(match.totalAmount ?? null);
+                  setContractSplitItems(match.splitItems || null);
+              }
+              setShowContractPicker(false);
+              setContractSearchQuery('');
+              if (onRefreshData) onRefreshData();
+          }
+      } catch (err) {
+          console.error("Lỗi khi liên kết hợp đồng:", err);
+      } finally {
+          setIsLinkingContract(false);
+      }
+  };
+
+  const handleUnlinkContract = async () => {
+      if (!matchedContract) return;
+      if (!window.confirm("Xác nhận hủy liên kết hợp đồng này với hồ sơ?")) return;
+      setIsLinkingContract(true);
+      try {
+          const updatedContract = {
+              ...matchedContract,
+              customerAddress: '' // Xóa liên kết
+          };
+          const success = await updateContractApi(updatedContract);
+          if (success) {
+              const fetchedContracts = await fetchContracts();
+              setContracts(fetchedContracts);
+              setMatchedContract(null);
+              setContractPrice(null);
+              setContractSplitItems(null);
+              setLiquidationInfo(null);
+              if (onRefreshData) onRefreshData();
+          }
+      } catch (err) {
+          console.error("Lỗi khi hủy liên kết hợp đồng:", err);
+      } finally {
+          setIsLinkingContract(false);
+      }
+  };
 
   useEffect(() => {
     if (record) {
@@ -199,9 +265,35 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
             const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
 
-            if (rCode && (cAddr === rCode || cCode === rCode)) return true;
-            if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
-            if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+            // Thuật toán so khớp mã hồ sơ thông minh hỗ trợ các tiền tố địa bàn
+            const matchCodes = (a: string, b: string): boolean => {
+                if (!a || !b) return false;
+                const cleanA = clean(a);
+                const cleanB = clean(b);
+                if (cleanA === cleanB) return true;
+
+                const stripPrefix = (s: string) => {
+                    return s.trim().toLowerCase()
+                        .replace(/^(tk|tq|md|th)-?/i, '')
+                        .replace(/[^a-z0-9]/gi, '');
+                };
+                const strippedA = stripPrefix(a);
+                const strippedB = stripPrefix(b);
+                if (strippedA && strippedB && strippedA === strippedB) return true;
+
+                const getTrailingNumber = (s: string) => {
+                    const m = s.match(/(\d+)$/);
+                    return m ? parseInt(m[1], 10).toString() : null;
+                };
+                const trailA = getTrailingNumber(a);
+                const trailB = getTrailingNumber(b);
+                if (trailA && trailB && trailA === trailB && (a.includes('/') || b.includes('/') || a.includes('-') || b.includes('-'))) {
+                    return true;
+                }
+                return false;
+            };
+
+            if (rCode && (matchCodes(rCode, cAddr) || matchCodes(rCode, cCode))) return true;
             if (rName && cName && rName === cName) {
                 if (rPlot && cPlot && rPlot === cPlot) return true;
                 if (rMap && cMap && rMap === cMap) return true;
@@ -295,7 +387,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
       setIsExtending(true);
       
-      const nowStr = new Date().toLocaleString('vi-VN');
+      const nowStr = formatDateTimeVN(getVietnamNowISO());
       const userLabel = currentUser ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})` : 'Hệ thống';
       const extensionNote = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(record.deadline)} -> Hạn mới: ${formatDate(extendDate)}. Lý do: ${extendReason.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
       
@@ -547,6 +639,29 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <CalendarClock size={17} />
               </button>
             )}
+            {onCreateContract && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && !matchedContract && (
+              <button
+                onClick={() => {
+                  if (onCreateContract) {
+                    onCreateContract(record);
+                    onClose();
+                  }
+                }}
+                className="p-1.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                title="Lập hợp đồng mới"
+              >
+                <FileSignature size={17} />
+              </button>
+            )}
+            {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+              <button
+                onClick={() => { onClose(); onCreateLiquidation(record); }}
+                className="p-1.5 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                title="Thanh lý HĐ"
+              >
+                <FileCheck size={17} />
+              </button>
+            )}
             {onEdit && (
               <button 
                 onClick={() => { onClose(); onEdit(record); }} 
@@ -724,13 +839,91 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
                   {/* Hợp đồng liên kết */}
                   {isContract && (
-                    <div className="pt-2 border-t border-slate-100">
-                      <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng số:</span>
-                          <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract ? matchedContract.code : 'Chưa có HĐ'}</span>
+                    <div className="pt-2 border-t border-slate-100 space-y-3">
+                      {matchedContract ? (
+                        /* ĐÃ CÓ HỢP ĐỒNG LIÊN KẾT */
+                        <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng Số:</span>
+                            <span className="text-[11px] font-bold text-indigo-900 truncate block font-mono">{matchedContract.code}</span>
+                          </div>
+                          <button
+                            onClick={handleUnlinkContract}
+                            disabled={isLinkingContract}
+                            className="text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 p-2 rounded-md border border-red-200 transition-all flex items-center justify-center cursor-pointer shrink-0"
+                            title="Hủy liên kết"
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
-                      </div>
+                      ) : (
+                        /* CHƯA CÓ HỢP ĐỒNG LIÊN KẾT: Chỉ hiển thị nút Chọn HĐ dạng icon */
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-500 uppercase font-bold">Liên kết hợp đồng:</span>
+                          <button
+                            onClick={() => setShowContractPicker(!showContractPicker)}
+                            className="bg-indigo-600 text-white p-2 rounded-md flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0"
+                            title="Chọn HĐ"
+                          >
+                            <FolderOpen size={13} />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* BỘ CHỌN HỢP ĐỒNG DI ĐỘNG INLINE */}
+                      {showContractPicker && !matchedContract && (() => {
+                        const unassignedContracts = contracts.filter(c => !c.customerAddress || c.customerAddress.trim() === '' || !c.customerAddress.includes('HS-'));
+                        const filteredContracts = unassignedContracts.filter(c => {
+                          const q = contractSearchQuery.trim().toLowerCase();
+                          if (!q) return true;
+                          return (c.code || '').toLowerCase().includes(q) || (c.customerName || '').toLowerCase().includes(q);
+                        });
+
+                        return (
+                          <div className="bg-slate-50 border border-indigo-100 rounded-lg p-3 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-700 uppercase flex items-center gap-1">
+                                <FolderOpen size={12} className="text-indigo-600" />
+                                Chọn HĐ ({unassignedContracts.length})
+                              </span>
+                              <button 
+                                onClick={() => { setShowContractPicker(false); setContractSearchQuery(''); }}
+                                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                            <input 
+                              type="text"
+                              className="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                              placeholder="Tìm nhanh theo Số HĐ hoặc tên khách..."
+                              value={contractSearchQuery}
+                              onChange={(e) => setContractSearchQuery(e.target.value)}
+                            />
+                            <div className="max-h-32 overflow-y-auto space-y-1 divide-y divide-slate-100 border border-slate-200 rounded-md bg-white p-1">
+                              {filteredContracts.length === 0 ? (
+                                <p className="text-[11px] text-slate-500 py-3 text-center italic">Không tìm thấy HĐ nào</p>
+                              ) : (
+                                filteredContracts.map(c => (
+                                  <div
+                                    key={c.id}
+                                    onClick={() => handleLinkContract(c)}
+                                    className="w-full text-left text-[11px] p-2 hover:bg-indigo-50/60 active:bg-indigo-100/60 rounded-md transition-all flex justify-between items-center group cursor-pointer"
+                                  >
+                                    <div className="min-w-0 pr-2">
+                                      <p className="font-bold text-indigo-950 truncate group-hover:text-indigo-600 font-mono">{c.code}</p>
+                                      <p className="text-slate-500 truncate text-[9px]">{c.customerName || 'Chưa rõ tên'}</p>
+                                    </div>
+                                    <button className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all cursor-pointer">
+                                      Chọn
+                                    </button>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

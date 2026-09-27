@@ -899,21 +899,98 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     return { migratedRecords, hasChanges };
 }
 
+export function findEmployeeMatch(
+    idOrName?: string | null,
+    employees: Employee[] = [],
+    users: User[] = []
+): Employee | null {
+    if (!idOrName) return null;
+    const trimmed = String(idOrName).trim();
+    if (!trimmed) return null;
+
+    // 1. Tìm trực tiếp trong danh sách nhân viên theo ID gốc
+    let emp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
+    if (emp) return emp;
+
+    // 2. Tìm theo tên nhân viên (không phân biệt hoa thường)
+    emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    if (emp) return emp;
+
+    // 3. Tìm theo email nhân viên
+    emp = employees.find(e => {
+        const eEmail = (e as any).email || '';
+        return eEmail && eEmail.toLowerCase().split('@')[0] === trimmed.toLowerCase().split('@')[0];
+    });
+    if (emp) return emp;
+
+    // 4. Tìm thông qua tài khoản đăng nhập (users)
+    const user = users.find(u => 
+        (u.id && u.id.toLowerCase() === trimmed.toLowerCase()) ||
+        (u.username && u.username.toLowerCase() === trimmed.toLowerCase()) ||
+        (u.email && u.email.toLowerCase().split('@')[0] === trimmed.toLowerCase().split('@')[0])
+    );
+
+    if (user) {
+        // Nếu tìm thấy user, ánh xạ sang nhân viên tương ứng
+        const empByUser = employees.find(e => 
+            (e.id && e.id === user.employeeId) ||
+            (e.name && e.name.toLowerCase() === (user.name || '').toLowerCase()) ||
+            ((e as any).email && (e as any).email.toLowerCase() === (user.email || '').toLowerCase())
+        );
+        if (empByUser) return empByUser;
+    }
+
+    return null;
+}
+
+export function resolveEmployeeName(
+    idOrName?: string | null,
+    employees: Employee[] = [],
+    users: User[] = []
+): string {
+    if (!idOrName) return 'Chưa phân công';
+    const trimmed = String(idOrName).trim();
+    if (!trimmed) return 'Chưa phân công';
+
+    const emp = findEmployeeMatch(idOrName, employees, users);
+    if (emp) return emp.name;
+
+    return trimmed;
+}
+
 // --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ (ID VS TÊN) ---
 export function getEmployeeName(idOrName?: string | null, employees: Employee[] = []): string {
     if (!idOrName) return 'Chưa giao';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return 'Chưa giao';
     
-    // 1. Tìm theo ID (không phân biệt hoa thường)
-    let emp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
-    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
-    
+    const cleanId = (s: string) => {
+        const lower = s.toLowerCase().trim();
+        const match = lower.match(/^(nv|e|nv0*|0*)(\d+)$/);
+        return match ? match[2] : lower;
+    };
+
+    const targetClean = cleanId(trimmed);
+
+    // 1. Tìm theo ID chuẩn hóa hoặc ID gốc
+    let emp = employees.find(e => {
+        if (!e.id) return false;
+        const eClean = cleanId(e.id);
+        return eClean === targetClean || e.id.toLowerCase() === trimmed.toLowerCase();
+    });
+
     // 2. Tìm theo Tên (không phân biệt hoa thường)
-    emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    if (!emp) {
+        emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    }
+
+    // 3. Tìm theo Email (tài khoản đăng nhập)
+    if (!emp) {
+        emp = employees.find(e => (e as any).email && (e as any).email.toLowerCase().split('@')[0] === trimmed.split('@')[0]);
+    }
+
     if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
     
-    // 3. Nếu không tìm thấy trong danh mục, trả về chính chuỗi đang lưu (tránh mất tên nếu nhập tự do)
     return trimmed;
 }
 
@@ -922,8 +999,22 @@ export function resolveEmployeeId(idOrName?: string | null, employees: Employee[
     const trimmed = String(idOrName).trim();
     if (!trimmed) return '';
     
-    // Nếu truyền vào trùng ID hoặc Tên trong danh sách, quy đổi về ID chuẩn
-    const emp = employees.find(e => (e.id && e.id.toLowerCase() === trimmed.toLowerCase()) || (e.name && e.name.toLowerCase() === trimmed.toLowerCase()));
+    const cleanId = (s: string) => {
+        const lower = s.toLowerCase().trim();
+        const match = lower.match(/^(nv|e|nv0*|0*)(\d+)$/);
+        return match ? match[2] : lower;
+    };
+
+    const targetClean = cleanId(trimmed);
+
+    const emp = employees.find(e => {
+        if (!e.id) return false;
+        const eClean = cleanId(e.id);
+        return eClean === targetClean || 
+               e.id.toLowerCase() === trimmed.toLowerCase() || 
+               (e.name && e.name.toLowerCase() === trimmed.toLowerCase()) ||
+               ((e as any).email && (e as any).email.toLowerCase().split('@')[0] === trimmed.split('@')[0]);
+    });
     return emp ? emp.id : trimmed;
 }
 
@@ -1842,6 +1933,91 @@ export function getReceiptReceiverName(
     // C. Nếu không thỏa mãn 2 điều kiện trên: Tuyệt đối để trống
     return '';
 }
+
+/**
+ * 🇻🇳 BỘ TIỆN ÍCH CHUẨN THỜI GIAN THỰC VIỆT NAM (GMT+7)
+ */
+
+export function getVietnamDateString(d?: Date | string | number | null): string {
+    const dateObj = d ? new Date(d) : new Date();
+    if (isNaN(dateObj.getTime())) return '';
+    
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    return formatter.format(dateObj); // Trả về "YYYY-MM-DD"
+}
+
+export function getVietnamTimeString(d?: Date | string | number | null): string {
+    const dateObj = d ? new Date(d) : new Date();
+    if (isNaN(dateObj.getTime())) return '';
+
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    return formatter.format(dateObj); // Trả về "HH:mm:ss"
+}
+
+export function getVietnamNowISO(): string {
+    const now = new Date();
+    const datePart = getVietnamDateString(now);
+    const timePart = getVietnamTimeString(now);
+    return `${datePart}T${timePart}+07:00`;
+}
+
+export function instantToVietnamDate(instant?: Date | string | number | null): Date {
+    const dateObj = instant ? new Date(instant) : new Date();
+    if (isNaN(dateObj.getTime())) return new Date();
+    
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    const parts = formatter.formatToParts(dateObj);
+    
+    const year = parseInt(parts.find(p => p.type === 'year')?.value || '1970', 10);
+    const month = parseInt(parts.find(p => p.type === 'month')?.value || '1', 10) - 1;
+    const day = parseInt(parts.find(p => p.type === 'day')?.value || '1', 10);
+    const hourVal = parts.find(p => p.type === 'hour')?.value || '0';
+    const hour = parseInt(hourVal === '24' ? '0' : hourVal, 10);
+    const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+    const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
+    
+    return new Date(year, month, day, hour, minute, second);
+}
+
+export function getVietnamNow(): Date {
+    return instantToVietnamDate(new Date());
+}
+
+export function formatDateTimeVN(dStr?: string | Date | null): string {
+    if (!dStr) return '';
+    const d = new Date(dStr);
+    if (isNaN(d.getTime())) return String(dStr);
+    
+    const datePart = getVietnamDateString(d);
+    const timePart = getVietnamTimeString(d);
+    
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+        return `${timePart} ${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return `${timePart} ${datePart}`;
+}
+
 
 
 

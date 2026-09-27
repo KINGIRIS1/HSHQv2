@@ -166,10 +166,10 @@ export function getLuuTruWorkflow(procedureCode?: string | null): {
       name: matchedItem.name,
       standardDays: totalDays,
       steps: matchedItem.steps.map(s => ({
-        stepNumber: s.stepNumber,
+        stepNumber: s.stepNumber ?? 1,
         name: s.name,
-        durationDays: s.durationDays,
-        durationHours: s.durationHours,
+        durationDays: s.durationDays ?? 1,
+        durationHours: s.durationHours || 8,
       })),
     };
   }

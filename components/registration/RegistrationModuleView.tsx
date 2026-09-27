@@ -16,6 +16,7 @@ import {
   CreditCard,
   Printer,
   Settings,
+  BarChart3,
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus } from '../../types';
 import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
@@ -27,7 +28,7 @@ import { HandoverPostingModal } from './HandoverPostingModal';
 import { HandoverPrintModal } from './HandoverPrintModal';
 import { RegistrationWorkflowModal } from './RegistrationWorkflowModal';
 import DeleteConfirmModal from '../DeleteConfirmModal';
-import { confirmAction } from '../../utils/appHelpers';
+import { confirmAction, getVietnamDateString } from '../../utils/appHelpers';
 import {
   fetchDangkyRecords,
   updateDangkyRecord,
@@ -44,11 +45,15 @@ import { syncDangKyToVaoSo } from '../../services/apiArchive';
 interface RegistrationModuleViewProps {
   currentUser?: User | null;
   employees: Employee[];
+  setCurrentView?: (view: string) => void;
+  setReportMainTab?: (tab: 'measurement' | 'archive' | 'registration') => void;
 }
 
 export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   currentUser,
   employees,
+  setCurrentView,
+  setReportMainTab,
 }) => {
   const [records, setRecords] = useState<RecordFile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -217,7 +222,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     try {
       const res = await handoverTaxInDb(recordIds, assignedTo, currentUser || undefined);
       if (!res.success) throw new Error(res.error || 'Giao chuyển thuế thất bại');
-      const todayStr = new Date().toISOString().substring(0, 10);
+      const todayStr = getVietnamDateString();
       setRecords((prev) =>
         prev.map((r) => {
           if (!recordIds.includes(r.id)) return r;
@@ -243,7 +248,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     try {
       const res = await handoverPostingInDb(recordIds, assignedTo, currentUser || undefined);
       if (!res.success) throw new Error(res.error || 'Giao niêm yết thất bại');
-      const todayStr = new Date().toISOString().substring(0, 10);
+      const todayStr = getVietnamDateString();
       const postingEndDateStr = addCalendarDays(todayStr, 30);
       setRecords((prev) =>
         prev.map((r) => {
@@ -271,7 +276,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     try {
       const res = await handoverPrintInDb(recordIds, assignedTo, currentUser || undefined);
       if (!res.success) throw new Error(res.error || 'Giao In GCN thất bại');
-      const todayStr = new Date().toISOString().substring(0, 10);
+      const todayStr = getVietnamDateString();
       setRecords((prev) =>
         prev.map((r) => {
           if (!recordIds.includes(r.id)) return r;
@@ -348,6 +353,18 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              if (setReportMainTab) setReportMainTab('registration');
+              if (setCurrentView) setCurrentView('reports');
+            }}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <BarChart3 size={15} />
+            <span>📊 Báo cáo Cấp giấy</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsWorkflowModalOpen(true)}

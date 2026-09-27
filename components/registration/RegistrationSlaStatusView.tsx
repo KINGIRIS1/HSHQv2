@@ -19,24 +19,36 @@ export interface WorkScheduleConfig {
 }
 
 export interface ProcedureStep {
-  id: string;
-  stepNumber: number;
+  id?: string;
+  stepNumber?: number;
   name: string;
+  label?: string;
+  title?: string;
   durationHours: number; // e.g. 8 hours
-  durationDays: number;  // e.g. 1 day
+  durationDays?: number;  // e.g. 1 day
   description?: string;
+  statusKey?: string;
+  durationMinutes?: number;
+  totalMinutes?: number;
+  isSlaPaused?: boolean;
+  department?: string;
+  pauseReason?: string;
 }
 
 export interface ProcedureItemConfig {
   id: string;
-  module: 'dangky' | 'dodac' | 'luutru';
+  module?: 'dangky' | 'dodac' | 'luutru';
   code: string;         // e.g. "3.1.1", "2.1", "1.1"
   name: string;         // Tên thủ tục chi tiết
+  title?: string;
+  standardDays?: number;
+  category?: string;
   hasTax?: boolean;
   hasPosting?: boolean;
   hasFieldWork?: boolean;
-  description: string;
+  description?: string;
   steps: ProcedureStep[];
+  totalDays?: number;
 }
 
 export interface ProcedureGroupConfig {

@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, RecordStatus } from '../types';
+import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, RecordStatus, CertificateOwnerItem } from '../types';
 import { connectionManager } from './connectionService';
 import { sanitizeData, isBlankRecord, keepOnlyDate, keepOnlyDateTime, sanitizePayloadForDateErrors, sanitizePayloadFor22P02 } from './apiCore';
 import { getTargetTable, RECORD_DB_COLUMNS, DANGKY_RECORDS_DB_COLUMNS } from './apiRecords';
@@ -52,6 +52,17 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
       attachedFiles = JSON.parse(dbItem.attachedFiles);
     } catch {
       attachedFiles = [];
+    }
+  }
+
+  let certificateOwners: CertificateOwnerItem[] = [];
+  if (Array.isArray(dbItem.certificateOwners)) {
+    certificateOwners = dbItem.certificateOwners;
+  } else if (typeof dbItem.certificateOwners === 'string') {
+    try {
+      certificateOwners = JSON.parse(dbItem.certificateOwners);
+    } catch {
+      certificateOwners = [];
     }
   }
 
@@ -145,6 +156,7 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     statusLogs,
     dossierComponents,
     attachedFiles,
+    certificateOwners,
     data: dbItem.data || {},
     sourceTable: 'dangky_records',
   };
@@ -273,6 +285,7 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.statusLogs !== undefined) payload.statusLogs = record.statusLogs;
   if (record.dossierComponents !== undefined) payload.dossierComponents = record.dossierComponents;
   if (record.attachedFiles !== undefined) payload.attachedFiles = record.attachedFiles;
+  if (record.certificateOwners !== undefined) payload.certificateOwners = record.certificateOwners;
 
   payload.updatedAt = new Date().toISOString();
   return sanitizePayloadForDateErrors(payload);

@@ -128,10 +128,10 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
-                  {proc.code}
+                  {proc ? (proc as any).code : '3.x'}
                 </span>
-                <span className="text-[11px] font-bold text-slate-800 truncate" title={record.recordType || proc.name}>
-                  {record.recordType || proc.name}
+                <span className="text-[11px] font-bold text-slate-800 truncate" title={record.recordType || (proc ? (proc as any).name : '')}>
+                  {record.recordType || (proc ? (proc as any).name : 'Hồ sơ')}
                 </span>
               </div>
               {record.content && (

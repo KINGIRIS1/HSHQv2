@@ -1901,6 +1901,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     key={r.id}
                     record={r}
                     employees={employees}
+                    users={users}
                     visibleColumns={props.visibleColumns}
                     columnOrder={props.columnOrder}
                     isSelected={props.selectedRecordIds.has(r.id)}
@@ -2122,6 +2123,17 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "vao_so":
+      if (!hasPermission('VAO_SO_GCN_VIEW') && !hasPermission('VAO_SO_GCN') && currentUser.role !== UserRole.ADMIN) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white rounded-2xl shadow-sm border border-red-100 max-w-lg mx-auto my-12">
+            <div className="bg-red-50 p-4 rounded-full text-red-600 mb-4">
+              <ShieldAlert size={48} />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Truy cập bị từ chối</h2>
+            <p className="text-sm text-gray-500 mb-4">Tài khoản của bạn không có quyền truy cập phân hệ Vào sổ GCN (Vô số GCN).</p>
+          </div>
+        );
+      }
       return <VaoSoView currentUser={currentUser} wards={wards} />;
     case "barcode_generator":
       return <BarcodeGeneratorView />;

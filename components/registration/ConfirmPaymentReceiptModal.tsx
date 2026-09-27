@@ -12,6 +12,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { RecordFile } from '../../types';
+import { getVietnamDateString } from '../../utils/appHelpers';
 
 interface ConfirmPaymentReceiptModalProps {
   isOpen: boolean;
@@ -30,9 +31,7 @@ export const ConfirmPaymentReceiptModal: React.FC<ConfirmPaymentReceiptModalProp
   onConfirmPayment,
 }) => {
   const [receiptNumber, setReceiptNumber] = useState<string>('');
-  const [receiptDate, setReceiptDate] = useState<string>(
-    new Date().toISOString().substring(0, 10)
-  );
+  const [receiptDate, setReceiptDate] = useState<string>(() => getVietnamDateString());
   const [note, setNote] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const isSubmittingRef = useRef<boolean>(false);
@@ -49,12 +48,12 @@ export const ConfirmPaymentReceiptModal: React.FC<ConfirmPaymentReceiptModalProp
           selectedRecords[0].taxNoticeDate ||
           selectedRecords[0].taxPaymentDate ||
           selectedRecords[0].paymentReceiptDate ||
-          new Date().toISOString().substring(0, 10)
+          getVietnamDateString()
         );
         setNote('');
       } else {
         setReceiptNumber('');
-        setReceiptDate(new Date().toISOString().substring(0, 10));
+        setReceiptDate(getVietnamDateString());
         setNote('');
       }
     }

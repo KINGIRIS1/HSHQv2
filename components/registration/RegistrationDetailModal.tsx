@@ -31,6 +31,7 @@ import {
   addCalendarDays,
   getStepSlaInfo,
 } from '../../utils/registrationWorkflows';
+import { formatDateTimeVN } from '../../utils/appHelpers';
 
 interface RegistrationDetailModalProps {
   isOpen: boolean;
@@ -391,7 +392,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                           <div className="flex items-center justify-between font-bold text-slate-800">
                             <span className="text-blue-700">{log.newStatus}</span>
                             <span className="text-[11px] text-slate-500">
-                              {log.changedAt ? log.changedAt.substring(0, 16).replace('T', ' ') : ''}
+                              {log.changedAt ? formatDateTimeVN(log.changedAt) : ''}
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-600 mt-1">

@@ -390,8 +390,25 @@ export const useRecordFilter = (
             }
         }
 
-        // Sorting
+        // Sorting: Luôn ưu tiên hồ sơ trễ hạn nhất lên đầu bảng (áp dụng cho cả bảng chính và hồ sơ cá nhân)
         result.sort((a, b) => {
+            const isOverdueA = isRecordOverdue(a);
+            const isOverdueB = isRecordOverdue(b);
+
+            // 1. Hồ sơ trễ hạn luôn được đưa lên trên cùng bảng
+            if (isOverdueA && !isOverdueB) return -1;
+            if (!isOverdueA && isOverdueB) return 1;
+
+            // 2. Giữa các hồ sơ trễ hạn: đưa hồ sơ trễ hạn lâu nhất lên đầu tiên (deadline sớm nhất)
+            if (isOverdueA && isOverdueB) {
+                const dateA = a.deadline ? new Date(a.deadline).getTime() : 0;
+                const dateB = b.deadline ? new Date(b.deadline).getTime() : 0;
+                if (dateA && dateB && dateA !== dateB) return dateA - dateB;
+                if (dateA && !dateB) return -1;
+                if (!dateA && dateB) return 1;
+            }
+
+            // 3. Các hồ sơ bình thường sắp xếp theo tiêu chí người dùng chọn
             let aVal: any = a[sortConfig.key as keyof RecordFile];
             let bVal: any = b[sortConfig.key as keyof RecordFile];
             if (!aVal) return 1; if (!bVal) return -1;

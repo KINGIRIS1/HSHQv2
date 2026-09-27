@@ -736,18 +736,79 @@ export const useAppData = (currentUser: User | null) => {
     };
 
     // --- Employee Handlers ---
-    const handleSaveEmployee = async (emp: Employee) => {
-        const exists = employees.find(e => e.id === emp.id);
-        const savedEmp = await saveEmployeeApi(emp, !!exists);
+    const handleSaveEmployee = async (emp: Employee, originalId?: string) => {
+        let isRename = false;
+        if (originalId && originalId !== emp.id) {
+            isRename = true;
+            // Xóa nhân viên có ID cũ
+            await deleteEmployeeApi(originalId);
+        }
+
+        const exists = isRename ? false : employees.some(e => e.id === emp.id);
+        const savedEmp = await saveEmployeeApi(emp, exists);
         if (savedEmp) {
-            const nextEmps = exists
-                ? employees.map(e => e.id === savedEmp.id ? savedEmp : e)
-                : [...employees, savedEmp];
+            let nextEmps = [...employees];
+            if (isRename) {
+                // Thay thế ID cũ bằng ID mới
+                nextEmps = nextEmps.filter(e => e.id !== originalId);
+                nextEmps.push(savedEmp);
+            } else {
+                nextEmps = exists
+                    ? nextEmps.map(e => e.id === savedEmp.id ? savedEmp : e)
+                    : [...nextEmps, savedEmp];
+            }
             setEmployees(nextEmps);
+
+            // 1. Cập nhật đồng bộ tài khoản người dùng (users)
+            if (isRename) {
+                const updatedUsers = users.map(u => {
+                    if (u.employeeId === originalId) {
+                        const updatedUser = { ...u, employeeId: emp.id };
+                        saveUserApi(updatedUser, true).catch(err => console.error(err));
+                        return updatedUser;
+                    }
+                    return u;
+                });
+                setUsers(updatedUsers);
+            }
+
+            // 2. Cập nhật đồng bộ các hồ sơ liên quan (records)
+            if (isRename) {
+                const updatedRecords = records.map(r => {
+                    let changed = false;
+                    const rUp = { ...r };
+                    if (rUp.assignedTo === originalId) { rUp.assignedTo = emp.id; changed = true; }
+                    if (rUp.receivedBy === originalId) { rUp.receivedBy = emp.id; changed = true; }
+                    
+                    if (rUp.data && typeof rUp.data === 'object') {
+                        const d = { ...rUp.data };
+                        let dataChanged = false;
+                        if (d.fieldStaff === originalId) { d.fieldStaff = emp.id; dataChanged = true; }
+                        if (d.drawingStaff === originalId) { d.drawingStaff = emp.id; dataChanged = true; }
+                        if (d.technicalStaff === originalId) { d.technicalStaff = emp.id; dataChanged = true; }
+                        if (dataChanged) {
+                            rUp.data = d;
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        updateRecordApi(rUp).catch(err => console.error(err));
+                        return rUp;
+                    }
+                    return r;
+                });
+                setRecords(updatedRecords);
+            }
 
             // Tự động re-enrich danh sách users dựa trên danh sách nhân viên mới
             enrichUsersList(users, nextEmps).then(enrichedUsers => {
-                setUsers(enrichedUsers);
+                const finalUsers = enrichedUsers.map(eu => {
+                    if (isRename && eu.employeeId === originalId) {
+                        return { ...eu, employeeId: emp.id };
+                    }
+                    return eu;
+                });
+                setUsers(finalUsers);
             });
         }
     };
