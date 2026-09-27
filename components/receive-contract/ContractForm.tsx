@@ -524,7 +524,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id);
       if (isExistingContract && !formData.code) {
-          setNotification({ type: 'error', message: "Vui lòng kiểm tra Mã hợp đồng." }); 
+          setNotification({ type: 'error', message: "Vui lòng kiểm tra Số hợp đồng." }); 
           return; 
       }
       if (!formData.customerName) { 
@@ -532,7 +532,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           return; 
       }
 
-      // Kiểm tra trùng SỐ HỢP ĐỒNG (mã HĐ) khi chỉnh sửa hợp đồng đã có mã
+      // Kiểm tra trùng SỐ HỢP ĐỒNG khi chỉnh sửa hợp đồng đã có số
       if (mode === 'contract' && isExistingContract && formData.code && contracts) {
           const duplicateCodeContract = contracts.find(c => 
               c.code && 
@@ -603,7 +603,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       if (savedCode) {
           const msg = initialData ? 'Cập nhật thành công!' : 'Đã tạo mới thành công!';
-          setNotification({ type: 'success', message: `${msg} Mã hợp đồng: ${savedCode}` });
+          setNotification({ type: 'success', message: `${msg} Số hợp đồng: ${savedCode}` });
           
           // Cập nhật lại code mới chốt chính thức vào form
           setFormData(prev => ({ 
@@ -861,7 +861,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             <div>
                                 <div className="flex justify-between items-center h-5 mb-1.5">
                                     <label className="text-[11px] sm:text-xs font-bold text-slate-600 uppercase tracking-wide">
-                                        Mã Hợp Đồng
+                                        Số hợp đồng
                                     </label>
                                     <span className="text-[10px] font-semibold text-purple-700 bg-purple-100/90 border border-purple-200/80 px-2 py-0.5 rounded-full inline-flex items-center">
                                         Cấp tự động
@@ -874,7 +874,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                         className="w-full h-10 px-3 py-2 text-xs sm:text-sm font-mono font-bold text-purple-800 bg-slate-100/90 border border-slate-300 rounded-lg cursor-not-allowed outline-none select-all shadow-2xs" 
                                         value={formData.code ?? ''} 
                                         placeholder="Đang cấp số tự động..."
-                                        title="Mã hợp đồng được cấp tự động từ hệ thống"
+                                        title="Số hợp đồng được cấp tự động từ hệ thống"
                                     />
                                 </div>
                             </div>

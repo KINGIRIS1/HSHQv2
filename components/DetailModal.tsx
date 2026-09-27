@@ -621,6 +621,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
+                {onCreateContract && !matchedContract && record && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                    <button
+                        onClick={() => { onClose(); onCreateContract(record); }}
+                        className="p-1.5 text-purple-600 hover:bg-purple-50 active:bg-purple-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        title="Lập hợp đồng cho hồ sơ này"
+                    >
+                        <FileSignature size={18} />
+                    </button>
+                )}
+
                 {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
@@ -796,103 +806,43 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                         if (!isContractProcedure && !hasExcerptOrMeasurement && !matchedContract) return null;
 
-                        const isLiquidated = Boolean(matchedContract?.liquidationDate || (matchedContract?.liquidationAmount && matchedContract.liquidationAmount > 0));
-
                         return (
-                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                                <div className="flex items-center justify-between border-b pb-2.5">
-                                    <h3 className="text-xs font-bold text-indigo-700 uppercase flex items-center gap-2 border-l-4 border-indigo-600 pl-2">
-                                        <FileText size={16}/> {hasExcerptOrMeasurement ? 'Hợp đồng & Đo đạc / Trích lục' : 'Hợp đồng liên kết với hồ sơ'}
-                                    </h3>
-                                    {matchedContract && (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isLiquidated ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
-                                            {isLiquidated ? 'ĐÃ THANH LÝ' : 'ĐÃ LẬP HỢP ĐỒNG'}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                <h3 className="text-xs font-bold text-indigo-600 uppercase mb-3 flex items-center gap-2 border-l-4 border-indigo-600 pl-2">
+                                    <FileText size={16}/> {hasExcerptOrMeasurement && (isContractProcedure || matchedContract) ? 'Hợp đồng & Trích đo / Trích lục' : hasExcerptOrMeasurement ? (recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo') : 'Hợp đồng liên kết'}
+                                </h3>
+                                <div className={`grid grid-cols-1 ${(isContractProcedure || matchedContract) && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3`}>
                                     {/* HỢP ĐỒNG LIÊN KẾT */}
-                                    {matchedContract ? (
-                                        <div className="bg-gradient-to-br from-indigo-50/90 to-purple-50/50 border border-indigo-100 rounded-xl p-3.5 space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wide">Mã Hợp Đồng</span>
-                                                <span className="text-xs font-mono font-bold text-indigo-950 bg-white px-2.5 py-1 rounded-md border border-indigo-200 shadow-2xs">
-                                                    {matchedContract.code}
-                                                </span>
-                                            </div>
-
-                                            <div className="text-xs space-y-1 text-slate-700 pt-1 border-t border-indigo-100/60">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-slate-500">Ngày lập HĐ:</span>
-                                                    <span className="font-semibold text-slate-800">
-                                                        {matchedContract.createdDate ? new Date(matchedContract.createdDate).toLocaleDateString('vi-VN') : '---'}
-                                                    </span>
+                                    {(isContractProcedure || matchedContract) && (
+                                        <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="bg-indigo-200 text-indigo-700 p-2 rounded-lg shrink-0">
+                                                    <FileText size={16} />
                                                 </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-slate-500">Loại / Dịch vụ:</span>
-                                                    <span className="font-semibold text-slate-800 truncate max-w-[180px]" title={matchedContract.serviceType || matchedContract.contractType}>
-                                                        {matchedContract.contractType} {matchedContract.serviceType ? `- ${matchedContract.serviceType}` : ''}
-                                                    </span>
+                                                <div className="text-left truncate">
+                                                    <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng số:</span>
+                                                    <p className="text-xs font-bold text-indigo-950 truncate">
+                                                        {matchedContract ? matchedContract.code : ''}
+                                                    </p>
                                                 </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-slate-500">Kinh phí HĐ:</span>
-                                                    <span className="font-bold text-indigo-700">
-                                                        {(matchedContract.totalAmount || contractPrice || 0).toLocaleString('vi-VN')} đ
-                                                    </span>
-                                                </div>
-                                                {isLiquidated && (
-                                                    <div className="flex justify-between items-center text-emerald-700 font-semibold pt-1 border-t border-indigo-100/60">
-                                                        <span>Giá trị thanh lý:</span>
-                                                        <span>{(matchedContract.liquidationAmount || 0).toLocaleString('vi-VN')} đ</span>
-                                                    </div>
-                                                )}
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-3.5 flex flex-col justify-between gap-2.5">
-                                            <div>
-                                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block">Hợp đồng liên kết</span>
-                                                <p className="text-xs text-slate-500 mt-1 italic">Chưa có hợp đồng nào được liên kết với hồ sơ này.</p>
-                                            </div>
-                                            {onCreateContract && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        onClose();
-                                                        onCreateContract(record);
-                                                    }}
-                                                    className="w-full py-1.5 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
-                                                >
-                                                    <Plus size={14} /> Lập hợp đồng cho hồ sơ này
-                                                </button>
-                                            )}
                                         </div>
                                     )}
 
                                     {/* SỐ TRÍCH ĐO / SỐ TRÍCH LỤC */}
-                                    {hasExcerptOrMeasurement ? (
-                                        <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3.5 flex flex-col justify-between">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
-                                                    <FileCheck size={18} />
-                                                </div>
-                                                <div className="text-left truncate">
-                                                    <span className="text-[10px] text-purple-600 uppercase font-bold block">
-                                                        {recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo'}
-                                                    </span>
-                                                    <p className="text-sm font-bold text-purple-950 truncate mt-0.5">
-                                                        {excerptNum}
-                                                    </p>
-                                                </div>
+                                    {hasExcerptOrMeasurement && (
+                                        <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3 flex items-center gap-2.5">
+                                            <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
+                                                <FileCheck size={16} />
                                             </div>
-                                            <div className="text-[11px] text-purple-700 mt-3 pt-2 border-t border-purple-100 italic">
-                                                Hồ sơ đã được cấp số kỹ thuật đo vẽ.
+                                            <div className="text-left truncate">
+                                                <span className="text-[10px] text-purple-600 uppercase font-bold block">
+                                                    {recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo'}
+                                                </span>
+                                                <p className="text-xs font-bold text-purple-950 truncate">
+                                                    {excerptNum}
+                                                </p>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3.5 flex items-center gap-2.5 text-slate-400">
-                                            <FileCheck size={18} />
-                                            <span className="text-xs italic">Chưa cấp số trích đo / trích lục</span>
                                         </div>
                                     )}
                                 </div>
