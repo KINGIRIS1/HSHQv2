@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, User, UserRole } from '../types';
 import { updateRecordFieldsApi } from '../services/api';
 

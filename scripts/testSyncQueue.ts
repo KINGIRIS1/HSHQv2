@@ -19,11 +19,11 @@ const mockStorage: Record<string, string> = {};
 
 // Mock IndexedDB
 const mockIndexedDB = {
-    open: (name: string, version: number) => {
+    open: () => {
         const req: any = {
             result: {
                 objectStoreNames: { contains: () => true },
-                transaction: (storeName: string, mode: string) => {
+                transaction: () => {
                     const tx: any = {
                         objectStore: () => ({
                             get: (key: string) => {

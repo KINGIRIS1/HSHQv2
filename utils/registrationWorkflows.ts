@@ -45,6 +45,9 @@ export const calculateRecordStepSla = (_r: any, _s?: any, _p?: any) => ({
 });
 
 export interface WorkflowStep {
+  id?: string;
+  name?: string;
+  statusKey?: RecordStatus | string;
   key: RecordStatus | string;
   label: string;
   shortLabel: string;

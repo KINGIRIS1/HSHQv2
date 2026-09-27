@@ -1,392 +1,431 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, Contract } from '../types';
-import { X, Trash2, AlertTriangle, RefreshCw, CheckCircle, Database } from 'lucide-react';
-import { deleteContractApi } from '../services/apiContracts';
+import { X, AlertTriangle, Trash2, CheckCircle, RefreshCw, Search, CheckSquare, Square, Eye, ShieldAlert, Loader2, Filter, Layers } from 'lucide-react';
+import { removeVietnameseTones, confirmAction } from '../utils/appHelpers';
 
 interface DuplicateRecordsAuditModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: RecordFile[];
-  contracts: Contract[];
+  contracts?: Contract[];
   onDeleteRecord?: (id: string) => Promise<boolean>;
   onDeleteBatch?: (ids: string[]) => Promise<boolean>;
-  onRefresh?: () => Promise<void>;
+  onRefresh?: () => Promise<void> | void;
 }
+
+interface DuplicateGroup {
+  id: string;
+  type: 'code' | 'plot_sheet' | 'customer_info';
+  title: string;
+  description: string;
+  records: RecordFile[];
+}
+
+const normalize = (str: string | null | undefined): string => {
+  if (!str) return '';
+  return removeVietnameseTones(str).trim().toLowerCase();
+};
 
 const DuplicateRecordsAuditModal: React.FC<DuplicateRecordsAuditModalProps> = ({
   isOpen,
   onClose,
-  records = [],
+  records,
   contracts = [],
   onDeleteRecord,
   onDeleteBatch,
   onRefresh
 }) => {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'records' | 'contracts'>('records');
-  const [loading, setLoading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const duplicateRecordGroups = useMemo(() => {
-    const groups: { [key: string]: RecordFile[] } = {};
+  // Group duplicate records
+  const duplicateRecordGroups = useMemo<DuplicateGroup[]>(() => {
+    if (!records || records.length === 0) return [];
+
+    const groups: DuplicateGroup[] = [];
+
+    // 1. Duplicate by exact Code
+    const codeMap = new Map<string, RecordFile[]>();
     records.forEach(r => {
-      if (r.code && r.code.trim()) {
-        const code = r.code.trim().toUpperCase();
-        if (!groups[code]) groups[code] = [];
-        groups[code].push(r);
+      const code = normalize(r.code);
+      if (code) {
+        if (!codeMap.has(code)) codeMap.set(code, []);
+        codeMap.get(code)!.push(r);
       }
     });
-    return Object.entries(groups)
-      .filter(([_, list]) => list.length > 1)
-      .map(([code, list]) => ({ code, items: list }));
+
+    codeMap.forEach((list, code) => {
+      if (list.length > 1) {
+        groups.push({
+          id: `code_${code}`,
+          type: 'code',
+          title: `Trùng mã hồ sơ: ${list[0].code}`,
+          description: `Phát hiện ${list.length} hồ sơ có cùng mã số "${list[0].code}"`,
+          records: list
+        });
+      }
+    });
+
+    // 2. Duplicate by Plot + Sheet + Ward
+    const plotSheetMap = new Map<string, RecordFile[]>();
+    records.forEach(r => {
+      const plot = normalize(r.landPlot);
+      const sheet = normalize(r.mapSheet);
+      const ward = normalize(r.ward);
+      if (plot && sheet && ward) {
+        const key = `${ward}__${sheet}__${plot}`;
+        if (!plotSheetMap.has(key)) plotSheetMap.set(key, []);
+        plotSheetMap.get(key)!.push(r);
+      }
+    });
+
+    plotSheetMap.forEach((list, key) => {
+      // Only consider if not already caught entirely in the same code group and has same or similar customer
+      if (list.length > 1) {
+        const uniqueCodes = new Set(list.map(r => r.code));
+        if (uniqueCodes.size > 1) {
+          const first = list[0];
+          groups.push({
+            id: `plot_${key}`,
+            type: 'plot_sheet',
+            title: `Trùng vị trí: Thửa ${first.landPlot}, Tờ ${first.mapSheet} (${first.ward || ''})`,
+            description: `Có ${list.length} hồ sơ cùng vị trí thửa đất (${first.ward || ''})`,
+            records: list
+          });
+        }
+      }
+    });
+
+    return groups;
   }, [records]);
 
+  // Duplicate contracts
   const duplicateContractGroups = useMemo(() => {
-    const groups: { [key: string]: Contract[] } = {};
+    if (!contracts || contracts.length === 0) return [];
+    const codeMap = new Map<string, Contract[]>();
     contracts.forEach(c => {
-      if (c.code && c.code.trim()) {
-        const code = c.code.trim().toUpperCase();
-        if (!groups[code]) groups[code] = [];
-        groups[code].push(c);
+      const code = normalize(c.code);
+      if (code) {
+        if (!codeMap.has(code)) codeMap.set(code, []);
+        codeMap.get(code)!.push(c);
       }
     });
-    return Object.entries(groups)
-      .filter(([_, list]) => list.length > 1)
-      .map(([code, list]) => ({ code, items: list }));
+
+    const list: { code: string; contracts: Contract[] }[] = [];
+    codeMap.forEach((items, code) => {
+      if (items.length > 1) {
+        list.push({ code: items[0].code, contracts: items });
+      }
+    });
+    return list;
   }, [contracts]);
+
+  // Filter groups
+  const filteredRecordGroups = useMemo(() => {
+    if (!searchTerm.trim()) return duplicateRecordGroups;
+    const term = normalize(searchTerm);
+    return duplicateRecordGroups.filter(g =>
+      normalize(g.title).includes(term) ||
+      normalize(g.description).includes(term) ||
+      g.records.some(r =>
+        normalize(r.code).includes(term) ||
+        normalize(r.customerName).includes(term) ||
+        normalize(r.ward).includes(term)
+      )
+    );
+  }, [duplicateRecordGroups, searchTerm]);
+
+  // Auto-select duplicate candidates (keeps the most complete / most recent one in each group)
+  const handleAutoSelectDuplicates = () => {
+    const newSelected = new Set<string>();
+    duplicateRecordGroups.forEach(group => {
+      // Sort: keep record with highest data fullness or most recent updated/received date
+      const sorted = [...group.records].sort((a, b) => {
+        const dateA = a.updatedAt || a.receivedDate || '';
+        const dateB = b.updatedAt || b.receivedDate || '';
+        return dateB.localeCompare(dateA);
+      });
+      // Keep sorted[0], select sorted[1..n] for removal
+      for (let i = 1; i < sorted.length; i++) {
+        newSelected.add(sorted[i].id);
+      }
+    });
+    setSelectedIds(newSelected);
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllInGroup = (group: DuplicateGroup) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const allSelected = group.records.every(r => next.has(r.id));
+      if (allSelected) {
+        group.records.forEach(r => next.delete(r.id));
+      } else {
+        group.records.forEach(r => next.add(r.id));
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const confirmed = await confirmAction(
+      `Bạn có chắc chắn muốn xóa ${count} hồ sơ trùng lặp đã chọn? Thao tác này không thể hoàn tác!`,
+      'Xác nhận xóa hồ sơ trùng'
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    setSuccessMsg(null);
+    try {
+      const idsToDelete = Array.from(selectedIds);
+      if (onDeleteBatch) {
+        await onDeleteBatch(idsToDelete);
+      } else if (onDeleteRecord) {
+        for (const id of idsToDelete) {
+          await onDeleteRecord(id);
+        }
+      }
+      setSelectedIds(new Set());
+      setSuccessMsg(`Đã xóa thành công ${count} hồ sơ trùng lặp!`);
+      if (onRefresh) {
+        await onRefresh();
+      }
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Lỗi xóa hồ sơ trùng lặp:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
-  const showStatus = (type: 'success' | 'error', text: string) => {
-    setStatusMsg({ type, text });
-    setTimeout(() => setStatusMsg(null), 4000);
-  };
-
-  const handleDeleteRecordItem = async (id: string, code: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa bản sao hồ sơ có ID: ${id} (Mã: ${code}) không?`)) return;
-    setLoading(true);
-    try {
-      let success = false;
-      if (onDeleteRecord) {
-        success = await onDeleteRecord(id);
-      }
-      if (success) {
-        showStatus('success', `Đã xóa thành công hồ sơ trùng lặp có ID: ${id}`);
-        if (onRefresh) await onRefresh();
-      } else {
-        showStatus('error', 'Không thể xóa hồ sơ trùng lặp.');
-      }
-    } catch (err: any) {
-      console.error(err);
-      showStatus('error', err.message || 'Lỗi khi xóa hồ sơ trùng lặp.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteContractItem = async (id: string, code: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa bản sao hợp đồng mã: ${code} không?`)) return;
-    setLoading(true);
-    try {
-      const success = await deleteContractApi(id);
-      if (success) {
-        showStatus('success', `Đã xóa thành công hợp đồng trùng lặp mã: ${code}`);
-        if (onRefresh) await onRefresh();
-      } else {
-        showStatus('error', 'Không thể xóa hợp đồng.');
-      }
-    } catch (err: any) {
-      console.error(err);
-      showStatus('error', err.message || 'Lỗi khi xóa hợp đồng trùng lặp.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCleanAllRecordDuplicates = async () => {
-    if (duplicateRecordGroups.length === 0) return;
-    if (!window.confirm(`Hệ thống sẽ giữ lại bản ghi có ID lớn nhất/nhỏ nhất và XÓA TOÀN BỘ các bản sao trùng lặp còn lại cho tất cả ${duplicateRecordGroups.length} nhóm. Bạn có chắc chắn muốn thực hiện dọn dẹp hàng loạt?`)) return;
-    
-    setLoading(true);
-    let deletedCount = 0;
-    try {
-      const idsToDelete: string[] = [];
-      duplicateRecordGroups.forEach(group => {
-        // Sắp xếp theo thứ tự thời gian tạo hoặc giữ lại phần tử đầu tiên, xóa các phần tử sau
-        const sorted = [...group.items];
-        // Giữ lại phần tử thứ nhất, đưa các phần tử khác vào danh sách xóa
-        for (let i = 1; i < sorted.length; i++) {
-          if (sorted[i].id) {
-            idsToDelete.push(sorted[i].id!);
-          }
-        }
-      });
-
-      if (idsToDelete.length === 0) {
-        showStatus('error', 'Không tìm thấy ID hợp lệ để xóa.');
-        setLoading(false);
-        return;
-      }
-
-      let success = false;
-      if (onDeleteBatch) {
-        success = await onDeleteBatch(idsToDelete);
-      }
-      if (success) {
-        showStatus('success', `Đã dọn dẹp thành công ${idsToDelete.length} hồ sơ trùng lặp.`);
-        if (onRefresh) await onRefresh();
-      } else {
-        showStatus('error', 'Dọn dẹp hàng loạt thất bại.');
-      }
-    } catch (err: any) {
-      console.error(err);
-      showStatus('error', err.message || 'Lỗi khi dọn dẹp hàng loạt.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in">
-      <div className="bg-white rounded-2xl w-full max-w-4xl shadow-xl flex flex-col max-h-[90vh] border border-slate-100 animate-scale-up">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[75] p-3 md:p-6 backdrop-blur-xs animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden border border-gray-200">
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-              <Database size={20} />
+        <div className="px-6 py-4 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-500/10 text-amber-600 rounded-xl border border-amber-200">
+              <ShieldAlert className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Kiểm Tra Trùng Lặp Hệ Thống</h3>
-              <p className="text-xs text-slate-500 font-medium">Phát hiện và xử lý hồ sơ/hợp đồng bị tạo trùng mã</p>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                Kiểm Tra & Xử Lý Hồ Sơ Trùng Lặp
+                {duplicateRecordGroups.length > 0 && (
+                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 border border-red-200">
+                    {duplicateRecordGroups.length} nhóm trùng
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-gray-600">
+                Tự động quét và phát hiện các hồ sơ có cùng mã số, vị trí thửa đất hoặc thông tin tiếp nhận
+              </p>
             </div>
           </div>
-          <button 
-            type="button" 
-            onClick={onClose} 
-            className="p-1.5 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
           >
-            <X size={18} />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tabs & Toolbar */}
-        <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-white">
-          <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setActiveTab('records')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'records'
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Hồ Sơ Trùng ({duplicateRecordGroups.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('contracts')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'contracts'
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Hợp Đồng Trùng ({duplicateContractGroups.length})
-            </button>
+        {/* Toolbar & Filter */}
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Tìm mã hồ sơ, tên khách hàng, xã..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 w-64"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {activeTab === 'records' && duplicateRecordGroups.length > 0 && (
+            <button
+              onClick={handleAutoSelectDuplicates}
+              className="px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg border border-amber-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Tự động giữ lại 1 bản ghi mới nhất và chọn các bản sao cũ hơn để xóa"
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+              <span>Tự động chọn bản sao</span>
+            </button>
+
+            {selectedIds.size > 0 && (
               <button
-                type="button"
-                onClick={handleCleanAllRecordDuplicates}
-                disabled={loading}
-                className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                className="px-3.5 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
               >
-                <Trash2 size={14} /> Dọn dẹp hàng loạt
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Xóa {selectedIds.size} hồ sơ đã chọn</span>
               </button>
             )}
+
             {onRefresh && (
               <button
-                type="button"
-                onClick={onRefresh}
-                disabled={loading}
-                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 bg-white rounded-lg transition-all cursor-pointer"
-                title="Tải lại danh sách"
+                onClick={() => onRefresh()}
+                className="p-1.5 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                title="Tải lại dữ liệu"
               >
-                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Status Message */}
-        {statusMsg && (
-          <div className={`mx-4 mt-3 p-3 rounded-lg border flex items-center gap-2.5 text-xs font-semibold animate-fade-in ${
-            statusMsg.type === 'success' 
-              ? 'bg-green-50 border-green-200 text-green-800' 
-              : 'bg-red-50 border-red-200 text-red-800'
-          }`}>
-            {statusMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
-            <span>{statusMsg.text}</span>
+        {/* Notification message */}
+        {successMsg && (
+          <div className="mx-6 mt-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-medium flex items-center gap-2 animate-fade-in shrink-0">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{successMsg}</span>
           </div>
         )}
 
-        {/* Main Content Area */}
-        <div className="p-4 overflow-y-auto flex-1 min-h-[300px]">
-          {activeTab === 'records' ? (
-            duplicateRecordGroups.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="p-4 bg-green-50 text-green-600 rounded-full mb-3.5">
-                  <CheckCircle size={32} />
-                </div>
-                <h4 className="font-bold text-slate-800 text-sm">Hệ Thống Sạch Sẽ</h4>
-                <p className="text-xs text-slate-500 max-w-xs mt-1">Không phát hiện bất kỳ mã hồ sơ tiếp nhận nào bị trùng lặp dữ liệu.</p>
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {filteredRecordGroups.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-gray-500">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
+                <CheckCircle className="w-8 h-8" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl flex items-start gap-2.5 text-xs font-medium">
-                  <AlertTriangle className="shrink-0 text-amber-600 mt-0.5" size={16} />
-                  <div>
-                    <span className="font-bold">Cảnh báo dữ liệu:</span> Phát hiện {duplicateRecordGroups.length} nhóm mã hồ sơ có nhiều hơn 1 bản ghi lưu trữ. Bạn có thể xóa bản sao dư thừa để tránh lỗi sai sót thông tin.
-                  </div>
-                </div>
-
-                <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-2xs">
-                  {duplicateRecordGroups.map(group => (
-                    <div key={group.code} className="p-3.5 hover:bg-slate-50/50 transition-all">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 font-mono text-xs font-bold rounded-md">
-                          Mã: {group.code}
-                        </span>
-                        <span className="text-xs font-bold text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-sm">
-                          {group.items.length} bản sao
-                        </span>
-                      </div>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50/80 border-b border-slate-100">
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[10%]">ID</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[25%]">Khách hàng / Chủ sử dụng</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[20%]">Ngày nhận</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[15%]">Xã/Phường</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[20%]">Người tiếp nhận</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[10%] text-center">Thao tác</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {group.items.map((item, idx) => (
-                              <tr key={item.id} className={idx === 0 ? "bg-indigo-50/20" : ""}>
-                                <td className="px-2 py-1.5 text-slate-600 font-mono text-[10px]">{item.id}</td>
-                                <td className="px-2 py-1.5 font-bold text-slate-800">{item.customerName || 'N/A'}</td>
-                                <td className="px-2 py-1.5 text-slate-600">{item.receivedDate ? item.receivedDate.split('T')[0] : 'N/A'}</td>
-                                <td className="px-2 py-1.5 text-slate-600">{item.ward || 'N/A'}</td>
-                                <td className="px-2 py-1.5 text-slate-600 font-medium">{item.receivedBy || 'N/A'}</td>
-                                <td className="px-2 py-1.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteRecordItem(item.id!, item.code!)}
-                                    disabled={loading}
-                                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                    title="Xóa bản sao này"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
+              <h3 className="text-base font-bold text-gray-800">Không tìm thấy hồ sơ trùng lặp nào</h3>
+              <p className="text-xs text-gray-500 max-w-md mt-1">
+                Toàn bộ cơ sở dữ liệu hồ sơ hiện tại đều chuẩn xác, không bị trùng mã hồ sơ hoặc số thửa tờ bản đồ.
+              </p>
+            </div>
           ) : (
-            duplicateContractGroups.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="p-4 bg-green-50 text-green-600 rounded-full mb-3.5">
-                  <CheckCircle size={32} />
-                </div>
-                <h4 className="font-bold text-slate-800 text-sm">Hợp Đồng Sạch Sẽ</h4>
-                <p className="text-xs text-slate-500 max-w-xs mt-1">Không phát hiện bất kỳ mã hợp đồng đo đạc nào bị tạo trùng lặp.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl flex items-start gap-2.5 text-xs font-medium">
-                  <AlertTriangle className="shrink-0 text-amber-600 mt-0.5" size={16} />
-                  <div>
-                    <span className="font-bold">Cảnh báo dữ liệu:</span> Phát hiện {duplicateContractGroups.length} nhóm mã hợp đồng bị tạo trùng lặp trong hệ thống.
-                  </div>
-                </div>
-
-                <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-2xs">
-                  {duplicateContractGroups.map(group => (
-                    <div key={group.code} className="p-3.5 hover:bg-slate-50/50 transition-all">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 font-mono text-xs font-bold rounded-md">
-                          Mã: {group.code}
-                        </span>
-                        <span className="text-xs font-bold text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-sm">
-                          {group.items.length} bản sao
-                        </span>
-                      </div>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50/80 border-b border-slate-100">
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[10%]">ID</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[25%]">Khách hàng</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[20%]">Ngày lập</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[15%]">Xã/Phường</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[20%]">Tổng số tiền</th>
-                              <th className="px-2 py-1.5 font-bold text-slate-500 w-[10%] text-center">Thao tác</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {group.items.map((item, idx) => (
-                              <tr key={item.id} className={idx === 0 ? "bg-indigo-50/20" : ""}>
-                                <td className="px-2 py-1.5 text-slate-600 font-mono text-[10px]">{item.id}</td>
-                                <td className="px-2 py-1.5 font-bold text-slate-800">{item.customerName || 'N/A'}</td>
-                                <td className="px-2 py-1.5 text-slate-600">{item.createdDate ? item.createdDate.split('T')[0] : 'N/A'}</td>
-                                <td className="px-2 py-1.5 text-slate-600">{item.ward || 'N/A'}</td>
-                                <td className="px-2 py-1.5 font-bold text-slate-700">{item.totalAmount ? item.totalAmount.toLocaleString('vi-VN') + ' đ' : '0 đ'}</td>
-                                <td className="px-2 py-1.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteContractItem(item.id!, item.code!)}
-                                    disabled={loading}
-                                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                    title="Xóa bản sao hợp đồng này"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+            filteredRecordGroups.map((group, groupIdx) => {
+              const allInGroupSelected = group.records.every(r => selectedIds.has(r.id));
+              return (
+                <div
+                  key={group.id || groupIdx}
+                  className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden transition-all hover:border-amber-300"
+                >
+                  <div className="px-4 py-3 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        onClick={() => handleSelectAllInGroup(group)}
+                        className="text-gray-500 hover:text-gray-800 cursor-pointer"
+                      >
+                        {allInGroupSelected ? (
+                          <CheckSquare className="w-4 h-4 text-amber-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-gray-400" />
+                        )}
+                      </button>
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                          {group.title}
+                          <span className="text-[10px] px-2 py-0.5 font-medium rounded-full bg-amber-100 text-amber-800">
+                            {group.records.length} bản ghi
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-gray-500">{group.description}</p>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="divide-y divide-gray-100">
+                    {group.records.map((rec, rIdx) => {
+                      const isSelected = selectedIds.has(rec.id);
+                      return (
+                        <div
+                          key={rec.id || rIdx}
+                          className={`px-4 py-2.5 flex items-center justify-between gap-3 text-xs transition-colors ${
+                            isSelected ? 'bg-amber-50/60' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSelect(rec.id)}
+                              className="rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                            />
+                            <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-4 gap-2">
+                              <div>
+                                <span className="font-bold text-gray-900 block truncate">{rec.code}</span>
+                                <span className="text-[11px] text-gray-500 block truncate">{rec.customerName}</span>
+                              </div>
+                              <div>
+                                <span className="text-[11px] text-gray-700 block">
+                                  Thửa: <span className="font-semibold">{rec.landPlot || '—'}</span> / Tờ:{' '}
+                                  <span className="font-semibold">{rec.mapSheet || '—'}</span>
+                                </span>
+                                <span className="text-[11px] text-gray-500 block truncate">{rec.ward || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[11px] text-gray-700 block">
+                                  Tiếp nhận:{' '}
+                                  <span className="font-medium">
+                                    {rec.receivedDate ? rec.receivedDate.split('T')[0] : '—'}
+                                  </span>
+                                </span>
+                                <span className="text-[11px] text-gray-500 block">
+                                  Trạng thái: <span className="font-medium">{rec.status}</span>
+                                </span>
+                              </div>
+                              <div className="text-right flex items-center justify-end gap-1.5">
+                                {onDeleteRecord && (
+                                  <button
+                                    onClick={async () => {
+                                      const ok = await confirmAction(
+                                        `Bạn có chắc chắn muốn xóa hồ sơ ${rec.code} này?`,
+                                        'Xác nhận'
+                                      );
+                                      if (ok) {
+                                        await onDeleteRecord(rec.id);
+                                        if (onRefresh) await onRefresh();
+                                      }
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                    title="Xóa bản ghi này"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
+              );
+            })
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50 rounded-b-2xl">
+        <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0">
+          <span className="text-xs text-gray-500">
+            Tổng số hồ sơ trong hệ thống: <span className="font-bold text-gray-800">{records.length}</span>
+          </span>
           <button
-            type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+            className="px-4 py-2 text-xs font-semibold bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors cursor-pointer"
           >
-            Đóng cửa sổ
+            Đóng
           </button>
         </div>
       </div>

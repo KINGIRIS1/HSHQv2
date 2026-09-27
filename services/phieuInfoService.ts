@@ -1,5 +1,4 @@
 
-import PizZip from 'pizzip';
 
 // --- TYPES ---
 export interface PhieuInfoData {

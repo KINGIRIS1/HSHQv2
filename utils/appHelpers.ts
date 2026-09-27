@@ -1,11 +1,10 @@
 
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificateRecordType, isSurveyRecordType, isArchiveRecord } from '../constants';
+import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificateRecordType, isSurveyRecordType, isArchiveRecord, MOCK_EMPLOYEES } from '../constants';
 import { CAP_GIAY_STEP_ORDER, getCapGiayWorkflowStage } from './capGiayStateMachine';
 import { getDodacWorkflowStage } from './dodacStateMachine';
 import { getLuuTruWorkflowStage } from './luuTruStateMachine';
 import { calculateRegistrationDeadline, getRegistrationWorkflowCategory } from './registrationWorkflows';
-import { loadRegistrationSlaFullConfig } from '../components/registration/RegistrationSlaStatusView';
 
 /**
  * Unified Workflow Stage Resolver for Dashboard, Report, Filter, KPI, SLA
@@ -196,40 +195,43 @@ export const formatDateKey = (date: Date): string => {
 };
 
 // Tính hạn trả (deadline) dựa trên loại hồ sơ, ngày nhận, danh sách ngày nghỉ lễ
-export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[], fullRecord?: Partial<RecordFile>): string => {
-    const rType = fullRecord?.recordType || type;
-    const rDate = fullRecord?.receivedDate || receivedDateStr;
-    if (!rDate) return '';
-    const cleanDate = String(rDate).split('T')[0];
-    const lowerType = (rType || '').toLowerCase().trim();
-    const sourceTable = (fullRecord as any)?.sourceTable;
+export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[]): string => {
+    if (!receivedDateStr) return '';
+    const cleanDate = receivedDateStr.split('T')[0];
+    const lowerType = (type || '').toLowerCase().trim();
+    const short = getShortRecordType(type);
 
-    // 1. Nếu là nhóm 3.x hoặc Module Cấp giấy, dùng SLA Cấp giấy
-    const isCapGiay = sourceTable === 'dangky_records' || lowerType.startsWith('3.') || lowerType.includes('3.');
-    if (isCapGiay) {
-        const recObj = fullRecord ? { ...fullRecord, recordType: rType, receivedDate: cleanDate } : { recordType: rType, receivedDate: cleanDate };
-        const res = calculateRegistrationDeadline(recObj, holidays);
+    // 1. Nếu là nhóm 3.x (Đăng ký / Cấp giấy), dùng Single Source of Truth
+    const category = getRegistrationWorkflowCategory(type);
+    if (category !== 'unclassified') {
+        const res = calculateRegistrationDeadline({ recordType: type, receivedDate: cleanDate }, holidays);
         return res.deadline;
     }
 
-    // Look up SLA from procedureItems configuration first
-    const fullConfig = loadRegistrationSlaFullConfig();
-    const matchedProcItem = fullConfig.procedureItems.find(p => p.code === lowerType || lowerType.includes(p.code));
-    let daysToAdd = 3;
+    // Nếu mang tiền tố 3.x mà không phân loại được -> Trả về rỗng, TUYỆT ĐỐI không tính bừa!
+    if (short.startsWith('3.') || lowerType.startsWith('3.')) {
+        return '';
+    }
 
-    if (matchedProcItem) {
-        const sumDays = matchedProcItem.steps.reduce((sum, s) => sum + (s.durationDays || 0), 0);
-        if (sumDays > 0) daysToAdd = sumDays;
-    } else if (isLuuTru) {
-        daysToAdd = 3;
-    } else {
-        // 3. Nhóm 2.x (Đo đạc)
-        const isNoFieldWork = lowerType.includes('2.1') || lowerType.includes('2.3') || lowerType.includes('trích lục');
-        if (isNoFieldWork) {
-            daysToAdd = 6; // Đo đạc không thực địa (2.1, 2.3)
-        } else {
-            daysToAdd = 8; // Đo đạc có thực địa (2.2, 2.4, 2.5)
-        }
+    // 2. Nhóm 1.x (Lưu trữ) và 2.x (Đo đạc)
+    let daysToAdd = 30; 
+
+    if (
+        short === '1.1 Sao lục' || short === '1.2 Công văn' || short === '2.1 Trích lục' ||
+        lowerType.startsWith('1.1') || lowerType.startsWith('1.2') || lowerType.startsWith('2.1') ||
+        lowerType.includes('sao lục') || lowerType.includes('công văn') || lowerType.includes('trích lục')
+    ) {
+        daysToAdd = 10;
+    } else if (
+        short === '2.3 Duyệt đơn' ||
+        lowerType.includes('2.3') || lowerType.includes('duyệt đơn') || lowerType.includes('số thửa')
+    ) {
+        daysToAdd = 12;
+    } else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
+               lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
+               lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
+               lowerType.includes('đo đạc')) {
+        daysToAdd = 30;
     }
     
     let count = 0;
@@ -439,8 +441,8 @@ export function processAssignmentTimelineCheck(
     return `${day}/${month}/${year}`;
   };
 
-  const oldEmp = employees.find(e => e.id === record.assignedTo);
-  const newEmp = employees.find(e => e.id === newEmployeeId);
+  const oldEmp = findMatchingEmployee(record.assignedTo, employees);
+  const newEmp = findMatchingEmployee(newEmployeeId, employees);
 
   const oldEmpName = oldEmp ? oldEmp.name : (record.assignedTo || 'Chưa phân công');
   const newEmpName = newEmp ? newEmp.name : newEmployeeId;
@@ -899,7 +901,14 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     return { migratedRecords, hasChanges };
 }
 
-export function findEmployeeMatch(
+// --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ ĐA TẦNG (ID VS TÊN VS MÃ SỐ TỰ DO) ---
+
+/**
+ * Tìm kiếm nhân viên linh hoạt từ danh sách nhân sự, danh sách tài khoản hoặc danh bạ chuẩn.
+ * Hỗ trợ khớp chính xác, khớp theo mã số tự do (ví dụ: '9' <-> 'NV9' <-> 'NV009'),
+ * khớp tên đăng nhập (username), và khớp họ tên.
+ */
+export function findMatchingEmployee(
     idOrName?: string | null,
     employees: Employee[] = [],
     users: User[] = []
@@ -907,114 +916,140 @@ export function findEmployeeMatch(
     if (!idOrName) return null;
     const trimmed = String(idOrName).trim();
     if (!trimmed) return null;
+    const lower = trimmed.toLowerCase();
 
-    // 1. Tìm trực tiếp trong danh sách nhân viên theo ID gốc
-    let emp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
-    if (emp) return emp;
-
-    // 2. Tìm theo tên nhân viên (không phân biệt hoa thường)
-    emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
-    if (emp) return emp;
-
-    // 3. Tìm theo email nhân viên
-    emp = employees.find(e => {
-        const eEmail = (e as any).email || '';
-        return eEmail && eEmail.toLowerCase().split('@')[0] === trimmed.toLowerCase().split('@')[0];
-    });
-    if (emp) return emp;
-
-    // 4. Tìm thông qua tài khoản đăng nhập (users)
-    const user = users.find(u => 
-        (u.id && u.id.toLowerCase() === trimmed.toLowerCase()) ||
-        (u.username && u.username.toLowerCase() === trimmed.toLowerCase()) ||
-        (u.email && u.email.toLowerCase().split('@')[0] === trimmed.toLowerCase().split('@')[0])
+    // 1. Khớp chính xác ID hoặc Tên trong danh sách employees
+    let emp = employees.find(e => 
+        (e.id && e.id.toLowerCase() === lower) || 
+        (e.name && e.name.toLowerCase() === lower)
     );
+    if (emp) return emp;
 
-    if (user) {
-        // Nếu tìm thấy user, ánh xạ sang nhân viên tương ứng
-        const empByUser = employees.find(e => 
-            (e.id && e.id === user.employeeId) ||
-            (e.name && e.name.toLowerCase() === (user.name || '').toLowerCase()) ||
-            ((e as any).email && (e as any).email.toLowerCase() === (user.email || '').toLowerCase())
+    // 2. Khớp linh hoạt theo số (Ví dụ: "9" khớp "NV9", "NV09", "NV009"; "6" khớp "NV6", "NV006")
+    const digitsOnly = lower.replace(/\D/g, '');
+    if (digitsOnly !== '') {
+        const numVal = parseInt(digitsOnly, 10);
+        if (!isNaN(numVal)) {
+            emp = employees.find(e => {
+                if (!e.id) return false;
+                const empDigits = e.id.replace(/\D/g, '');
+                return empDigits !== '' && parseInt(empDigits, 10) === numVal;
+            });
+            if (emp) return emp;
+        }
+    }
+
+    // 3. Khớp qua danh sách người dùng (users)
+    if (users && users.length > 0) {
+        const matchedUser = users.find(u => {
+            if (!u) return false;
+            const uId = (u.id || '').trim().toLowerCase();
+            const uUsername = (u.username || '').trim().toLowerCase();
+            const uName = (u.name || '').trim().toLowerCase();
+            const uEmpId = (u.employeeId || '').trim().toLowerCase();
+
+            if (uId === lower || uUsername === lower || uName === lower || uEmpId === lower) return true;
+
+            if (digitsOnly !== '') {
+                const numVal = parseInt(digitsOnly, 10);
+                if (uEmpId) {
+                    const uEmpDigits = uEmpId.replace(/\D/g, '');
+                    if (uEmpDigits && parseInt(uEmpDigits, 10) === numVal) return true;
+                }
+                if (uUsername) {
+                    const uUserDigits = uUsername.replace(/\D/g, '');
+                    if (uUserDigits && parseInt(uUserDigits, 10) === numVal) return true;
+                }
+            }
+            return false;
+        });
+
+        if (matchedUser) {
+            if (matchedUser.employeeId) {
+                const foundEmp = findMatchingEmployee(matchedUser.employeeId, employees, []);
+                if (foundEmp) return foundEmp;
+            }
+            return {
+                id: matchedUser.employeeId || matchedUser.username || matchedUser.id || lower,
+                name: matchedUser.name || matchedUser.username,
+                department: (matchedUser as any).department || 'Nhân sự',
+                position: (matchedUser as any).position || 'Nhân viên',
+                managedWards: (matchedUser as any).managedWards || []
+            };
+        }
+    }
+
+    // 4. Dự phòng đối soát với MOCK_EMPLOYEES (nếu danh sách nhân viên từ CSDL thiếu hoặc chưa nạp)
+    if (Array.isArray(MOCK_EMPLOYEES) && MOCK_EMPLOYEES.length > 0) {
+        emp = MOCK_EMPLOYEES.find(e => 
+            (e.id && e.id.toLowerCase() === lower) || 
+            (e.name && e.name.toLowerCase() === lower)
         );
-        if (empByUser) return empByUser;
+        if (emp) return emp;
+
+        if (digitsOnly !== '') {
+            const numVal = parseInt(digitsOnly, 10);
+            if (!isNaN(numVal)) {
+                emp = MOCK_EMPLOYEES.find(e => {
+                    if (!e.id) return false;
+                    const empDigits = e.id.replace(/\D/g, '');
+                    return empDigits !== '' && parseInt(empDigits, 10) === numVal;
+                });
+                if (emp) return emp;
+            }
+        }
     }
 
     return null;
 }
 
+/**
+ * Trả về Tên hiển thị chuẩn của nhân viên từ ID, Mã số hoặc Tên tự do.
+ * Kết quả trả về họ tên sạch sẽ (ví dụ: "Phạm Trí Hiếu", "Lê Duy Linh").
+ */
 export function resolveEmployeeName(
     idOrName?: string | null,
     employees: Employee[] = [],
     users: User[] = []
 ): string {
-    if (!idOrName) return 'Chưa phân công';
+    if (!idOrName) return '';
     const trimmed = String(idOrName).trim();
-    if (!trimmed) return 'Chưa phân công';
+    if (!trimmed) return '';
 
-    const emp = findEmployeeMatch(idOrName, employees, users);
-    if (emp) return emp.name;
+    const emp = findMatchingEmployee(trimmed, employees, users);
+    if (emp && emp.name) return emp.name;
 
     return trimmed;
 }
 
-// --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ (ID VS TÊN) ---
-export function getEmployeeName(idOrName?: string | null, employees: Employee[] = []): string {
+export function getEmployeeName(
+    idOrName?: string | null, 
+    employees: Employee[] = [], 
+    users: User[] = [],
+    includeDept: boolean = false
+): string {
     if (!idOrName) return 'Chưa giao';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return 'Chưa giao';
     
-    const cleanId = (s: string) => {
-        const lower = s.toLowerCase().trim();
-        const match = lower.match(/^(nv|e|nv0*|0*)(\d+)$/);
-        return match ? match[2] : lower;
-    };
-
-    const targetClean = cleanId(trimmed);
-
-    // 1. Tìm theo ID chuẩn hóa hoặc ID gốc
-    let emp = employees.find(e => {
-        if (!e.id) return false;
-        const eClean = cleanId(e.id);
-        return eClean === targetClean || e.id.toLowerCase() === trimmed.toLowerCase();
-    });
-
-    // 2. Tìm theo Tên (không phân biệt hoa thường)
-    if (!emp) {
-        emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    const emp = findMatchingEmployee(trimmed, employees, users);
+    if (emp && emp.name) {
+        return includeDept ? `${emp.name} (${emp.department || 'Nhân sự'})` : emp.name;
     }
-
-    // 3. Tìm theo Email (tài khoản đăng nhập)
-    if (!emp) {
-        emp = employees.find(e => (e as any).email && (e as any).email.toLowerCase().split('@')[0] === trimmed.split('@')[0]);
-    }
-
-    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
     
     return trimmed;
 }
 
-export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = []): string {
+export function resolveEmployeeId(
+    idOrName?: string | null, 
+    employees: Employee[] = [], 
+    users: User[] = []
+): string {
     if (!idOrName) return '';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return '';
     
-    const cleanId = (s: string) => {
-        const lower = s.toLowerCase().trim();
-        const match = lower.match(/^(nv|e|nv0*|0*)(\d+)$/);
-        return match ? match[2] : lower;
-    };
-
-    const targetClean = cleanId(trimmed);
-
-    const emp = employees.find(e => {
-        if (!e.id) return false;
-        const eClean = cleanId(e.id);
-        return eClean === targetClean || 
-               e.id.toLowerCase() === trimmed.toLowerCase() || 
-               (e.name && e.name.toLowerCase() === trimmed.toLowerCase()) ||
-               ((e as any).email && (e as any).email.toLowerCase().split('@')[0] === trimmed.split('@')[0]);
-    });
+    const emp = findMatchingEmployee(trimmed, employees, users);
     return emp ? emp.id : trimmed;
 }
 
@@ -1332,7 +1367,6 @@ export interface StatusTransitionOptions {
         appraisalDate?: string | null;
         taxTransferDate?: string | null;
         taxKv7Date?: string | null;
-        taxNoticeDate?: string | null;
         taxPaymentDate?: string | null;
         printCertDate?: string | null;
         pendingHandoverDate?: string | null;
@@ -1625,15 +1659,15 @@ export function syncRecordStatusTransition(
             }
         });
 
-        // BẢO TOÀN NGÀY THÁNG: Bỏ cập nhật mốc tự động (Auto-advance = OFF). Chỉ gán ngày khi có customDates do người dùng nhập/chọn thủ công.
-        const effectiveTargetDate = undefined;
+        // BẢO TOÀN NGÀY THÁNG: Chỉ gán ngày mới khi thực sự chuyển sang trạng thái mới và ngày đó chưa có. Nếu chỉ lưu/cập nhật thông tin hồ sơ, tuyệt đối giữ nguyên ngày cũ.
+        const effectiveTargetDate = isActuallyChangingStatus ? targetDate : undefined;
 
         if (newStatus === RecordStatus.RECEIVED) {
-            updates.receivedDate = options?.customDates?.receivedDate || currentRecord.receivedDate;
+            updates.receivedDate = options?.customDates?.receivedDate || currentRecord.receivedDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.ASSIGNED || newStatus === RecordStatus.IN_PROGRESS) {
-            updates.assignedDate = options?.customDates?.assignedDate || currentRecord.assignedDate;
+            updates.assignedDate = options?.customDates?.assignedDate || currentRecord.assignedDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.FIELD_WORK) {
-            const fieldDate = options?.customDates?.fieldAssignedDate || options?.customDates?.assignedDate || currentRecord.fieldAssignedDate;
+            const fieldDate = options?.customDates?.fieldAssignedDate || options?.customDates?.assignedDate || currentRecord.fieldAssignedDate || effectiveTargetDate;
             updates.fieldAssignedDate = fieldDate;
             if (!currentRecord.assignedDate && !updates.assignedDate) {
                 updates.assignedDate = fieldDate;
@@ -1642,7 +1676,7 @@ export function syncRecordStatusTransition(
                 updates.surveyorId = options?.assignedTo || currentRecord.assignedTo;
             }
         } else if (newStatus === RecordStatus.OFFICE_WORK) {
-            const officeDate = options?.customDates?.officeAssignedDate || options?.customDates?.assignedDate || currentRecord.officeAssignedDate;
+            const officeDate = options?.customDates?.officeAssignedDate || options?.customDates?.assignedDate || currentRecord.officeAssignedDate || effectiveTargetDate;
             updates.officeAssignedDate = officeDate;
             if (!currentRecord.assignedDate && !updates.assignedDate) {
                 updates.assignedDate = currentRecord.fieldAssignedDate || officeDate;
@@ -1654,30 +1688,26 @@ export function syncRecordStatusTransition(
                 updates.drafterId = currentRecord.assignedTo;
             }
         } else if (newStatus === RecordStatus.COMPLETED_WORK) {
-            updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate;
+            updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.APPRAISAL) {
-            updates.appraisalDate = options?.customDates?.appraisalDate || currentRecord.appraisalDate;
+            updates.appraisalDate = options?.customDates?.appraisalDate || currentRecord.appraisalDate || effectiveTargetDate;
             if (options?.assignedTo) updates.assignedTo = options.assignedTo;
         } else if (newStatus === RecordStatus.TAX_TRANSFER) {
-            updates.taxTransferDate = options?.customDates?.taxTransferDate || currentRecord.taxTransferDate;
+            updates.taxTransferDate = options?.customDates?.taxTransferDate || currentRecord.taxTransferDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_TAX_KV7) {
-            updates.taxKv7Date = options?.customDates?.taxKv7Date || currentRecord.taxKv7Date;
-        } else if (newStatus === RecordStatus.PENDING_TAX_NOTICE) {
-            updates.taxNoticeDate = options?.customDates?.taxNoticeDate || currentRecord.taxNoticeDate;
+            updates.taxKv7Date = options?.customDates?.taxKv7Date || currentRecord.taxKv7Date || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_TAX_PAYMENT) {
-            updates.taxPaymentDate = options?.customDates?.taxPaymentDate || currentRecord.taxPaymentDate;
-            if (options?.customDates?.taxNoticeDate) updates.taxNoticeDate = options.customDates.taxNoticeDate;
+            updates.taxPaymentDate = options?.customDates?.taxPaymentDate || currentRecord.taxPaymentDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_PRINT_CERT) {
-            updates.printCertDate = options?.customDates?.printCertDate || currentRecord.printCertDate;
+            updates.printCertDate = options?.customDates?.printCertDate || currentRecord.printCertDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_HANDOVER) {
-            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate;
-            updates.pendingHandoverDate = options?.customDates?.pendingHandoverDate || currentRecord.pendingHandoverDate;
+            updates.pendingHandoverDate = options?.customDates?.pendingHandoverDate || currentRecord.pendingHandoverDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_SUPPLEMENT) {
             updates.previousStatus = currentRecord.status || RecordStatus.RECEIVED;
-            updates.supplementRequestDate = options?.customDates?.supplementRequestDate || currentRecord.supplementRequestDate;
+            updates.supplementRequestDate = options?.customDates?.supplementRequestDate || currentRecord.supplementRequestDate || effectiveTargetDate;
             if (options?.notes) updates.pendingSupplementReason = options.notes;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
-            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate;
+            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate || effectiveTargetDate;
             if (options?.checkedBy) {
                 updates.checkedBy = options.checkedBy;
             }
@@ -1695,18 +1725,17 @@ export function syncRecordStatusTransition(
                 updates.officeAssignedDate = currentRecord.fieldCompletedDate || currentRecord.assignedDate || updates.assignedDate;
             }
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
-            updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate;
+            updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.SIGNED) {
-            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate;
-            updates.approvalDate = updates.completedDate;
+            updates.approvalDate = options?.customDates?.approvalDate || currentRecord.approvalDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.HANDOVER) {
-            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate;
-            updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate;
+            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || effectiveTargetDate;
+            updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate || effectiveTargetDate;
             if (options?.exportBatch !== undefined) updates.exportBatch = options.exportBatch;
             updates.is_handover = true;
             updates.handover_date = updates.exportDate || currentRecord.handover_date;
         } else if (newStatus === RecordStatus.RETURNED) {
-            updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate;
+            updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate || effectiveTargetDate;
             if (!updates.completedDate && !currentRecord.completedDate) {
                 updates.completedDate = updates.resultReturnedDate || currentRecord.completedDate;
             }
@@ -1734,18 +1763,26 @@ export function syncRecordStatusTransition(
                 if (options.customDates.officeAssignedDate) updates.officeAssignedDate = options.customDates.officeAssignedDate;
                 if (options.customDates.officeCompletedDate) updates.officeCompletedDate = options.customDates.officeCompletedDate;
             }
-            if (options.customDates.taxTransferDate) updates.taxTransferDate = options.customDates.taxTransferDate;
-            if (options.customDates.taxKv7Date) updates.taxKv7Date = options.customDates.taxKv7Date;
-            if (options.customDates.taxNoticeDate) updates.taxNoticeDate = options.customDates.taxNoticeDate;
-            if (options.customDates.taxPaymentDate) updates.taxPaymentDate = options.customDates.taxPaymentDate;
-            if (options.customDates.printCertDate) updates.printCertDate = options.customDates.printCertDate;
-            if (options.customDates.appraisalDate) updates.appraisalDate = options.customDates.appraisalDate;
-            if (options.customDates.pendingCheckDate) updates.pendingCheckDate = options.customDates.pendingCheckDate;
-            if (options.customDates.submissionDate) updates.submissionDate = options.customDates.submissionDate;
-            if (options.customDates.approvalDate) updates.approvalDate = options.customDates.approvalDate;
-            if (options.customDates.completedDate) updates.completedDate = options.customDates.completedDate;
-            if (options.customDates.exportDate) updates.exportDate = options.customDates.exportDate;
-            if (options.customDates.resultReturnedDate) updates.resultReturnedDate = options.customDates.resultReturnedDate;
+            if (newRank >= 2) {
+                if (options.customDates.completedWorkDate) updates.completedWorkDate = options.customDates.completedWorkDate;
+            }
+            if (newRank >= 3) {
+                if (options.customDates.pendingCheckDate) updates.pendingCheckDate = options.customDates.pendingCheckDate;
+                if (options.customDates.checkedDate) updates.checkedDate = options.customDates.checkedDate;
+            }
+            if (newRank >= 4) {
+                if (options.customDates.submissionDate) updates.submissionDate = options.customDates.submissionDate;
+            }
+            if (newRank >= 5) {
+                if (options.customDates.approvalDate) updates.approvalDate = options.customDates.approvalDate;
+            }
+            if (newRank >= 6) {
+                if (options.customDates.completedDate) updates.completedDate = options.customDates.completedDate;
+                if (options.customDates.exportDate) updates.exportDate = options.customDates.exportDate;
+            }
+            if (newRank >= 7) {
+                if (options.customDates.resultReturnedDate) updates.resultReturnedDate = options.customDates.resultReturnedDate;
+            }
         }
     }
 
@@ -1933,91 +1970,6 @@ export function getReceiptReceiverName(
     // C. Nếu không thỏa mãn 2 điều kiện trên: Tuyệt đối để trống
     return '';
 }
-
-/**
- * 🇻🇳 BỘ TIỆN ÍCH CHUẨN THỜI GIAN THỰC VIỆT NAM (GMT+7)
- */
-
-export function getVietnamDateString(d?: Date | string | number | null): string {
-    const dateObj = d ? new Date(d) : new Date();
-    if (isNaN(dateObj.getTime())) return '';
-    
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    });
-    return formatter.format(dateObj); // Trả về "YYYY-MM-DD"
-}
-
-export function getVietnamTimeString(d?: Date | string | number | null): string {
-    const dateObj = d ? new Date(d) : new Date();
-    if (isNaN(dateObj.getTime())) return '';
-
-    const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    return formatter.format(dateObj); // Trả về "HH:mm:ss"
-}
-
-export function getVietnamNowISO(): string {
-    const now = new Date();
-    const datePart = getVietnamDateString(now);
-    const timePart = getVietnamTimeString(now);
-    return `${datePart}T${timePart}+07:00`;
-}
-
-export function instantToVietnamDate(instant?: Date | string | number | null): Date {
-    const dateObj = instant ? new Date(instant) : new Date();
-    if (isNaN(dateObj.getTime())) return new Date();
-    
-    const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
-    const parts = formatter.formatToParts(dateObj);
-    
-    const year = parseInt(parts.find(p => p.type === 'year')?.value || '1970', 10);
-    const month = parseInt(parts.find(p => p.type === 'month')?.value || '1', 10) - 1;
-    const day = parseInt(parts.find(p => p.type === 'day')?.value || '1', 10);
-    const hourVal = parts.find(p => p.type === 'hour')?.value || '0';
-    const hour = parseInt(hourVal === '24' ? '0' : hourVal, 10);
-    const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-    const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
-    
-    return new Date(year, month, day, hour, minute, second);
-}
-
-export function getVietnamNow(): Date {
-    return instantToVietnamDate(new Date());
-}
-
-export function formatDateTimeVN(dStr?: string | Date | null): string {
-    if (!dStr) return '';
-    const d = new Date(dStr);
-    if (isNaN(d.getTime())) return String(dStr);
-    
-    const datePart = getVietnamDateString(d);
-    const timePart = getVietnamTimeString(d);
-    
-    const parts = datePart.split('-');
-    if (parts.length === 3) {
-        return `${timePart} ${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-    return `${timePart} ${datePart}`;
-}
-
 
 
 

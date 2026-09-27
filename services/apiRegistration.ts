@@ -1,15 +1,9 @@
 import { supabase } from './supabaseClient';
-import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, RecordStatus, CertificateOwnerItem } from '../types';
+import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, RecordStatus } from '../types';
 import { connectionManager } from './connectionService';
-import { sanitizeData, isBlankRecord, keepOnlyDate, keepOnlyDateTime, sanitizePayloadForDateErrors, sanitizePayloadFor22P02 } from './apiCore';
-import { getTargetTable, RECORD_DB_COLUMNS, DANGKY_RECORDS_DB_COLUMNS } from './apiRecords';
+import { isBlankRecord, keepOnlyDate, keepOnlyDateTime, sanitizePayloadForDateErrors } from './apiCore';
+import { getTargetTable } from './apiRecords';
 import { calculateRegistrationDeadline, addCalendarDays } from '../utils/registrationWorkflows';
-
-const toNullableNumber = (val: any): number | null => {
-  if (val === undefined || val === null || val === '' || val === 'null' || val === 'undefined') return null;
-  const num = Number(val);
-  return isNaN(num) ? null : num;
-};
 
 /**
  * Service chuyên trách 100% độc lập cho bảng dangky_records (Tổ Đăng ký / Cấp giấy)
@@ -52,17 +46,6 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
       attachedFiles = JSON.parse(dbItem.attachedFiles);
     } catch {
       attachedFiles = [];
-    }
-  }
-
-  let certificateOwners: CertificateOwnerItem[] = [];
-  if (Array.isArray(dbItem.certificateOwners)) {
-    certificateOwners = dbItem.certificateOwners;
-  } else if (typeof dbItem.certificateOwners === 'string') {
-    try {
-      certificateOwners = JSON.parse(dbItem.certificateOwners);
-    } catch {
-      certificateOwners = [];
     }
   }
 
@@ -156,7 +139,6 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     statusLogs,
     dossierComponents,
     attachedFiles,
-    certificateOwners,
     data: dbItem.data || {},
     sourceTable: 'dangky_records',
   };
@@ -177,7 +159,7 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.ward !== undefined) payload.ward = record.ward;
   if (record.landPlot !== undefined) payload.landPlot = record.landPlot;
   if (record.mapSheet !== undefined) payload.mapSheet = record.mapSheet;
-  if (record.area !== undefined) payload.area = toNullableNumber(record.area) ?? 0;
+  if (record.area !== undefined) payload.area = Number(record.area) || 0;
   if (record.address !== undefined) payload.address = record.address;
   if (record.group !== undefined) payload.group = record.group;
   if (record.recordType !== undefined) payload.recordType = record.recordType;
@@ -185,7 +167,7 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.issueNumber !== undefined) payload.issueNumber = record.issueNumber;
   if (record.entryNumber !== undefined) payload.entryNumber = record.entryNumber;
   if (record.issueDate !== undefined) payload.issueDate = keepOnlyDate(record.issueDate);
-  if (record.residentialArea !== undefined) payload.residentialArea = toNullableNumber(record.residentialArea);
+  if (record.residentialArea !== undefined) payload.residentialArea = record.residentialArea;
   if (record.status !== undefined) payload.status = record.status;
   if (record.data !== undefined) payload.data = record.data;
   if (record.receivedBy !== undefined) payload.receivedBy = record.receivedBy;
@@ -204,8 +186,8 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.submissionDate !== undefined) payload.submissionDate = keepOnlyDate(record.submissionDate);
   if (record.approvalDate !== undefined) payload.approvalDate = keepOnlyDate(record.approvalDate);
   if (record.completedDate !== undefined) payload.completedDate = keepOnlyDate(record.completedDate);
-  if (record.price !== undefined) payload.price = toNullableNumber(record.price) ?? 0;
-  if (record.advancePayment !== undefined) payload.advancePayment = toNullableNumber(record.advancePayment) ?? 0;
+  if (record.price !== undefined) payload.price = Number(record.price) || 0;
+  if (record.advancePayment !== undefined) payload.advancePayment = Number(record.advancePayment) || 0;
   if (record.notes !== undefined) payload.notes = record.notes;
   if (record.privateNotes !== undefined) payload.privateNotes = record.privateNotes;
   if (record.personalNotes !== undefined) payload.personalNotes = record.personalNotes;
@@ -221,14 +203,14 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.receiverName !== undefined) payload.receiverName = record.receiverName;
   if (record.returnedBy !== undefined) payload.returnedBy = record.returnedBy;
   if (record.resultReturnedDate !== undefined) payload.resultReturnedDate = keepOnlyDate(record.resultReturnedDate);
-  if (record.returnedPrice !== undefined) payload.returnedPrice = toNullableNumber(record.returnedPrice) ?? 0;
+  if (record.returnedPrice !== undefined) payload.returnedPrice = Number(record.returnedPrice) || 0;
   if (record.isHandedOver !== undefined) payload.isHandedOver = Boolean(record.isHandedOver);
   if (record.archiveHandoverDate !== undefined) payload.archiveHandoverDate = keepOnlyDate(record.archiveHandoverDate);
-  if (record.archiveHandoverBatch !== undefined) payload.archiveHandoverBatch = toNullableNumber(record.archiveHandoverBatch);
+  if (record.archiveHandoverBatch !== undefined) payload.archiveHandoverBatch = record.archiveHandoverBatch;
   if (record.exportBatch !== undefined) payload.exportBatch = record.exportBatch;
   if (record.exportDate !== undefined) payload.exportDate = keepOnlyDate(record.exportDate);
   if (record.handoverWard !== undefined) payload.handoverWard = record.handoverWard;
-  if (record.returnBatch !== undefined) payload.returnBatch = toNullableNumber(record.returnBatch);
+  if (record.returnBatch !== undefined) payload.returnBatch = record.returnBatch;
   if (record.returnBatchDate !== undefined) payload.returnBatchDate = keepOnlyDate(record.returnBatchDate);
   if (record.returnHandoverDept !== undefined) payload.returnHandoverDept = record.returnHandoverDept;
   if (record.reminderDate !== undefined) payload.reminderDate = keepOnlyDateTime(record.reminderDate);
@@ -285,7 +267,6 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.statusLogs !== undefined) payload.statusLogs = record.statusLogs;
   if (record.dossierComponents !== undefined) payload.dossierComponents = record.dossierComponents;
   if (record.attachedFiles !== undefined) payload.attachedFiles = record.attachedFiles;
-  if (record.certificateOwners !== undefined) payload.certificateOwners = record.certificateOwners;
 
   payload.updatedAt = new Date().toISOString();
   return sanitizePayloadForDateErrors(payload);
@@ -356,9 +337,6 @@ export const addDangkyRecord = async (record: RecordFile): Promise<RecordFile> =
   if (!payload.createdAt) {
     payload.createdAt = new Date().toISOString();
   }
-  payload = sanitizeData(payload, DANGKY_RECORDS_DB_COLUMNS);
-  payload = sanitizePayloadFor22P02(payload);
-  payload = sanitizePayloadForDateErrors(payload);
 
   let { data, error } = await supabase
     .from(TABLE_NAME)
@@ -368,22 +346,6 @@ export const addDangkyRecord = async (record: RecordFile): Promise<RecordFile> =
 
   if (error) {
     if (
-      error.code === '22P02' ||
-      String(error.message || '').toLowerCase().includes('22p02') ||
-      String(error.message || '').toLowerCase().includes('invalid input syntax')
-    ) {
-      console.warn(`[DangKy API] Phát hiện lỗi 22P02 kiểu dữ liệu khi thêm (${error.message}). Đang làm sạch và thử lại...`);
-      payload = sanitizePayloadFor22P02(payload);
-      const retryRes = await supabase
-        .from(TABLE_NAME)
-        .insert([payload])
-        .select()
-        .single();
-      if (!retryRes.error && retryRes.data) {
-        return mapDangkyRecordFromDb(retryRes.data);
-      }
-      error = retryRes.error || error;
-    } else if (
       error.code === '22007' ||
       error.code === '22008' ||
       String(error.message || '').toLowerCase().includes('timestamp') ||
@@ -414,9 +376,6 @@ export const addDangkyRecord = async (record: RecordFile): Promise<RecordFile> =
  */
 export const updateDangkyRecord = async (record: RecordFile): Promise<RecordFile> => {
   let payload = mapDangkyRecordToDb(record);
-  payload = sanitizeData(payload, DANGKY_RECORDS_DB_COLUMNS);
-  payload = sanitizePayloadFor22P02(payload);
-  payload = sanitizePayloadForDateErrors(payload);
 
   let { data, error } = await supabase
     .from(TABLE_NAME)
@@ -427,23 +386,6 @@ export const updateDangkyRecord = async (record: RecordFile): Promise<RecordFile
 
   if (error) {
     if (
-      error.code === '22P02' ||
-      String(error.message || '').toLowerCase().includes('22p02') ||
-      String(error.message || '').toLowerCase().includes('invalid input syntax')
-    ) {
-      console.warn(`[DangKy API] Phát hiện lỗi 22P02 kiểu dữ liệu khi cập nhật (${error.message}). Đang làm sạch và thử lại...`);
-      payload = sanitizePayloadFor22P02(payload);
-      const retryRes = await supabase
-        .from(TABLE_NAME)
-        .update(payload)
-        .eq('id', record.id)
-        .select()
-        .single();
-      if (!retryRes.error && retryRes.data) {
-        return mapDangkyRecordFromDb(retryRes.data);
-      }
-      error = retryRes.error || error;
-    } else if (
       error.code === '22007' ||
       error.code === '22008' ||
       String(error.message || '').toLowerCase().includes('timestamp') ||
@@ -478,9 +420,6 @@ export const updateDangkyRecordFields = async (
   fields: Partial<RecordFile>
 ): Promise<void> => {
   let payload = mapDangkyRecordToDb(fields);
-  payload = sanitizeData(payload, DANGKY_RECORDS_DB_COLUMNS);
-  payload = sanitizePayloadFor22P02(payload);
-  payload = sanitizePayloadForDateErrors(payload);
 
   let { error } = await supabase
     .from(TABLE_NAME)
@@ -489,21 +428,6 @@ export const updateDangkyRecordFields = async (
 
   if (error) {
     if (
-      error.code === '22P02' ||
-      String(error.message || '').toLowerCase().includes('22p02') ||
-      String(error.message || '').toLowerCase().includes('invalid input syntax')
-    ) {
-      console.warn(`[DangKy API] Phát hiện lỗi 22P02 kiểu dữ liệu khi cập nhật trường (${error.message}). Đang làm sạch và thử lại...`);
-      payload = sanitizePayloadFor22P02(payload);
-      const retryRes = await supabase
-        .from(TABLE_NAME)
-        .update(payload)
-        .eq('id', id);
-      if (!retryRes.error) {
-        return;
-      }
-      error = retryRes.error || error;
-    } else if (
       error.code === '22007' ||
       error.code === '22008' ||
       String(error.message || '').toLowerCase().includes('timestamp') ||
@@ -566,28 +490,18 @@ export const deleteBulkDangkyRecords = async (ids: string[]): Promise<void> => {
 export const assignDangkyRecordsBatch = async (
   recordIds: string[],
   assignedTo: string,
-  assignedDate: string,
-  assignStep: 'appraisal' | 'tax_transfer' = 'appraisal'
+  assignedDate: string
 ): Promise<void> => {
   if (!recordIds || recordIds.length === 0) return;
 
-  const targetStatus = assignStep === 'tax_transfer' ? RecordStatus.TAX_TRANSFER : RecordStatus.APPRAISAL;
-  const updateData: any = {
-    assignedTo,
-    assignedDate,
-    status: targetStatus,
-    updatedAt: new Date().toISOString(),
-  };
-
-  if (assignStep === 'appraisal') {
-    updateData.appraisalDate = assignedDate;
-  } else if (assignStep === 'tax_transfer') {
-    updateData.taxTransferDate = assignedDate;
-  }
-
   const { error } = await supabase
     .from(TABLE_NAME)
-    .update(updateData)
+    .update({
+      assignedTo,
+      assignedDate,
+      status: RecordStatus.APPRAISAL,
+      updatedAt: new Date().toISOString(),
+    })
     .in('id', recordIds);
 
   if (error) {
@@ -882,12 +796,6 @@ export const handoverTaxInDb = async (
   try {
     for (const item of recordsOrIds) {
       let record: RecordFile | null = typeof item === 'string' ? await getDangkyRecordById(item) : item;
-      if (!record && typeof item === 'string') {
-        try {
-          const { data } = await supabase.from('land_records').select('*').eq('id', item).single();
-          if (data) record = mapDangkyRecordFromDb(data);
-        } catch (_) {}
-      }
       if (!record) continue;
 
       const existingLogs = Array.isArray(record.statusLogs) ? [...record.statusLogs] : [];
@@ -904,26 +812,13 @@ export const handoverTaxInDb = async (
       const updatedRecord: RecordFile = {
         ...record,
         assignedTo: staffId,
-        assignedDate: todayStr,
         status: RecordStatus.TAX_TRANSFER,
         taxTransferDate: todayStr,
         statusLogs: [...existingLogs, newLog],
         updatedAt: now,
       };
 
-      try {
-        await updateDangkyRecord(updatedRecord);
-      } catch (_) {
-        await supabase.from('land_records').update({
-          assigned_to: staffId,
-          assigned_date: todayStr,
-          status: RecordStatus.TAX_TRANSFER,
-          tax_transfer_date: todayStr,
-          status_logs: updatedRecord.statusLogs,
-          updated_at: now,
-        }).eq('id', record.id);
-      }
-
+      await updateDangkyRecord(updatedRecord);
       updatedRecords.push(updatedRecord);
     }
 
@@ -985,56 +880,5 @@ export const advanceTaxStatusInDb = async (
   } catch (err: any) {
     console.error('advanceTaxStatusInDb error:', err);
     return { success: false, updatedCount: 0, error: err?.message || 'Lỗi chuyển trạng thái thuế', records: [] };
-  }
-};
-
-/**
- * Giao In Giấy chứng nhận cho cán bộ chuyên trách
- */
-export const handoverPrintInDb = async (
-  recordsOrIds: (RecordFile | string)[],
-  staffId: string,
-  currentUser?: string | { id?: string; name?: string; username?: string; employeeId?: string }
-): Promise<{ success: boolean; updatedCount: number; error?: string; records: RecordFile[] }> => {
-  if (!recordsOrIds || recordsOrIds.length === 0) return { success: true, updatedCount: 0, records: [] };
-  const now = new Date().toISOString();
-  const todayStr = now.split('T')[0];
-  const userName = typeof currentUser === 'string' ? currentUser : (currentUser?.name || currentUser?.username || 'Lãnh đạo phê duyệt');
-  const updatedRecords: RecordFile[] = [];
-
-  try {
-    for (const item of recordsOrIds) {
-      let record: RecordFile | null = typeof item === 'string' ? await getDangkyRecordById(item) : item;
-      if (!record) continue;
-
-      const existingLogs = Array.isArray(record.statusLogs) ? [...record.statusLogs] : [];
-      const newLog: RecordStatusLog = {
-        id: crypto.randomUUID?.() || `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        recordId: record.id,
-        previousStatus: record.status,
-        newStatus: RecordStatus.PENDING_PRINT_CERT,
-        changedBy: userName,
-        changedAt: now,
-        note: `Giao cán bộ in Giấy chứng nhận (GCN): ${staffId}`,
-      };
-
-      const updatedRecord: RecordFile = {
-        ...record,
-        assignedTo: staffId,
-        assignedDate: todayStr,
-        status: RecordStatus.PENDING_PRINT_CERT,
-        printStaffAssignedAt: now,
-        statusLogs: [...existingLogs, newLog],
-        updatedAt: now,
-      };
-
-      await updateDangkyRecord(updatedRecord);
-      updatedRecords.push(updatedRecord);
-    }
-
-    return { success: true, updatedCount: updatedRecords.length, records: updatedRecords };
-  } catch (err: any) {
-    console.error('handoverPrintInDb error:', err);
-    return { success: false, updatedCount: 0, error: err?.message || 'Lỗi giao in GCN', records: [] };
   }
 };

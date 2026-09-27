@@ -224,6 +224,53 @@ export const createContractApi = async (contract: Contract): Promise<boolean> =>
     }
 };
 
+export const createContractBatchApi = async (contractList: Contract[]): Promise<boolean> => {
+    try {
+        if (!Array.isArray(contractList) || contractList.length === 0) return true;
+
+        // 1. Lưu lập tức vào RAM Cache & IndexedDB
+        let contracts = memoryContractsCache;
+        if (!contracts || contracts.length === 0) {
+            contracts = await getIndexedDBContracts();
+        }
+        const updatedContracts = [...contracts];
+        contractList.forEach(contract => {
+            const index = updatedContracts.findIndex(c => c.id === contract.id || (c.code && c.code === contract.code));
+            if (index >= 0) {
+                updatedContracts[index] = contract;
+            } else {
+                updatedContracts.unshift(contract);
+            }
+        });
+        await setLocalContracts(updatedContracts);
+
+        // 2. Thử đồng bộ lên Cloud Supabase nếu có kết nối
+        if (isConfigured) {
+            try {
+                const payloads = contractList.map(mapContractToDb);
+                const { error } = await supabase.from('contracts').insert(payloads);
+                if (error) {
+                    if (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist'))) {
+                        console.warn("⚠️ Bảng contracts thiếu cột camelCase. Đang thử lại với kiểu cột snake_case...");
+                        const snakePayloads = contractList.map(mapContractToDbSnake);
+                        const { error: err2 } = await supabase.from('contracts').insert(snakePayloads);
+                        if (err2) logError("createContractBatchApi snake_case", err2);
+                    } else {
+                        logError("createContractBatchApi camelCase", error);
+                    }
+                }
+            } catch (cloudErr) {
+                logError("createContractBatchApi Cloud sync", cloudErr);
+            }
+        }
+
+        return true;
+    } catch (error) {
+        logError("createContractBatchApi Local error", error);
+        return false;
+    }
+};
+
 export const updateContractApi = async (contract: Contract): Promise<boolean> => {
     try {
         // 1. Cập nhật RAM Cache & IndexedDB

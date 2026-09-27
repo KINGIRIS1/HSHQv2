@@ -13,47 +13,33 @@ import {
   ChevronDown,
   MapPin,
   Users,
-  CreditCard,
-  Printer,
-  Settings,
-  BarChart3,
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus } from '../../types';
 import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
 import { RegistrationRecordRow } from './RegistrationRecordRow';
 import { RegistrationDetailModal } from './RegistrationDetailModal';
 import { RegistrationAssignModal } from './RegistrationAssignModal';
-import { HandoverTaxModal } from './HandoverTaxModal';
-import { HandoverPostingModal } from './HandoverPostingModal';
-import { HandoverPrintModal } from './HandoverPrintModal';
-import { RegistrationWorkflowModal } from './RegistrationWorkflowModal';
 import DeleteConfirmModal from '../DeleteConfirmModal';
-import { confirmAction, getVietnamDateString } from '../../utils/appHelpers';
+import { confirmAction } from '../../utils/appHelpers';
 import {
   fetchDangkyRecords,
   updateDangkyRecord,
   deleteDangkyRecord,
   deleteBulkDangkyRecords,
   assignDangkyRecordsBatch,
-  handoverTaxInDb,
-  handoverPostingInDb,
-  handoverPrintInDb,
 } from '../../services/apiRegistration';
-import { addCalendarDays } from '../../utils/registrationWorkflows';
 import { syncDangKyToVaoSo } from '../../services/apiArchive';
 
 interface RegistrationModuleViewProps {
   currentUser?: User | null;
   employees: Employee[];
-  setCurrentView?: (view: string) => void;
-  setReportMainTab?: (tab: 'measurement' | 'archive' | 'registration') => void;
+  users?: User[];
 }
 
 export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   currentUser,
   employees,
-  setCurrentView,
-  setReportMainTab,
+  users = [],
 }) => {
   const [records, setRecords] = useState<RecordFile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -63,10 +49,6 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   const [viewingRecord, setViewingRecord] = useState<RecordFile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
   const [isAssignOpen, setIsAssignOpen] = useState<boolean>(false);
-  const [isHandoverTaxOpen, setIsHandoverTaxOpen] = useState<boolean>(false);
-  const [isHandoverPostingOpen, setIsHandoverPostingOpen] = useState<boolean>(false);
-  const [isHandoverPrintOpen, setIsHandoverPrintOpen] = useState<boolean>(false);
-  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState<boolean>(false);
   const [recordToDelete, setRecordToDelete] = useState<RecordFile | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null
@@ -145,11 +127,12 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     const saved = await updateDangkyRecord(updated);
     setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
 
-    // Tự động đồng bộ sang module Vào sổ GCN CHỈ KHI hồ sơ đã ký duyệt và chuyển qua trạng thái Chờ bàn giao hoặc đã có số vào sổ
+    // Tự động đồng bộ sang module Vào sổ GCN nếu hồ sơ đã ký, duyệt, chuyển bàn giao hoặc có số vào sổ
     if (
+      saved.status === RecordStatus.SIGNED ||
       saved.status === RecordStatus.PENDING_HANDOVER ||
       saved.status === RecordStatus.HANDOVER ||
-      saved.status === RecordStatus.RETURNED ||
+      Boolean(saved.approvalDate) ||
       Boolean(saved.entryNumber)
     ) {
       syncDangKyToVaoSo([saved]).catch((err) => {
@@ -198,102 +181,18 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   const handleConfirmAssign = async (
     recordIds: string[],
     assignedTo: string,
-    assignedDate: string,
-    assignStep: 'appraisal' | 'tax_transfer'
+    assignedDate: string
   ) => {
-    await assignDangkyRecordsBatch(recordIds, assignedTo, assignedDate, assignStep);
-    const targetStatus = assignStep === 'tax_transfer' ? RecordStatus.TAX_TRANSFER : RecordStatus.APPRAISAL;
-    const stepLabel = assignStep === 'tax_transfer' ? 'Chuyển thông tin thuế' : 'Thẩm định';
+    await assignDangkyRecordsBatch(recordIds, assignedTo, assignedDate);
     setRecords((prev) =>
-      prev.map((r) => {
-        if (!recordIds.includes(r.id)) return r;
-        const updated: RecordFile = { ...r, assignedTo, assignedDate, status: targetStatus };
-        if (assignStep === 'appraisal') updated.appraisalDate = assignedDate;
-        if (assignStep === 'tax_transfer') updated.taxTransferDate = assignedDate;
-        return updated;
-      })
+      prev.map((r) =>
+        recordIds.includes(r.id)
+          ? { ...r, assignedTo, assignedDate, status: RecordStatus.IN_PROGRESS }
+          : r
+      )
     );
     setSelectedIds(new Set());
-    showFeedback('success', `Đã phân công bước [${stepLabel}] cho ${recordIds.length} hồ sơ cho cán bộ ${assignedTo}`);
-  };
-
-  // Giao chuyển thuế hàng loạt
-  const handleConfirmHandoverTax = async (recordIds: string[], assignedTo: string) => {
-    try {
-      const res = await handoverTaxInDb(recordIds, assignedTo, currentUser || undefined);
-      if (!res.success) throw new Error(res.error || 'Giao chuyển thuế thất bại');
-      const todayStr = getVietnamDateString();
-      setRecords((prev) =>
-        prev.map((r) => {
-          if (!recordIds.includes(r.id)) return r;
-          return {
-            ...r,
-            assignedTo,
-            assignedDate: todayStr,
-            taxTransferDate: todayStr,
-            status: RecordStatus.TAX_TRANSFER,
-          };
-        })
-      );
-      setSelectedIds(new Set());
-      setIsHandoverTaxOpen(false);
-      showFeedback('success', `Đã giao chuyển thuế cho ${res.updatedCount} hồ sơ cho cán bộ ${assignedTo}`);
-    } catch (err: any) {
-      showFeedback('error', err?.message || 'Lỗi khi giao chuyển thuế');
-    }
-  };
-
-  // Giao niêm yết hàng loạt
-  const handleConfirmHandoverPosting = async (recordIds: string[], assignedTo: string) => {
-    try {
-      const res = await handoverPostingInDb(recordIds, assignedTo, currentUser || undefined);
-      if (!res.success) throw new Error(res.error || 'Giao niêm yết thất bại');
-      const todayStr = getVietnamDateString();
-      const postingEndDateStr = addCalendarDays(todayStr, 30);
-      setRecords((prev) =>
-        prev.map((r) => {
-          if (!recordIds.includes(r.id)) return r;
-          return {
-            ...r,
-            assignedTo,
-            assignedDate: todayStr,
-            postingDate: todayStr,
-            postingEndDate: postingEndDateStr,
-            status: RecordStatus.PENDING_POSTING,
-          };
-        })
-      );
-      setSelectedIds(new Set());
-      setIsHandoverPostingOpen(false);
-      showFeedback('success', `Đã giao niêm yết ${res.updatedCount} hồ sơ cho cán bộ ${assignedTo}`);
-    } catch (err: any) {
-      showFeedback('error', err?.message || 'Lỗi khi giao niêm yết');
-    }
-  };
-
-  // Giao In GCN hàng loạt
-  const handleConfirmHandoverPrint = async (recordIds: string[], assignedTo: string) => {
-    try {
-      const res = await handoverPrintInDb(recordIds, assignedTo, currentUser || undefined);
-      if (!res.success) throw new Error(res.error || 'Giao In GCN thất bại');
-      const todayStr = getVietnamDateString();
-      setRecords((prev) =>
-        prev.map((r) => {
-          if (!recordIds.includes(r.id)) return r;
-          return {
-            ...r,
-            assignedTo,
-            assignedDate: todayStr,
-            status: RecordStatus.PENDING_PRINT_CERT,
-          };
-        })
-      );
-      setSelectedIds(new Set());
-      setIsHandoverPrintOpen(false);
-      showFeedback('success', `Đã giao In GCN cho ${res.updatedCount} hồ sơ cho cán bộ ${assignedTo}`);
-    } catch (err: any) {
-      showFeedback('error', err?.message || 'Lỗi khi giao In GCN');
-    }
+    showFeedback('success', `Đã phân công ${recordIds.length} hồ sơ cho cán bộ ${assignedTo}`);
   };
 
   // Lắng nghe phím Esc để thoát các modal / popover
@@ -316,21 +215,25 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   // Danh sách hồ sơ đang được chọn
   const selectedRecordsList = records.filter((r) => selectedIds.has(r.id));
 
-  // Thống kê nhanh theo 12 sub-tabs quy trình Cấp giấy
+  // Thống kê nhanh theo sub-tabs quy trình Cấp giấy
   const stats = {
     all: records.length,
     unassigned: records.filter((r) => !r.assignedTo || r.status === RecordStatus.RECEIVED).length,
     appraisal: records.filter((r) => r.status === RecordStatus.APPRAISAL).length,
-    tax_transfer: records.filter((r) => r.status === RecordStatus.TAX_TRANSFER).length,
-    tax_kv7: records.filter((r) => r.status === RecordStatus.PENDING_TAX_KV7).length,
-    tax_notice: records.filter((r) => r.status === RecordStatus.PENDING_TAX_PAYMENT).length,
+    tax: records.filter(
+      (r) =>
+        r.status === RecordStatus.TAX_TRANSFER ||
+        r.status === RecordStatus.PENDING_TAX_KV7 ||
+        r.status === RecordStatus.PENDING_TAX_PAYMENT
+    ).length,
     print_cert: records.filter((r) => r.status === RecordStatus.PENDING_PRINT_CERT).length,
     pending_check: records.filter((r) => r.status === RecordStatus.PENDING_CHECK).length,
     pending_sign: records.filter((r) => r.status === RecordStatus.PENDING_SIGN).length,
     signed: records.filter(
       (r) => r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER
     ).length,
-    handover: records.filter((r) => r.isHandedOver || r.status === RecordStatus.HANDOVER).length,
+    supplement: records.filter((r) => r.status === RecordStatus.PENDING_SUPPLEMENT).length,
+    handed_over: records.filter((r) => r.isHandedOver || r.status === RecordStatus.HANDOVER).length,
     returned: records.filter((r) => r.status === RecordStatus.RETURNED).length,
   };
 
@@ -353,27 +256,6 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              if (setReportMainTab) setReportMainTab('registration');
-              if (setCurrentView) setCurrentView('reports');
-            }}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-          >
-            <BarChart3 size={15} />
-            <span>📊 Báo cáo Cấp giấy</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsWorkflowModalOpen(true)}
-            className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-blue-200 shadow-2xs"
-          >
-            <Settings size={14} />
-            <span>⚙️ Trạng thái & SLA</span>
-          </button>
-
           <button
             type="button"
             onClick={loadData}
@@ -406,20 +288,19 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         </div>
       )}
 
-      {/* 12 Sub-Tabs Nghiệp vụ */}
+      {/* Sub-Tabs Nghiệp vụ */}
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-2 overflow-x-auto scrollbar-none">
         {[
           { id: 'all', label: 'Tất cả hồ sơ', count: stats.all },
-          { id: 'unassigned', label: 'Chưa giao', count: stats.unassigned },
+          { id: 'unassigned', label: 'Chờ phân công', count: stats.unassigned },
           { id: 'appraisal', label: 'Thẩm định', count: stats.appraisal },
-          { id: 'tax_transfer', label: 'Phiếu chuyển thuế', count: stats.tax_transfer },
-          { id: 'tax_kv7', label: 'Thuế Khu vực 7', count: stats.tax_kv7 },
-          { id: 'tax_notice', label: 'Thông báo thuế', count: stats.tax_notice },
-          { id: 'print_cert', label: 'In GCN', count: stats.print_cert },
-          { id: 'pending_check', label: 'Kiểm tra', count: stats.pending_check },
-          { id: 'pending_sign', label: 'Trình ký', count: stats.pending_sign },
-          { id: 'signed', label: 'Chờ bàn giao', count: stats.signed },
-          { id: 'handover', label: 'Chờ trả kết quả', count: stats.handover },
+          { id: 'tax', label: 'Chuyển thuế / KV7 / GNT', count: stats.tax },
+          { id: 'print_cert', label: 'Chờ in GCN', count: stats.print_cert },
+          { id: 'pending_check', label: 'Chờ kiểm tra', count: stats.pending_check },
+          { id: 'pending_sign', label: 'Chờ ký duyệt', count: stats.pending_sign },
+          { id: 'signed', label: 'Đã ký / Chờ giao', count: stats.signed },
+          { id: 'supplement', label: 'Chờ bổ sung', count: stats.supplement },
+          { id: 'handed_over', label: 'Đã giao 1 cửa', count: stats.handed_over },
           { id: 'returned', label: 'Đã trả kết quả', count: stats.returned },
         ].map((tab) => (
           <button
@@ -622,30 +503,6 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setIsHandoverPostingOpen(true)}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <FileText size={13} />
-                <span>Giao niêm yết ({selectedIds.size})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsHandoverTaxOpen(true)}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <CreditCard size={13} />
-                <span>Giao chuyển thuế ({selectedIds.size})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsHandoverPrintOpen(true)}
-                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <Printer size={13} />
-                <span>Giao In GCN ({selectedIds.size})</span>
-              </button>
-              <button
-                type="button"
                 onClick={handleBulkDelete}
                 className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
               >
@@ -716,6 +573,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
                         setIsAssignOpen(true);
                       }}
                       employees={employees}
+                      users={users}
                     />
                   ))
                 )}
@@ -810,37 +668,6 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         selectedRecords={selectedRecordsList}
         employees={employees}
         onConfirmAssign={handleConfirmAssign}
-      />
-
-      <HandoverTaxModal
-        isOpen={isHandoverTaxOpen}
-        onClose={() => setIsHandoverTaxOpen(false)}
-        selectedRecords={selectedRecordsList}
-        employees={employees}
-        onConfirmHandoverTax={handleConfirmHandoverTax}
-      />
-
-      <HandoverPostingModal
-        isOpen={isHandoverPostingOpen}
-        onClose={() => setIsHandoverPostingOpen(false)}
-        selectedRecords={selectedRecordsList}
-        employees={employees}
-        onConfirmHandoverPosting={handleConfirmHandoverPosting}
-      />
-
-      <HandoverPrintModal
-        isOpen={isHandoverPrintOpen}
-        onClose={() => setIsHandoverPrintOpen(false)}
-        selectedRecords={selectedRecordsList}
-        employees={employees}
-        onConfirmHandoverPrint={handleConfirmHandoverPrint}
-      />
-
-      {/* Modal Cấu hình Trạng thái & SLA */}
-      <RegistrationWorkflowModal
-        isOpen={isWorkflowModalOpen}
-        onClose={() => setIsWorkflowModalOpen(false)}
-        onSaved={loadData}
       />
 
       {/* Modal xác nhận xóa hồ sơ Cấp giấy */}

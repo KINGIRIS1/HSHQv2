@@ -37,7 +37,7 @@ const formatDate = (dateStr?: string | null) => {
 const RecordRow: React.FC<RecordRowProps> = ({
   record,
   employees,
-  users = [],
+  users,
   visibleColumns,
   isSelected,
   canPerformAction,
@@ -61,7 +61,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
   React.useEffect(() => { setLocalMsr(record.measurementNumber || ""); }, [record.measurementNumber]);
   React.useEffect(() => { setLocalExc(record.excerptNumber || ""); }, [record.excerptNumber]);
   React.useEffect(() => { setLocalRec(record.receiptNumber || ""); }, [record.receiptNumber]);
-  const employeeName = resolveEmployeeName(record.assignedTo, employees, users);
+  const employee = employees.find(e => e.id === record.assignedTo);
   const isOverdue = isRecordOverdue(record);
   const isApproaching = isRecordApproaching(record);
   
@@ -214,8 +214,10 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     break;
             }
 
+            const resolvedName = resolveEmployeeName(personId, employees, users);
+
             return {
-                name: resolveEmployeeName(personId, employees, users),
+                name: resolvedName,
                 date: dateVal
             };
         })();
@@ -468,7 +470,8 @@ export default React.memo(RecordRow, (prevProps, nextProps) => {
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.visibleColumns === nextProps.visibleColumns &&
     prevProps.columnOrder === nextProps.columnOrder &&
-    prevProps.employees.length === nextProps.employees.length &&
+    prevProps.employees === nextProps.employees &&
+    prevProps.users === nextProps.users &&
     prevProps.hasPermission === nextProps.hasPermission &&
     prevProps.currentUser === nextProps.currentUser &&
     prevProps.canPerformAction === nextProps.canPerformAction

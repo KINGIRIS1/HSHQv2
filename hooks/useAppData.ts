@@ -1,18 +1,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { RecordFile, Employee, User, UserRole, RecordStatus, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
+import { RecordFile, Employee, User, UserRole, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, deleteRecordsBatchApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting,
-    enrichUsersList, enrichUserWithEmployees, RECENTLY_UPDATED_RECORDS, markRecordsRecentlyUpdated
-} from '../services/api';
+    enrichUsersList, enrichUserWithEmployees, RECENTLY_UPDATED_RECORDS, migrateEmployeeIdInAllTables} from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
 import { fetchAllArchiveRecordsAsRecordFiles } from '../services/apiArchive';
 import { getIndexedDBItem } from '../services/storageService';
 import { getPendingSyncCount, syncPendingRecordsToCloud, generateStandardUUID } from '../services/syncQueueService';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
-import { migrateUnbatchedRecords, deduplicateRecords } from '../utils/appHelpers';
+import { migrateUnbatchedRecords, deduplicateRecords, normalizeEmployeeId } from '../utils/appHelpers';
 import { connectionManager } from '../services/connectionService';
 import { syncGoogleDriveConfigFromCloud } from '../services/attachmentStorage';
 
@@ -55,7 +54,7 @@ const reconcileWithProtectedRecords = (incomingRecords: RecordFile[], currentPre
     });
 };
 
-export const useAppData = (currentUser: User | null) => {
+export const useAppData = (_currentUser?: any) => {
     // Khởi tạo danh sách hồ sơ ban đầu (sẽ được nạp tức thì từ IndexedDB & Cloud)
     const [records, setRecords] = useState<RecordFile[]>([]);
     const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
@@ -157,7 +156,7 @@ export const useAppData = (currentUser: User | null) => {
             }
 
             // GIAI ĐOẠN 2: Nạp ngầm Hồ sơ công việc sau khi hệ thống & nhân sự đã sẵn sàng
-            fetchRecords((tier, partialList, isComplete) => {
+            fetchRecords((_tier, partialList) => {
                 if (Array.isArray(partialList) && partialList.length > 0) {
                     setRecords(prev => {
                         if (!prev || prev.length === 0) {
@@ -728,7 +727,6 @@ export const useAppData = (currentUser: User | null) => {
 
     const handleBatchUpdate = async (updatedRecords: RecordFile[]) => {
         // Optimistic update
-        const updatedIds = updatedRecords.map(r => r.id);
         setRecords(prev => prev.map(r => {
             const found = updatedRecords.find(u => u.id === r.id);
             return found ? found : r;
@@ -737,79 +735,58 @@ export const useAppData = (currentUser: User | null) => {
 
     // --- Employee Handlers ---
     const handleSaveEmployee = async (emp: Employee, originalId?: string) => {
-        let isRename = false;
-        if (originalId && originalId !== emp.id) {
-            isRename = true;
-            // Xóa nhân viên có ID cũ
-            await deleteEmployeeApi(originalId);
-        }
+        const normEmpId = normalizeEmployeeId(emp.id);
+        const cleanEmp = { ...emp, id: normEmpId };
+        
+        const hasIdChanged = originalId && normalizeEmployeeId(originalId) !== normEmpId;
+        const exists = employees.find(e => {
+            const lookId = originalId ? normalizeEmployeeId(originalId) : normEmpId;
+            return normalizeEmployeeId(e.id) === lookId;
+        });
 
-        const exists = isRename ? false : employees.some(e => e.id === emp.id);
-        const savedEmp = await saveEmployeeApi(emp, exists);
+        const savedEmp = await saveEmployeeApi(cleanEmp, !!exists, originalId);
         if (savedEmp) {
-            let nextEmps = [...employees];
-            if (isRename) {
-                // Thay thế ID cũ bằng ID mới
-                nextEmps = nextEmps.filter(e => e.id !== originalId);
-                nextEmps.push(savedEmp);
-            } else {
-                nextEmps = exists
-                    ? nextEmps.map(e => e.id === savedEmp.id ? savedEmp : e)
-                    : [...nextEmps, savedEmp];
+            let nextEmps = employees;
+            if (hasIdChanged && originalId) {
+                const normOldId = normalizeEmployeeId(originalId);
+                nextEmps = employees.filter(e => normalizeEmployeeId(e.id) !== normOldId);
             }
+            
+            const matchExists = nextEmps.find(e => normalizeEmployeeId(e.id) === normEmpId);
+            nextEmps = matchExists
+                ? nextEmps.map(e => normalizeEmployeeId(e.id) === normEmpId ? savedEmp : e)
+                : [...nextEmps, savedEmp];
+
             setEmployees(nextEmps);
-
-            // 1. Cập nhật đồng bộ tài khoản người dùng (users)
-            if (isRename) {
-                const updatedUsers = users.map(u => {
-                    if (u.employeeId === originalId) {
-                        const updatedUser = { ...u, employeeId: emp.id };
-                        saveUserApi(updatedUser, true).catch(err => console.error(err));
-                        return updatedUser;
-                    }
-                    return u;
-                });
-                setUsers(updatedUsers);
-            }
-
-            // 2. Cập nhật đồng bộ các hồ sơ liên quan (records)
-            if (isRename) {
-                const updatedRecords = records.map(r => {
-                    let changed = false;
-                    const rUp = { ...r };
-                    if (rUp.assignedTo === originalId) { rUp.assignedTo = emp.id; changed = true; }
-                    if (rUp.receivedBy === originalId) { rUp.receivedBy = emp.id; changed = true; }
-                    
-                    if (rUp.data && typeof rUp.data === 'object') {
-                        const d = { ...rUp.data };
-                        let dataChanged = false;
-                        if (d.fieldStaff === originalId) { d.fieldStaff = emp.id; dataChanged = true; }
-                        if (d.drawingStaff === originalId) { d.drawingStaff = emp.id; dataChanged = true; }
-                        if (d.technicalStaff === originalId) { d.technicalStaff = emp.id; dataChanged = true; }
-                        if (dataChanged) {
-                            rUp.data = d;
-                            changed = true;
-                        }
-                    }
-                    if (changed) {
-                        updateRecordApi(rUp).catch(err => console.error(err));
-                        return rUp;
-                    }
-                    return r;
-                });
-                setRecords(updatedRecords);
-            }
 
             // Tự động re-enrich danh sách users dựa trên danh sách nhân viên mới
             enrichUsersList(users, nextEmps).then(enrichedUsers => {
-                const finalUsers = enrichedUsers.map(eu => {
-                    if (isRename && eu.employeeId === originalId) {
-                        return { ...eu, employeeId: emp.id };
-                    }
-                    return eu;
-                });
-                setUsers(finalUsers);
+                setUsers(enrichedUsers);
             });
+
+            // Nếu ID nhân viên bị thay đổi, tiến hành đồng bộ ngầm toàn bộ mã nhân sự cũ trong các bảng hồ sơ sang mã nhân sự mới
+            if (hasIdChanged && originalId) {
+                const normOldId = normalizeEmployeeId(originalId);
+                
+                // 1. Cập nhật ngầm trên Supabase Cloud
+                migrateEmployeeIdInAllTables(normOldId, normEmpId).catch(err => {
+                    console.error("Lỗi đồng bộ mã nhân viên hàng loạt trên Cloud DB:", err);
+                });
+
+                // 2. Cập nhật tức thời trong state local (RAM) để thay đổi hiển thị ngay lập tức
+                setRecords(prev => prev.map(r => {
+                    let changed = false;
+                    const rUpdated = { ...r };
+                    const fields = ['assignedTo', 'receivedBy', 'surveyorId', 'drafterId', 'checkedBy', 'submittedTo', 'returnedBy'] as const;
+                    fields.forEach(f => {
+                        if (rUpdated[f] && normalizeEmployeeId(rUpdated[f]) === normOldId) {
+                            (rUpdated as any)[f] = normEmpId;
+                            changed = true;
+                        }
+                    });
+                    return changed ? rUpdated : r;
+                }));
+            }
         }
     };
 

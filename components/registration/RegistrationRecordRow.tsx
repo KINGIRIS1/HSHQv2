@@ -12,9 +12,10 @@ import {
   Eye,
   AlertTriangle,
 } from 'lucide-react';
-import { RecordFile, Employee, RecordStatus, DossierComponentItem } from '../../types';
+import { RecordFile, Employee, User as AppUser, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
-import { getRegistrationWorkflowCategory, getProcedureByRecordType, getStepSlaInfo, getAppointmentInfo } from '../../utils/registrationWorkflows';
+import { getRegistrationWorkflowCategory, getStepSlaInfo, getAppointmentInfo } from '../../utils/registrationWorkflows';
+import { resolveEmployeeName } from '../../utils/appHelpers';
 
 interface RegistrationRecordRowProps {
   record: RecordFile;
@@ -26,6 +27,7 @@ interface RegistrationRecordRowProps {
   onDelete?: (record: RecordFile) => void;
   onAssign?: (record: RecordFile) => void;
   employees?: Employee[];
+  users?: AppUser[];
 }
 
 export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
@@ -38,6 +40,7 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
   onDelete,
   onAssign,
   employees = [],
+  users = [],
 }) => {
   const isOverdue = React.useMemo(() => {
     if (
@@ -123,15 +126,28 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
       {/* Nội dung hồ sơ & Quy trình */}
       <td className="py-2.5 px-3 text-slate-600 max-w-[240px]">
         {(() => {
-          const proc = getProcedureByRecordType(record.recordType);
+          const cat = getRegistrationWorkflowCategory(record.recordType);
+          const catBadges: Record<string, { label: string; cls: string }> = {
+            tax_transfer: { label: 'Có thuế', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+            fast_track: { label: 'Không thuế', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
+            gdbd: { label: 'Thế chấp/GDBD', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+            gdbd_register: { label: 'ĐK Thế chấp', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+            gdbd_release: { label: 'Giải chấp', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+            lost_cert: { label: 'Mất GCN', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+            lost_cert_tax: { label: 'Mất GCN (có thuế)', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+            split_plot: { label: 'Tách/Hợp', cls: 'bg-teal-50 text-teal-800 border-teal-200' },
+            unclassified: { label: 'Chưa phân loại', cls: 'bg-slate-100 text-slate-500 border-slate-300' },
+          };
+          const badge = catBadges[cat] || catBadges.unclassified;
+
           return (
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
-                  {proc ? (proc as any).code : '3.x'}
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${badge.cls}`}>
+                  {badge.label}
                 </span>
-                <span className="text-[11px] font-bold text-slate-800 truncate" title={record.recordType || (proc ? (proc as any).name : '')}>
-                  {record.recordType || (proc ? (proc as any).name : 'Hồ sơ')}
+                <span className="text-[11px] font-bold text-slate-800 truncate" title={record.recordType || ''}>
+                  {record.recordType || 'Đăng ký đất đai'}
                 </span>
               </div>
               {record.content && (
@@ -148,27 +164,12 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
       <td className="py-2.5 px-3">
         {record.assignedTo ? (
           (() => {
-            const cleanKey = (record.assignedTo || '').trim().toLowerCase();
-            const emp = (employees || []).find(e => 
-              (e.id || '').trim().toLowerCase() === cleanKey || 
-              (e.name || '').trim().toLowerCase() === cleanKey
-            );
-            const displayName = emp && emp.name ? emp.name : record.assignedTo;
-            const assignedDateDisplay = record.assignedDate 
-              ? record.assignedDate.split('T')[0].split('-').reverse().join('/') 
-              : null;
+            const displayName = resolveEmployeeName(record.assignedTo, employees, users);
+
             return (
-              <div className="flex flex-col gap-0.5">
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-semibold text-xs">
-                  <User size={11} className="text-slate-500 shrink-0" />
-                  <span className="truncate max-w-[130px]" title={displayName}>{displayName}</span>
-                </div>
-                {assignedDateDisplay && (
-                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1 pl-1">
-                    <Calendar size={10} className="text-slate-400 shrink-0" />
-                    <span>{assignedDateDisplay}</span>
-                  </span>
-                )}
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-medium">
+                <User size={11} className="text-slate-500" />
+                <span title={displayName}>{displayName}</span>
               </div>
             );
           })()
@@ -216,6 +217,46 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
       <td className="py-2.5 px-3 text-center">
         <div className="flex flex-col items-center">
           <StatusBadge status={record.status} />
+          {(() => {
+            const sla = getStepSlaInfo(record);
+            if (!sla || sla.status === 'completed' || sla.status === 'waiting') return null;
+            if (sla.step.isTaxPhase) {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Khâu liên thông thuế: Không tính vào thời hạn giải quyết của Chi nhánh">
+                  <span>Thuế (Không tính hạn)</span>
+                </span>
+              );
+            }
+            if (sla.step.isPostingPhase) {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200" title="Khâu niêm yết tại UBND xã 30 ngày: Không tính vào thời hạn giải quyết của Chi nhánh">
+                  <span>Niêm yết xã (Không tính hạn)</span>
+                </span>
+              );
+            }
+            if (sla.durationHours === 0) return null;
+            if (sla.status === 'overdue') {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title={`Khâu ${sla.step.label} đã quá hạn ${sla.overdueLabel}`}>
+                  <AlertTriangle size={10} className="text-rose-600" />
+                  <span>Trễ khâu {sla.overdueLabel.replace('Trễ ', '')}</span>
+                </span>
+              );
+            }
+            if (sla.status === 'warning') {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title={`Khâu ${sla.step.label} còn ${sla.remainingLabel}`}>
+                  <Clock size={10} className="text-amber-600" />
+                  <span>Còn {sla.remainingLabel}</span>
+                </span>
+              );
+            }
+            return (
+              <span className="mt-0.5 inline-block text-[10px] text-slate-400 font-medium">
+                Khâu: {sla.durationLabel}
+              </span>
+            );
+          })()}
         </div>
       </td>
 

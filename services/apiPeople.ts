@@ -253,6 +253,36 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean, ori
     }
 };
 
+export const migrateEmployeeIdInAllTables = async (oldId: string, newId: string): Promise<boolean> => {
+    if (!isConfigured || !supabase) return true;
+    
+    const cleanOld = oldId.trim();
+    const cleanNew = newId.trim();
+    if (!cleanOld || !cleanNew || cleanOld.toLowerCase() === cleanNew.toLowerCase()) return true;
+
+    try {
+        const tables = ['records', 'land_records', 'dangky_records', 'luutru_records'];
+        const fields = ['assignedTo', 'receivedBy', 'surveyorId', 'drafterId', 'checkedBy', 'submittedTo', 'returnedBy'];
+
+        for (const t of tables) {
+            for (const f of fields) {
+                try {
+                    await supabase
+                        .from(t)
+                        .update({ [f]: cleanNew })
+                        .eq(f, cleanOld);
+                } catch (e) {
+                    // Bỏ qua lỗi nếu bảng hoặc cột không tồn tại
+                }
+            }
+        }
+        return true;
+    } catch (err) {
+        console.warn("Lỗi đồng bộ mã nhân viên hàng loạt:", err);
+        return false;
+    }
+};
+
 export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
     if (!isConfigured) return true;
     try {

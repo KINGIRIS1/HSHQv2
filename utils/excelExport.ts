@@ -2,7 +2,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, cleanSyncNotes } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones, cleanSyncNotes, resolveEmployeeName } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
 /**
@@ -381,8 +381,7 @@ export const createRecordsWorkbook = async (
 
     const getEmployeeName = (empId?: string) => {
         if (!empId) return '';
-        const emp = employees.find(e => e.id === empId);
-        return emp ? emp.name : '';
+        return resolveEmployeeName(empId, employees);
     };
 
     const formatDate = (d: string | undefined | null) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus, RolePermissions, DepartmentPermissions, DossierComponentItem, AttachedFileMeta } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
-import { getNormalizedWard, getShortRecordType, isArchiveRecordType, isCertificateRecordType } from '../../constants';
+import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -9,16 +9,15 @@ import {
   CalendarClock, FileCheck, Calculator, Loader2, StickyNote, 
   Save, Bell, Printer, Pencil, Trash2, Info, ChevronLeft,
   Phone, Calendar, Hash, FileDown, Clock, ShieldAlert,
-  Paperclip, Eye, Download, Plus, FolderOpen
+  Paperclip, Eye, Download
 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
-import { updateRecordApi, fetchContracts, updateContractApi } from '../../services/api';
+import { updateRecordApi, fetchContracts } from '../../services/api';
 import { previewAttachment, downloadAttachment, isPreviewableFile } from '../../services/attachmentStorage';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName, formatDateTimeVN, getVietnamNowISO } from '../../utils/appHelpers';
-import { getRegistrationWorkflowCategory, getRegistrationWorkflow, getWorkflowStepIndex, getStepSlaInfo } from '../../utils/registrationWorkflows';
+import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName, findMatchingEmployee, resolveEmployeeName } from '../../utils/appHelpers';
 import { checkUserPermission, hasRecordActionPermission } from '../../utils/permissionUtils';
 
 interface MobileDetailModalProps {
@@ -158,72 +157,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   const [isAnnexModalOpen, setIsAnnexModalOpen] = useState(false);
   const [contracts, setContracts] = useState<any[]>([]);
   const [matchedContract, setMatchedContract] = useState<any | null>(null);
-  const [showContractPicker, setShowContractPicker] = useState(false);
-  const [contractSearchQuery, setContractSearchQuery] = useState('');
-  const [isLinkingContract, setIsLinkingContract] = useState(false);
-
-  const handleLinkContract = async (selectedContract: any) => {
-      if (!record) return;
-      setIsLinkingContract(true);
-      try {
-          const updatedContract = {
-              ...selectedContract,
-              customerAddress: record.code,
-              customerName: selectedContract.customerName || record.customerName,
-              phoneNumber: selectedContract.phoneNumber || record.phoneNumber,
-              ward: selectedContract.ward || record.ward,
-              landPlot: selectedContract.landPlot || record.landPlot,
-              mapSheet: selectedContract.mapSheet || record.mapSheet,
-              area: selectedContract.area || record.area || 0,
-              address: selectedContract.address || record.address,
-          };
-          
-          const success = await updateContractApi(updatedContract);
-          if (success) {
-              const fetchedContracts = await fetchContracts();
-              setContracts(fetchedContracts);
-              const match = fetchedContracts.find(c => c.id === selectedContract.id);
-              if (match) {
-                  setMatchedContract(match);
-                  setContractPrice(match.totalAmount ?? null);
-                  setContractSplitItems(match.splitItems || null);
-              }
-              setShowContractPicker(false);
-              setContractSearchQuery('');
-              if (onRefreshData) onRefreshData();
-          }
-      } catch (err) {
-          console.error("Lỗi khi liên kết hợp đồng:", err);
-      } finally {
-          setIsLinkingContract(false);
-      }
-  };
-
-  const handleUnlinkContract = async () => {
-      if (!matchedContract) return;
-      if (!window.confirm("Xác nhận hủy liên kết hợp đồng này với hồ sơ?")) return;
-      setIsLinkingContract(true);
-      try {
-          const updatedContract = {
-              ...matchedContract,
-              customerAddress: '' // Xóa liên kết
-          };
-          const success = await updateContractApi(updatedContract);
-          if (success) {
-              const fetchedContracts = await fetchContracts();
-              setContracts(fetchedContracts);
-              setMatchedContract(null);
-              setContractPrice(null);
-              setContractSplitItems(null);
-              setLiquidationInfo(null);
-              if (onRefreshData) onRefreshData();
-          }
-      } catch (err) {
-          console.error("Lỗi khi hủy liên kết hợp đồng:", err);
-      } finally {
-          setIsLinkingContract(false);
-      }
-  };
 
   useEffect(() => {
     if (record) {
@@ -265,35 +198,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
             const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
 
-            // Thuật toán so khớp mã hồ sơ thông minh hỗ trợ các tiền tố địa bàn
-            const matchCodes = (a: string, b: string): boolean => {
-                if (!a || !b) return false;
-                const cleanA = clean(a);
-                const cleanB = clean(b);
-                if (cleanA === cleanB) return true;
-
-                const stripPrefix = (s: string) => {
-                    return s.trim().toLowerCase()
-                        .replace(/^(tk|tq|md|th)-?/i, '')
-                        .replace(/[^a-z0-9]/gi, '');
-                };
-                const strippedA = stripPrefix(a);
-                const strippedB = stripPrefix(b);
-                if (strippedA && strippedB && strippedA === strippedB) return true;
-
-                const getTrailingNumber = (s: string) => {
-                    const m = s.match(/(\d+)$/);
-                    return m ? parseInt(m[1], 10).toString() : null;
-                };
-                const trailA = getTrailingNumber(a);
-                const trailB = getTrailingNumber(b);
-                if (trailA && trailB && trailA === trailB && (a.includes('/') || b.includes('/') || a.includes('-') || b.includes('-'))) {
-                    return true;
-                }
-                return false;
-            };
-
-            if (rCode && (matchCodes(rCode, cAddr) || matchCodes(rCode, cCode))) return true;
+            if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+            if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+            if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
             if (rName && cName && rName === cName) {
                 if (rPlot && cPlot && rPlot === cPlot) return true;
                 if (rMap && cMap && rMap === cMap) return true;
@@ -387,7 +294,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
       setIsExtending(true);
       
-      const nowStr = formatDateTimeVN(getVietnamNowISO());
+      const nowStr = new Date().toLocaleString('vi-VN');
       const userLabel = currentUser ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})` : 'Hệ thống';
       const extensionNote = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(record.deadline)} -> Hạn mới: ${formatDate(extendDate)}. Lý do: ${extendReason.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
       
@@ -639,29 +546,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <CalendarClock size={17} />
               </button>
             )}
-            {onCreateContract && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && !matchedContract && (
-              <button
-                onClick={() => {
-                  if (onCreateContract) {
-                    onCreateContract(record);
-                    onClose();
-                  }
-                }}
-                className="p-1.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
-                title="Lập hợp đồng mới"
-              >
-                <FileSignature size={17} />
-              </button>
-            )}
-            {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-              <button
-                onClick={() => { onClose(); onCreateLiquidation(record); }}
-                className="p-1.5 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
-                title="Thanh lý HĐ"
-              >
-                <FileCheck size={17} />
-              </button>
-            )}
             {onEdit && (
               <button 
                 onClick={() => { onClose(); onEdit(record); }} 
@@ -839,91 +723,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
                   {/* Hợp đồng liên kết */}
                   {isContract && (
-                    <div className="pt-2 border-t border-slate-100 space-y-3">
-                      {matchedContract ? (
-                        /* ĐÃ CÓ HỢP ĐỒNG LIÊN KẾT */
-                        <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng Số:</span>
-                            <span className="text-[11px] font-bold text-indigo-900 truncate block font-mono">{matchedContract.code}</span>
-                          </div>
-                          <button
-                            onClick={handleUnlinkContract}
-                            disabled={isLinkingContract}
-                            className="text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 p-2 rounded-md border border-red-200 transition-all flex items-center justify-center cursor-pointer shrink-0"
-                            title="Hủy liên kết"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng số:</span>
+                          <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract ? matchedContract.code : 'Chưa có HĐ'}</span>
                         </div>
-                      ) : (
-                        /* CHƯA CÓ HỢP ĐỒNG LIÊN KẾT: Chỉ hiển thị nút Chọn HĐ dạng icon */
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between gap-2">
-                          <span className="text-[10px] text-slate-500 uppercase font-bold">Liên kết hợp đồng:</span>
-                          <button
-                            onClick={() => setShowContractPicker(!showContractPicker)}
-                            className="bg-indigo-600 text-white p-2 rounded-md flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0"
-                            title="Chọn HĐ"
-                          >
-                            <FolderOpen size={13} />
-                          </button>
-                        </div>
-                      )}
-
-                      {/* BỘ CHỌN HỢP ĐỒNG DI ĐỘNG INLINE */}
-                      {showContractPicker && !matchedContract && (() => {
-                        const unassignedContracts = contracts.filter(c => !c.customerAddress || c.customerAddress.trim() === '' || !c.customerAddress.includes('HS-'));
-                        const filteredContracts = unassignedContracts.filter(c => {
-                          const q = contractSearchQuery.trim().toLowerCase();
-                          if (!q) return true;
-                          return (c.code || '').toLowerCase().includes(q) || (c.customerName || '').toLowerCase().includes(q);
-                        });
-
-                        return (
-                          <div className="bg-slate-50 border border-indigo-100 rounded-lg p-3 space-y-2.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-slate-700 uppercase flex items-center gap-1">
-                                <FolderOpen size={12} className="text-indigo-600" />
-                                Chọn HĐ ({unassignedContracts.length})
-                              </span>
-                              <button 
-                                onClick={() => { setShowContractPicker(false); setContractSearchQuery(''); }}
-                                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                            <input 
-                              type="text"
-                              className="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                              placeholder="Tìm nhanh theo Số HĐ hoặc tên khách..."
-                              value={contractSearchQuery}
-                              onChange={(e) => setContractSearchQuery(e.target.value)}
-                            />
-                            <div className="max-h-32 overflow-y-auto space-y-1 divide-y divide-slate-100 border border-slate-200 rounded-md bg-white p-1">
-                              {filteredContracts.length === 0 ? (
-                                <p className="text-[11px] text-slate-500 py-3 text-center italic">Không tìm thấy HĐ nào</p>
-                              ) : (
-                                filteredContracts.map(c => (
-                                  <div
-                                    key={c.id}
-                                    onClick={() => handleLinkContract(c)}
-                                    className="w-full text-left text-[11px] p-2 hover:bg-indigo-50/60 active:bg-indigo-100/60 rounded-md transition-all flex justify-between items-center group cursor-pointer"
-                                  >
-                                    <div className="min-w-0 pr-2">
-                                      <p className="font-bold text-indigo-950 truncate group-hover:text-indigo-600 font-mono">{c.code}</p>
-                                      <p className="text-slate-500 truncate text-[9px]">{c.customerName || 'Chưa rõ tên'}</p>
-                                    </div>
-                                    <button className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all cursor-pointer">
-                                      Chọn
-                                    </button>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -945,211 +751,124 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               </div>
 
               <div className="space-y-0 pt-1">
-                {getRegistrationWorkflowCategory(record.recordType) !== 'unclassified' || isCertificateRecordType(record.recordType) ? (
-                  (() => {
-                      const wf = getRegistrationWorkflow(record.recordType);
-                      const currentIdx = getWorkflowStepIndex((record.status as RecordStatus) || RecordStatus.RECEIVED, wf.steps);
-
-                      return wf.steps.map((step: any, idx: number) => {
-                          const isLast = idx === wf.steps.length - 1;
-                          const isCompleted = idx < currentIdx || record.status === RecordStatus.RETURNED;
-                          const isCurrent = idx === currentIdx;
-                          const stepDate = step.dateField ? (record as any)[step.dateField] : null;
-                          const isActive = Boolean(stepDate) || isCompleted || isCurrent;
-
-                          let colorClass = {
-                              text: 'text-emerald-600',
-                              border: 'border-emerald-600',
-                              bg: 'bg-emerald-600'
-                          };
-
-                          if (step.isTaxPhase) {
-                              colorClass = {
-                                  text: 'text-amber-600',
-                                  border: 'border-amber-600',
-                                  bg: 'bg-amber-600'
-                              };
-                          } else if (isCurrent) {
-                              colorClass = {
-                                  text: 'text-blue-600',
-                                  border: 'border-blue-600',
-                                  bg: 'bg-blue-600'
-                              };
-                          }
-
-                          let detailInfo = '';
-                          if (step.key === RecordStatus.RECEIVED && record.receivedBy) {
-                              const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
-                              const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
-                              const name = receiver?.name || emp?.name || record.receivedBy;
-                              detailInfo = `${name} (${emp?.position || 'Nhân viên'})`;
-                          } else if (step.key === RecordStatus.APPRAISAL && record.assignedTo) {
-                              const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                              if (emp) detailInfo = `${emp.name} (${emp.position || 'Chuyên viên'})`;
-                          } else if (step.key === RecordStatus.PENDING_CHECK && record.checkedBy) {
-                              const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
-                                            users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
-                              if (checker) detailInfo = `${checker.name} (${(checker as any)?.position || 'Người kiểm tra'})`;
-                          } else if (step.key === RecordStatus.PENDING_SIGN && record.submittedTo) {
-                              const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
-                              const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
-                              if (director || emp) detailInfo = `${director?.name || emp?.name} (Lãnh đạo)`;
-                          } else if (step.key === RecordStatus.RETURNED && (record.receiverName || record.returnedBy)) {
-                              detailInfo = record.receiverName ? `Người nhận: ${record.receiverName}` : `Người trả: ${record.returnedBy}`;
-                          } else if (record.assignedTo && (isCurrent || step.key === record.status)) {
-                              const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                              if (emp) {
-                                  detailInfo = `${emp.name} (${emp.position || 'Chuyên viên'})`;
-                              } else {
-                                  detailInfo = record.assignedTo;
-                              }
-                          }
-
-                          const subText = [detailInfo, step.durationLabel ? `SLA: ${step.durationLabel}` : '']
-                              .filter(Boolean)
-                              .join(' • ');
-
-                          return (
-                              <TimelineItem
-                                  key={step.key}
-                                  date={stepDate}
-                                  forceActive={isActive}
-                                  label={step.label}
-                                  icon={step.isTaxPhase ? DollarSign : (step.key === RecordStatus.RETURNED ? FileCheck : UserIcon)}
-                                  isLast={isLast}
-                                  colorClass={colorClass}
-                                  subText={subText || undefined}
-                              />
-                          );
-                      });
-                  })()
-                ) : (
+                <TimelineItem 
+                  date={record.receivedDate} 
+                  label="TIẾP NHẬN" 
+                  icon={UserIcon}
+                  colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                  subText={record.receivedBy ? (() => {
+                      const emp = findMatchingEmployee(record.receivedBy, employees, users);
+                      return emp ? `${emp.name} (${emp.position || 'Nhân viên'})` : record.receivedBy;
+                  })() : undefined}
+                />
+                {isFieldWorkProcedure(record.recordType) ? (
                   <>
                     <TimelineItem 
-                      date={record.receivedDate} 
-                      label="TIẾP NHẬN HỒ SƠ" 
+                      date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
+                      forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
+                      label="ĐO ĐẠC THỰC ĐỊA" 
                       icon={UserIcon}
-                      colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                      subText={record.receivedBy ? (() => {
-                          const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
-                          const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
-                          const name = receiver?.name || emp?.name || record.receivedBy;
-                          return `${name} (${emp?.position || 'Nhân viên'})`;
-                      })() : undefined}
+                      colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                      subText={record.surveyorId ? (() => {
+                          const emp = findMatchingEmployee(record.surveyorId, employees, users);
+                          return `${emp?.name || record.surveyorId} (${emp?.position || 'Chuyên viên Ngoại nghiệp'})`;
+                      })() : (record.assignedTo ? (() => {
+                          const emp = findMatchingEmployee(record.assignedTo, employees, users);
+                          return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
+                      })() : undefined)}
                     />
-                    {isFieldWorkProcedure(record.recordType) ? (
-                      <>
-                        <TimelineItem 
-                          date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
-                          forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
-                          label="ĐO ĐẠC THỰC ĐỊA" 
-                          icon={UserIcon}
-                          colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                          subText={record.surveyorId ? (() => {
-                              const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
-                              return `${emp?.name || record.surveyorId} (${emp?.position || 'Chuyên viên Ngoại nghiệp'})`;
-                          })() : (record.assignedTo ? (() => {
-                              const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                              return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
-                          })() : undefined)}
-                        />
-                        <TimelineItem 
-                          date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
-                          forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
-                          label="BIÊN TẬP BẢN ĐỒ" 
-                          icon={UserIcon}
-                          colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
-                          subText={record.drafterId ? (() => {
-                              const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
-                              return `${emp?.name || record.drafterId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
-                          })() : (isPendingCheckActive && record.assignedTo ? (() => {
-                              const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                              return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
-                          })() : undefined)}
-                        />
-                      </>
-                    ) : isOfficeOnlySurveyProcedure(record.recordType) ? (
-                      <TimelineItem 
-                        date={record.officeAssignedDate || record.assignedDate || record.completedWorkDate} 
-                        forceActive={isWorkDone || !!record.assignedDate || !!record.officeAssignedDate || record.status === RecordStatus.OFFICE_WORK}
-                        label="BIÊN TẬP BẢN ĐỒ" 
-                        icon={UserIcon}
-                        colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
-                        subText={(record.drafterId || record.assignedTo) ? (() => {
-                            const targetId = record.drafterId || record.assignedTo;
-                            const emp = employees.find(e => e.id === targetId || e.name === targetId);
-                            return `${emp?.name || targetId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
-                        })() : undefined}
-                      />
-                    ) : (
-                      <TimelineItem 
-                        date={record.assignedDate || record.completedWorkDate} 
-                        forceActive={isWorkDone || Boolean(record.assignedDate || record.assignedTo || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS)}
-                        label="ĐANG THỰC HIỆN" 
-                        icon={UserIcon}
-                        colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                        subText={record.assignedTo ? (() => {
-                            const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                            return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
-                        })() : undefined}
-                      />
-                    )}
-
-                    {!isArchiveRecordType(record.recordType) && (
-                      <TimelineItem 
-                        date={record.pendingCheckDate || record.checkedDate} 
-                        forceActive={isPendingCheckActive}
-                        label="TRÌNH KIỂM TRA" 
-                        icon={Send}
-                        colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                        subText={(() => {
-                            if (record.checkedBy) {
-                                const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy);
-                                const userChecker = users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
-                                const name = checker?.name || userChecker?.name || record.checkedBy;
-                                return `${name} (${checker?.position || (userChecker as any)?.position || 'Người kiểm tra'})`;
-                            }
-                            if (isPendingCheckActive) {
-                                return 'Chờ phân công kiểm tra';
-                            }
-                            return undefined;
-                        })()}
-                      />
-                    )}
-
                     <TimelineItem 
-                      date={record.submissionDate || record.approvalDate} 
-                      forceActive={isPendingSignActive || isSignedActive}
-                      label="TRÌNH KÝ DUYỆT" 
-                      icon={Send}
-                      colorClass={{text: 'text-purple-600', border: 'border-purple-600', bg: 'bg-purple-600'}}
-                      subText={record.submittedTo ? (() => {
-                          const director = users.find(u => u.employeeId === record.submittedTo || u.id === record.submittedTo || u.name === record.submittedTo);
-                          const emp = employees.find(e => e.id === record.submittedTo || e.id === director?.employeeId || e.name === record.submittedTo);
-                          const name = director?.name || emp?.name || record.submittedTo;
-                          return `${name} (${emp?.position || (director?.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
-                      })() : undefined}
-                    />
-
-                    <TimelineItem 
-                      date={record.completedDate} 
-                      label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
-                      icon={CheckSquare}
-                      isLast={false}
-                      colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
-                      subText={record.exportBatch ? `Đợt xuất: ${getPureBatchNumber(record.exportBatch)}` : undefined}
-                    />
-
-                    <TimelineItem 
-                      date={record.resultReturnedDate} 
-                      label="TRẢ KẾT QUẢ" 
-                      icon={FileCheck}
-                      isLast={true}
-                      colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                      subText={record.receiverName ? `Người nhận: ${record.receiverName}` : (record.returnedBy ? `Người trả: ${record.returnedBy}` : undefined)}
+                      date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
+                      forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
+                      label="BIÊN TẬP BẢN ĐỒ" 
+                      icon={UserIcon}
+                      colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                      subText={record.drafterId ? (() => {
+                          const emp = findMatchingEmployee(record.drafterId, employees, users);
+                          return `${emp?.name || record.drafterId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
+                      })() : (isPendingCheckActive && record.assignedTo ? (() => {
+                          const emp = findMatchingEmployee(record.assignedTo, employees, users);
+                          return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
+                      })() : undefined)}
                     />
                   </>
+                ) : isOfficeOnlySurveyProcedure(record.recordType) ? (
+                  <TimelineItem 
+                    date={record.officeAssignedDate || record.assignedDate || record.completedWorkDate} 
+                    forceActive={isWorkDone || !!record.assignedDate || !!record.officeAssignedDate || record.status === RecordStatus.OFFICE_WORK}
+                    label="BIÊN TẬP BẢN ĐỒ" 
+                    icon={UserIcon}
+                    colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                    subText={(record.drafterId || record.assignedTo) ? (() => {
+                        const targetId = record.drafterId || record.assignedTo;
+                        const emp = findMatchingEmployee(targetId, employees, users);
+                        return `${emp?.name || targetId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
+                    })() : undefined}
+                  />
+                ) : (
+                  <TimelineItem 
+                    date={record.assignedDate || record.completedWorkDate} 
+                    forceActive={isWorkDone || Boolean(record.assignedDate || record.assignedTo || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS)}
+                    label="ĐANG THỰC HIỆN" 
+                    icon={UserIcon}
+                    colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                    subText={record.assignedTo ? (() => {
+                        const emp = findMatchingEmployee(record.assignedTo, employees, users);
+                        return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
+                    })() : undefined}
+                  />
                 )}
+
+                {!isArchiveRecordType(record.recordType) && (
+                  <TimelineItem 
+                    date={record.pendingCheckDate || record.checkedDate} 
+                    forceActive={isPendingCheckActive}
+                    label="TRÌNH KIỂM TRA" 
+                    icon={Send}
+                    colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
+                    subText={(() => {
+                        if (record.checkedBy) {
+                            const checker = findMatchingEmployee(record.checkedBy, employees, users);
+                            const name = checker?.name || record.checkedBy;
+                            return `${name} (${checker?.position || 'Người kiểm tra'})`;
+                        }
+                        if (isPendingCheckActive) {
+                            return 'Chờ phân công kiểm tra';
+                        }
+                        return undefined;
+                    })()}
+                  />
+                )}
+
+                <TimelineItem 
+                  date={record.submissionDate || record.approvalDate} 
+                  forceActive={isPendingSignActive || isSignedActive}
+                  label="TRÌNH KÝ DUYỆT" 
+                  icon={Send}
+                  colorClass={{text: 'text-purple-600', border: 'border-purple-600', bg: 'bg-purple-600'}}
+                  subText={record.submittedTo ? (() => {
+                      const emp = findMatchingEmployee(record.submittedTo, employees, users);
+                      return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
+                  })() : undefined}
+                />
+
+                <TimelineItem 
+                  date={record.completedDate} 
+                  label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
+                  icon={CheckSquare}
+                  isLast={false}
+                  colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
+                  subText={record.exportBatch ? `Đợt xuất: ${getPureBatchNumber(record.exportBatch)}` : undefined}
+                />
+
+                <TimelineItem 
+                  date={record.resultReturnedDate} 
+                  label="TRẢ KẾT QUẢ" 
+                  icon={FileCheck}
+                  isLast={true}
+                  colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                  subText={record.receiverName ? `Người nhận: ${record.receiverName}` : (record.returnedBy ? `Người trả: ${record.returnedBy}` : undefined)}
+                />
               </div>
             </div>
           </div>
