@@ -416,7 +416,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto pt-0 px-3.5 pb-3.5 md:pt-0 md:px-4 md:pb-4 min-h-0">
+      <div className={`flex-1 min-h-0 pt-0 px-3.5 pb-3.5 md:pt-0 md:px-4 md:pb-4 flex flex-col ${viewMode === 'create' ? 'overflow-y-auto' : 'overflow-hidden'}`}>
         {viewMode === 'create' && (
             <RecordForm 
                 initialData={editingRecord}

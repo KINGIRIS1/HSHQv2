@@ -695,8 +695,8 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto pt-0 px-3.5 pb-3.5 md:pt-0 md:px-5 md:pb-5 lg:pt-0 lg:px-6 lg:pb-6 bg-gray-50">
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-gray-50">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3.5 md:p-5 lg:p-6 flex flex-col">
             {activeModule === 'contract' && (
                 <ContractForm 
                     initialData={editingContract}

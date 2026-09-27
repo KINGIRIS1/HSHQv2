@@ -717,7 +717,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             </div>
 
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
+            <div className="p-4 border-b border-gray-100 flex flex-col gap-4 shrink-0">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                         {subTab === 'all' && 'Tất cả hồ sơ sao lục'}

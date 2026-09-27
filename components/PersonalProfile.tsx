@@ -99,16 +99,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   onCreateLiquidation,
   onMapCorrection,
 }) => {
-  // Thêm tab 'pending_sign', 'overdue'
   const [activeTab, setActiveTab] = useState<
     | "all"
     | "pending"
     | "pending_check"
     | "pending_sign"
     | "finished"
-    | "reminder"
-    | "overdue"
   >(isDirector ? "pending_sign" : "pending");
+  const [warningFilter, setWarningFilter] = useState<"none" | "overdue" | "approaching">("none");
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -468,93 +466,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     }
   }, [isChecker]);
 
-  // 0. Tất cả hồ sơ cá nhân
-  const allMyRecords = useMemo(() => {
-    return filterAndSort([...myRecords], searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
-
-  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, FIELD_WORK, OFFICE_WORK, COMPLETED_WORK)
-  const pendingRecords = useMemo(() => {
-    let list = myRecords.filter((r) => {
-      const isExecuting =
-        r.status === RecordStatus.ASSIGNED ||
-        r.status === RecordStatus.IN_PROGRESS ||
-        r.status === RecordStatus.FIELD_WORK ||
-        r.status === RecordStatus.OFFICE_WORK ||
-        r.status === RecordStatus.COMPLETED_WORK;
-      if (!isExecuting) return false;
-
-      // Nếu là trạng thái Nội nghiệp và người dùng là Ngoại nghiệp (đã bàn giao đi cho người khác)
-      if (
-        r.status === RecordStatus.OFFICE_WORK &&
-        r.surveyorId === user.employeeId &&
-        r.assignedTo !== user.employeeId
-      ) {
-        return false;
-      }
-      return true;
-    });
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig, user.employeeId]);
-
-  // 3. Hồ sơ Chờ kiểm tra (PENDING_CHECK) - Dành cho Tổ trưởng/Tổ phó
-  const pendingCheckRecords = useMemo(() => {
-    let list = myRecords.filter(
-      (r) =>
-        r.status === RecordStatus.PENDING_CHECK,
-    );
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
-
-  // 4. Hồ sơ Chờ ký (PENDING_SIGN) - Chuyển thành Tab chính
-  const reviewRecords = useMemo(() => {
-    let list = myRecords.filter((r) => r.status === RecordStatus.PENDING_SIGN);
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
-
-  // 4. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, REJECTED, WITHDRAWN hoặc Ngoại nghiệp đã giao việc Nội nghiệp)
-  const finishedRecords = useMemo(() => {
-    let list = myRecords.filter(
-      (r) =>
-        r.status === RecordStatus.SIGNED ||
-        r.status === RecordStatus.HANDOVER ||
-        r.status === RecordStatus.RETURNED ||
-        r.status === RecordStatus.REJECTED ||
-        r.status === RecordStatus.WITHDRAWN ||
-        (r.surveyorId === user.employeeId && r.assignedTo !== user.employeeId && r.status === RecordStatus.OFFICE_WORK),
-    );
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig, user.employeeId]);
-
-  // 5. Hồ sơ Có hẹn nhắc việc
-  const reminderRecords = useMemo(() => {
-    let list = myRecords.filter(
-      (r) =>
-        r.reminderDate &&
-        r.status !== RecordStatus.HANDOVER &&
-        r.status !== RecordStatus.WITHDRAWN &&
-        r.status !== RecordStatus.REJECTED &&
-        r.status !== RecordStatus.RETURNED,
-    );
-    // Logic search & sort riêng cho reminder
-    if (searchTerm) {
-      const lowerSearch = removeVietnameseTones(searchTerm);
-      const rawSearch = searchTerm.toLowerCase();
-      list = list.filter((r) => {
-        const nameNorm = removeVietnameseTones(r.customerName || "");
-        const codeRaw = (r.code || "").toLowerCase();
-        return nameNorm.includes(lowerSearch) || codeRaw.includes(rawSearch);
-      });
-    }
-    return list.sort((a, b) => {
-      const timeA = new Date(a.reminderDate!).getTime();
-      const timeB = new Date(b.reminderDate!).getTime();
-      return timeA - timeB;
-    });
-  }, [myRecords, searchTerm]);
-
   // Chi tiết thời gian quá hạn chính xác theo quy tắc mới
-  const getOverdueDetails = (record: RecordFile) => {
+  function getOverdueDetails(record: RecordFile): { isOverdue: boolean; totalDays: number; text: string } | null {
     if (
       record.status === RecordStatus.HANDOVER ||
       record.status === RecordStatus.RETURNED ||
@@ -602,20 +515,57 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       totalDays: diffDays,
       text,
     };
-  };
+  }
 
-  // 6. Hồ sơ Quá hạn (chưa hoàn thành và quá hạn trả)
-  const overdueRecords = useMemo(() => {
-    let list = myRecords.filter((r) => getOverdueDetails(r) !== null);
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+  // Helper kiểm tra hồ sơ tới hạn (1 - 3 ngày)
+  function isRecordApproaching(r: RecordFile): boolean {
+    if (
+      r.status === RecordStatus.HANDOVER ||
+      r.status === RecordStatus.RETURNED ||
+      r.status === RecordStatus.WITHDRAWN ||
+      r.status === RecordStatus.REJECTED ||
+      r.status === RecordStatus.SIGNED ||
+      r.exportBatch ||
+      r.exportDate ||
+      r.resultReturnedDate
+    ) {
+      return false;
+    }
+    if (getOverdueDetails(r) !== null) return false;
+    if (!r.deadline) return false;
+    const deadline = parseSafeDate(r.deadline);
+    if (!deadline) return false;
 
-  const totalOverdueCount = useMemo(() => {
-    return myRecords.filter((r) => getOverdueDetails(r) !== null).length;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadline.setHours(0, 0, 0, 0);
+
+    const diffTime = deadline.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 3;
+  }
+
+  const warningCount = useMemo(() => {
+    let overdue = 0;
+    let approaching = 0;
+    myRecords.forEach((r) => {
+      if (getOverdueDetails(r) !== null) {
+        overdue++;
+      } else if (isRecordApproaching(r)) {
+        approaching++;
+      }
+    });
+    return { overdue, approaching };
   }, [myRecords]);
 
-  // Helper filter & sort chung
   function filterAndSort(list: RecordFile[], term: string, sort: any) {
+    // 0. Warning filter
+    if (warningFilter === "overdue") {
+      list = list.filter((r) => getOverdueDetails(r) !== null);
+    } else if (warningFilter === "approaching") {
+      list = list.filter((r) => isRecordApproaching(r));
+    }
+
     // 1. Time range filter
     if (filterFromDate) {
       list = list.filter(r => {
@@ -669,6 +619,64 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     });
   }
 
+  // 0. Tất cả hồ sơ cá nhân
+  const allMyRecords = useMemo(() => {
+    return filterAndSort([...myRecords], searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig, warningFilter, filterFromDate, filterToDate, filterRecordType, filterStatus]);
+
+  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, FIELD_WORK, OFFICE_WORK, COMPLETED_WORK)
+  const pendingRecords = useMemo(() => {
+    let list = myRecords.filter((r) => {
+      const isExecuting =
+        r.status === RecordStatus.ASSIGNED ||
+        r.status === RecordStatus.IN_PROGRESS ||
+        r.status === RecordStatus.FIELD_WORK ||
+        r.status === RecordStatus.OFFICE_WORK ||
+        r.status === RecordStatus.COMPLETED_WORK;
+      if (!isExecuting) return false;
+
+      // Nếu là trạng thái Nội nghiệp và người dùng là Ngoại nghiệp (đã bàn giao đi cho người khác)
+      if (
+        r.status === RecordStatus.OFFICE_WORK &&
+        r.surveyorId === user.employeeId &&
+        r.assignedTo !== user.employeeId
+      ) {
+        return false;
+      }
+      return true;
+    });
+    return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig, user.employeeId, warningFilter, filterFromDate, filterToDate, filterRecordType, filterStatus]);
+
+  // 3. Hồ sơ Chờ kiểm tra (PENDING_CHECK) - Dành cho Tổ trưởng/Tổ phó
+  const pendingCheckRecords = useMemo(() => {
+    let list = myRecords.filter(
+      (r) =>
+        r.status === RecordStatus.PENDING_CHECK,
+    );
+    return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig, warningFilter, filterFromDate, filterToDate, filterRecordType, filterStatus]);
+
+  // 4. Hồ sơ Chờ ký (PENDING_SIGN) - Chuyển thành Tab chính
+  const reviewRecords = useMemo(() => {
+    let list = myRecords.filter((r) => r.status === RecordStatus.PENDING_SIGN);
+    return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig, warningFilter, filterFromDate, filterToDate, filterRecordType, filterStatus]);
+
+  // 4. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, REJECTED, WITHDRAWN hoặc Ngoại nghiệp đã giao việc Nội nghiệp)
+  const finishedRecords = useMemo(() => {
+    let list = myRecords.filter(
+      (r) =>
+        r.status === RecordStatus.SIGNED ||
+        r.status === RecordStatus.HANDOVER ||
+        r.status === RecordStatus.RETURNED ||
+        r.status === RecordStatus.REJECTED ||
+        r.status === RecordStatus.WITHDRAWN ||
+        (r.surveyorId === user.employeeId && r.assignedTo !== user.employeeId && r.status === RecordStatus.OFFICE_WORK),
+    );
+    return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig, user.employeeId, warningFilter, filterFromDate, filterToDate, filterRecordType, filterStatus]);
+
   // Tổng hợp các chỉ số
   const completedTotal = finishedRecords.length;
 
@@ -682,11 +690,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           ? pendingCheckRecords
           : activeTab === "pending_sign"
             ? reviewRecords
-            : activeTab === "finished"
-              ? finishedRecords
-              : activeTab === "overdue"
-                ? overdueRecords
-                : reminderRecords;
+            : finishedRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
 
@@ -1537,10 +1541,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return "Trình ký";
       case "finished":
         return "Hoàn thành";
-      case "overdue":
-        return "Quá hạn";
-      case "reminder":
-        return "Nhắc việc";
       default:
         return "danh sách";
     }
@@ -1576,7 +1576,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             Danh sách hồ sơ bạn đang phụ trách.
           </p>
         </div>
-        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-3 sm:grid-cols-5"} sm:flex gap-1.5 md:gap-3 w-full md:w-auto justify-center`}>
+        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-3 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"} sm:flex gap-1.5 md:gap-3 w-full md:w-auto justify-center`}>
           <div 
             onClick={() => { setActiveTab("all"); setCurrentPage(1); setSearchTerm(""); }}
             className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-slate-50 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm bg-slate-100" : "border-slate-200 hover:border-slate-400"} min-w-0 md:min-w-[95px] flex flex-col justify-center`}
@@ -1624,67 +1624,62 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               Hoàn thành
             </div>
           </div>
-          <div 
-            onClick={() => { setActiveTab("overdue"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2 bg-red-50/70 rounded-lg border ${activeTab === "overdue" ? "ring-2 ring-red-500 border-red-500 font-extrabold shadow-sm bg-red-100/90" : "border-red-200 hover:border-red-400"} min-w-0 md:min-w-[110px] flex flex-col justify-center relative`}
-            title="Xem danh sách hồ sơ quá hạn"
-          >
-            <div className="flex items-center justify-center gap-1.5">
-              <span className="text-xs md:text-sm text-red-700 uppercase font-bold tracking-wide leading-tight flex items-center gap-1">
-                🔴 Quá hạn
-              </span>
-              {totalOverdueCount > 0 && (
-                <span className="bg-red-600 text-white text-[10px] md:text-xs font-black px-1.5 py-0.5 rounded-full shadow-xs leading-none">
-                  {totalOverdueCount}
-                </span>
-              )}
-            </div>
-          </div>
         </div>
       </div>
 
       {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
         {/* SEARCH & ACTIONS */}
-        <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2.5 shrink-0 w-full">
-          <div className="relative flex-1 sm:w-64 min-w-0">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder={`Tìm trong ${getTabLabel()}...`}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
+        <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-2.5 shrink-0 w-full flex-wrap">
+          {/* Cụm nút cảnh báo Trễ hạn / Tới hạn ở bên trái */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() =>
+                setWarningFilter((prev) => (prev === "overdue" ? "none" : "overdue"))
+              }
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border shrink-0 ${
+                warningFilter === "overdue"
+                  ? "bg-red-600 text-white border-red-600"
+                  : "bg-white text-red-600 border-red-200 hover:bg-red-50"
+              }`}
+              title="Lọc hồ sơ quá hạn"
+            >
+              <AlertTriangle size={16} /> {warningCount.overdue}
+            </button>
+            <button
+              onClick={() =>
+                setWarningFilter((prev) => (prev === "approaching" ? "none" : "approaching"))
+              }
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border shrink-0 ${
+                warningFilter === "approaching"
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
+              }`}
+              title="Lọc hồ sơ tới hạn"
+            >
+              <Clock size={16} /> {warningCount.approaching}
+            </button>
           </div>
 
-          {!isDirector && (
-            <button
-              onClick={() => {
-                setActiveTab(activeTab === "reminder" ? "pending" : "reminder");
-                setCurrentPage(1);
-                setSearchTerm("");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shadow-sm border shrink-0 cursor-pointer ${
-                activeTab === "reminder"
-                  ? "bg-pink-600 text-white border-pink-700"
-                  : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
-              }`}
-              title={`Nhắc việc (${reminderRecords.length})`}
-            >
-              <Bell size={16} />
-              <span className="hidden sm:inline">({reminderRecords.length})</span>
-            </button>
-          )}
+          {/* Cụm Tìm kiếm (sát cạnh nút lọc), Bộ lọc & Xuất Excel ở bên phải */}
+          <div className="flex items-center gap-2.5 flex-1 sm:w-auto justify-end max-w-xl">
+            <div className="relative flex-1 sm:w-64 min-w-0">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder={`Tìm trong ${getTabLabel()}...`}
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
 
-          {/* Cụm Bộ lọc & Xuất Excel ngoài cùng bên tay phải */}
-          <div className="flex items-center gap-2 shrink-0">
             {/* LỌC BUTTON (POPOVER LIKE ĐO ĐẠC) */}
             <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
               <button
@@ -1877,13 +1872,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                       </th>
 
                       <th className="p-3 w-[150px]">
-                        {activeTab === "reminder" ? (
-                          <div className="flex items-center gap-1 text-pink-600">
-                            <CalendarClock size={14} /> Thời gian nhắc
-                          </div>
-                        ) : (
-                          renderSortHeader("Hẹn trả", "deadline")
-                        )}
+                        {renderSortHeader("Hẹn trả", "deadline")}
                       </th>
 
                       {activeTab === "pending_check" && (
@@ -1899,14 +1888,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                     {paginatedDisplayRecords.map((r, index) => {
                       const deadlineStatus = getDeadlineStatus(r);
                       const isSelected = selectedIds.has(r.id);
-                      const rowClass =
-                        activeTab === "reminder"
-                          ? isSelected
-                            ? "bg-pink-100/70 hover:bg-pink-100"
-                            : "hover:bg-pink-50/50 bg-pink-50/10"
-                          : isSelected
-                            ? "bg-blue-50/70 hover:bg-blue-100/70"
-                            : "hover:bg-blue-50/50";
+                      const rowClass = isSelected
+                        ? "bg-blue-50/70 hover:bg-blue-100/70"
+                        : "hover:bg-blue-50/50";
 
                       return (
                         <tr 
@@ -1952,34 +1936,27 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           </td>
 
                           <td className="p-3 align-middle">
-                            {activeTab === "reminder" ? (
-                              <div className="flex items-center gap-1.5 text-pink-700 font-bold bg-pink-100 px-2 py-1 rounded w-fit text-xs">
-                                <Bell size={12} className="fill-pink-700" />
-                                {formatDateTime(r.reminderDate || undefined)}
+                            <div>
+                              <div
+                                className={`flex items-center gap-1.5 ${deadlineStatus.color}`}
+                              >
+                                {deadlineStatus.icon}
+                                <span>{formatDate(r.deadline || undefined)}</span>
+                                <span className="text-[10px] uppercase ml-1">
+                                  {deadlineStatus.text}
+                                </span>
                               </div>
-                            ) : (
-                              <div>
-                                <div
-                                  className={`flex items-center gap-1.5 ${deadlineStatus.color}`}
-                                >
-                                  {deadlineStatus.icon}
-                                  <span>{formatDate(r.deadline || undefined)}</span>
-                                  <span className="text-[10px] uppercase ml-1">
-                                    {deadlineStatus.text}
-                                  </span>
-                                </div>
-                                {(() => {
-                                  const overdueInfo = getOverdueDetails(r);
-                                  if (!overdueInfo) return null;
-                                  return (
-                                    <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-600 text-white text-[11px] font-bold shadow-xs">
-                                      <span>🔴</span>
-                                      <span>{overdueInfo.text}</span>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            )}
+                              {(() => {
+                                const overdueInfo = getOverdueDetails(r);
+                                if (!overdueInfo) return null;
+                                return (
+                                  <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-600 text-white text-[11px] font-bold shadow-xs">
+                                    <span>🔴</span>
+                                    <span>{overdueInfo.text}</span>
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </td>
 
                           {activeTab === "pending_check" && (
@@ -2171,20 +2148,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                         </div>
                         
                         <div className="flex items-center gap-1.5 col-span-2">
-                          {activeTab === "reminder" ? (
-                            <div className="flex items-center gap-1 text-pink-700 font-bold bg-pink-50 px-2 py-0.5 rounded text-[11px]">
-                              <Bell size={10} className="fill-pink-700" />
-                              <span>Nhắc: {formatDateTime(r.reminderDate || undefined)}</span>
-                            </div>
-                          ) : (
-                            <div className={`flex items-center gap-1 ${deadlineStatus.color} font-medium`}>
-                              {deadlineStatus.icon || <Clock size={12} />}
-                              <span>Hẹn trả: {formatDate(r.deadline || undefined)}</span>
-                              <span className="text-[9px] uppercase px-1 bg-current/10 rounded ml-1">
-                                {deadlineStatus.text}
-                              </span>
-                            </div>
-                          )}
+                          <div className={`flex items-center gap-1 ${deadlineStatus.color} font-medium`}>
+                            {deadlineStatus.icon || <Clock size={12} />}
+                            <span>Hẹn trả: {formatDate(r.deadline || undefined)}</span>
+                            <span className="text-[9px] uppercase px-1 bg-current/10 rounded ml-1">
+                              {deadlineStatus.text}
+                            </span>
+                          </div>
                         </div>
 
                         {activeTab === "pending_check" && r.checkedBy && (
