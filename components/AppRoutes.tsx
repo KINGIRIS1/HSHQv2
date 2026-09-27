@@ -97,6 +97,7 @@ import {
   FileCheck2,
   UserCheck,
   ArrowRight,
+  BookOpen,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -819,7 +820,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onClick={() => props.setCurrentView("test_records")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
-                    <FileText size={16} /> Tất cả
+                    <FileText size={16} /> Tất cả hồ sơ
                   </button>
                 )}
 
@@ -888,6 +889,16 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
                 <CheckSquare size={16} /> Hoàn thành
+              </button>
+            )}
+
+            {!isDirector && (
+              <button
+                id="tab-test-records-vaoso"
+                onClick={() => props.setCurrentView("vao_so")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "vao_so" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <BookOpen size={16} /> Vô số GCN
               </button>
             )}
 
@@ -2122,7 +2133,114 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "vao_so":
-      return <VaoSoView currentUser={currentUser} wards={wards} />;
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
+          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto shrink-0">
+            {!isDirector && (
+              <>
+                {isViewAllowedForUser(currentUser, employees, "test_records", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-test-records-all"
+                    onClick={() => props.setCurrentView("test_records")}
+                    className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+                  >
+                    <FileText size={16} /> Tất cả
+                  </button>
+                )}
+
+                {isViewAllowedForUser(currentUser, employees, "test_assign_tasks", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-test-records-assign-tasks"
+                    onClick={() => props.setCurrentView("test_assign_tasks")}
+                    className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+                  >
+                    <UserPlusIcon size={16} /> Chưa giao
+                  </button>
+                )}
+
+                {isViewAllowedForUser(currentUser, employees, "test_completed_list", rolePermissions, departmentPermissions) && (
+                  <>
+                    <button
+                      id="tab-test-records-measurement-field"
+                      onClick={() => props.setCurrentView("test_measurement_field")}
+                      className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+                    >
+                      <Compass size={16} /> Thẩm định
+                    </button>
+                    <button
+                      id="tab-test-records-measurement-office"
+                      onClick={() => props.setCurrentView("test_measurement_office")}
+                      className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+                    >
+                      <PenTool size={16} /> Thuế
+                    </button>
+                    <button
+                      id="tab-test-records-print-cert"
+                      onClick={() => props.setCurrentView("test_print_cert")}
+                      className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+                    >
+                      <Printer size={16} /> In GCN
+                    </button>
+                  </>
+                )}
+
+                {isViewAllowedForUser(currentUser, employees, "test_pending_check_list", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-test-records-pending-check-list"
+                    onClick={() => props.setCurrentView("test_pending_check_list")}
+                    className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+                  >
+                    <ClipboardList size={16} /> Kiểm tra
+                  </button>
+                )}
+              </>
+            )}
+
+            {isViewAllowedForUser(currentUser, employees, "test_check_list", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-check-list"
+                onClick={() => props.setCurrentView("test_check_list")}
+                className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+              >
+                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
+              </button>
+            )}
+
+            {isDirector && isViewAllowedForUser(currentUser, employees, "test_director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-director-completed"
+                onClick={() => props.setCurrentView("test_director_completed")}
+                className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+              >
+                <CheckSquare size={16} /> Hoàn thành
+              </button>
+            )}
+
+            {!isDirector && (
+              <button
+                id="tab-test-records-vaoso"
+                onClick={() => props.setCurrentView("vao_so")}
+                className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-purple-600 text-purple-700 bg-white"
+              >
+                <BookOpen size={16} /> Vô số GCN
+              </button>
+            )}
+
+            {!isDirector && isViewAllowedForUser(currentUser, employees, "test_handover_list", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-handover-list"
+                onClick={() => props.setCurrentView("test_handover_list")}
+                className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+              >
+                <Send size={16} /> Giao 1 cửa
+              </button>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <VaoSoView currentUser={currentUser} wards={wards} parentRecords={records} />
+          </div>
+        </div>
+      );
     case "barcode_generator":
       return <BarcodeGeneratorView />;
     case "account_settings":

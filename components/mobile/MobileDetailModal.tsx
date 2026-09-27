@@ -17,7 +17,7 @@ import { updateRecordApi, fetchContracts } from '../../services/api';
 import { previewAttachment, downloadAttachment, isPreviewableFile } from '../../services/attachmentStorage';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../../utils/appHelpers';
+import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName, findMatchingEmployee, resolveEmployeeName } from '../../utils/appHelpers';
 import { checkUserPermission, hasRecordActionPermission } from '../../utils/permissionUtils';
 
 interface MobileDetailModalProps {
@@ -546,6 +546,15 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <CalendarClock size={17} />
               </button>
             )}
+            {onCreateContract && !matchedContract && record && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+              <button 
+                onClick={() => { onClose(); onCreateContract(record); }}
+                className="p-1.5 text-purple-600 hover:bg-purple-50 active:bg-purple-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                title="Lập hợp đồng cho hồ sơ này"
+              >
+                <FileSignature size={17} />
+              </button>
+            )}
             {onEdit && (
               <button 
                 onClick={() => { onClose(); onEdit(record); }} 
@@ -727,7 +736,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                       <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng số:</span>
-                          <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract ? matchedContract.code : 'Chưa có HĐ'}</span>
+                          <span className="text-[11px] font-bold text-indigo-900 truncate block">
+                            {matchedContract ? matchedContract.code : ''}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -757,10 +768,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   icon={UserIcon}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                   subText={record.receivedBy ? (() => {
-                      const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
-                      const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
-                      const name = receiver?.name || emp?.name || record.receivedBy;
-                      return `${name} (${emp?.position || 'Nhân viên'})`;
+                      const emp = findMatchingEmployee(record.receivedBy, employees, users);
+                      return emp ? `${emp.name} (${emp.position || 'Nhân viên'})` : record.receivedBy;
                   })() : undefined}
                 />
                 {isFieldWorkProcedure(record.recordType) ? (
@@ -772,10 +781,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                       icon={UserIcon}
                       colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
                       subText={record.surveyorId ? (() => {
-                          const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
+                          const emp = findMatchingEmployee(record.surveyorId, employees, users);
                           return `${emp?.name || record.surveyorId} (${emp?.position || 'Chuyên viên Ngoại nghiệp'})`;
                       })() : (record.assignedTo ? (() => {
-                          const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                          const emp = findMatchingEmployee(record.assignedTo, employees, users);
                           return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
                       })() : undefined)}
                     />
@@ -786,10 +795,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                       icon={UserIcon}
                       colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
                       subText={record.drafterId ? (() => {
-                          const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
+                          const emp = findMatchingEmployee(record.drafterId, employees, users);
                           return `${emp?.name || record.drafterId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
                       })() : (isPendingCheckActive && record.assignedTo ? (() => {
-                          const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                          const emp = findMatchingEmployee(record.assignedTo, employees, users);
                           return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
                       })() : undefined)}
                     />
@@ -803,7 +812,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                     colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
                     subText={(record.drafterId || record.assignedTo) ? (() => {
                         const targetId = record.drafterId || record.assignedTo;
-                        const emp = employees.find(e => e.id === targetId || e.name === targetId);
+                        const emp = findMatchingEmployee(targetId, employees, users);
                         return `${emp?.name || targetId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
                     })() : undefined}
                   />
@@ -815,7 +824,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                     icon={UserIcon}
                     colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
                     subText={record.assignedTo ? (() => {
-                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                        const emp = findMatchingEmployee(record.assignedTo, employees, users);
                         return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
                     })() : undefined}
                   />
@@ -830,10 +839,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                     colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
                     subText={(() => {
                         if (record.checkedBy) {
-                            const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy);
-                            const userChecker = users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
-                            const name = checker?.name || userChecker?.name || record.checkedBy;
-                            return `${name} (${checker?.position || (userChecker as any)?.position || 'Người kiểm tra'})`;
+                            const checker = findMatchingEmployee(record.checkedBy, employees, users);
+                            const name = checker?.name || record.checkedBy;
+                            return `${name} (${checker?.position || 'Người kiểm tra'})`;
                         }
                         if (isPendingCheckActive) {
                             return 'Chờ phân công kiểm tra';
@@ -850,10 +858,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   icon={Send}
                   colorClass={{text: 'text-purple-600', border: 'border-purple-600', bg: 'bg-purple-600'}}
                   subText={record.submittedTo ? (() => {
-                      const director = users.find(u => u.employeeId === record.submittedTo || u.id === record.submittedTo || u.name === record.submittedTo);
-                      const emp = employees.find(e => e.id === record.submittedTo || e.id === director?.employeeId || e.name === record.submittedTo);
-                      const name = director?.name || emp?.name || record.submittedTo;
-                      return `${name} (${emp?.position || (director?.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
+                      const emp = findMatchingEmployee(record.submittedTo, employees, users);
+                      return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
                   })() : undefined}
                 />
 

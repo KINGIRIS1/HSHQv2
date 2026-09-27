@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { RecordFile, Holiday, RecordStatus, User, Employee, AttachedDocItem, AttachedFileMeta } from '../../types';
+import { RecordFile, Holiday, RecordStatus, User, Employee, AttachedDocItem, AttachedFileMeta, CertificateOwnerItem } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel, isCertificateRecordType } from '../../constants';
 import { getDepartmentForRecord } from '../../utils/appHelpers';
 import { getVerifiedUniqueRecordCode, checkRecordCodeExistsInDb } from '../../services/apiRecords';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile } from '../../services/attachmentStorage';
-import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2 } from 'lucide-react';
+import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2, Trash2, Users } from 'lucide-react';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
@@ -276,6 +276,59 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       setFormData(prev => ({ ...prev, otherDocs: JSON.stringify(updatedDocs) }));
   };
 
+  // Lấy danh sách đồng sở hữu (đảm bảo Người số 1 luôn khớp với Chủ sử dụng chính)
+  const getCertificateOwners = (): CertificateOwnerItem[] => {
+    const list = formData.certificateOwners || [];
+    const firstOwner: CertificateOwnerItem = {
+      fullName: formData.customerName || '',
+      cccd: formData.cccd || '',
+      address: formData.customerAddress || ''
+    };
+    if (list.length === 0) {
+      return [firstOwner];
+    }
+    const updated = [...list];
+    updated[0] = {
+      ...updated[0],
+      fullName: firstOwner.fullName,
+      cccd: firstOwner.cccd,
+      address: firstOwner.address
+    };
+    return updated;
+  };
+
+  const handleAddOwner = () => {
+    const currentList = getCertificateOwners();
+    const newList = [...currentList, { fullName: '', cccd: '', address: '' }];
+    setFormData(prev => ({
+      ...prev,
+      certificateOwners: newList
+    }));
+  };
+
+  const handleOwnerChange = (index: number, field: keyof CertificateOwnerItem, value: string) => {
+    const currentList = getCertificateOwners();
+    const newList = currentList.map((owner, idx) => {
+      if (idx === index) {
+        return { ...owner, [field]: value };
+      }
+      return owner;
+    });
+    setFormData(prev => ({
+      ...prev,
+      certificateOwners: newList
+    }));
+  };
+
+  const handleRemoveOwner = (index: number) => {
+    const currentList = getCertificateOwners();
+    const newList = currentList.filter((_, idx) => idx !== index);
+    setFormData(prev => ({
+      ...prev,
+      certificateOwners: newList
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setNotification(null);
@@ -345,6 +398,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       attachedFiles: formData.attachedFiles || [],
       otherDocs: JSON.stringify(attachedDocs),
       dossierComponents: formData.dossierComponents,
+      certificateOwners: getCertificateOwners(),
     };
 
     const recType = updatedFormData.recordType || '';
@@ -522,6 +576,108 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     )}
                 </div>
 
+                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
+                    <div className="flex items-center justify-between border-b pb-2 border-slate-100 mb-3">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                            <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
+                                <Users size={14} />
+                            </span> 
+                            Người đứng tên GCN
+                        </h3>
+                            <button
+                                type="button"
+                                onClick={handleAddOwner}
+                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-indigo-200"
+                            >
+                                <Plus size={14} /> Thêm mới
+                            </button>
+                        </div>
+
+                        <div className="overflow-x-auto border border-slate-100 rounded-lg">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200">
+                                        <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[5%] text-center">STT</th>
+                                        <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[35%]">Họ tên chủ hồ sơ *</th>
+                                        <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[25%]">Giấy CMND/ CCCD *</th>
+                                        <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[30%]">Địa chỉ chủ sử dụng</th>
+                                        <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[5%] text-center">Xóa</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {getCertificateOwners().map((owner, idx) => {
+                                        const isFirst = idx === 0;
+                                        return (
+                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-3 py-2 text-xs font-bold text-slate-600 text-center font-mono">
+                                                    {idx + 1}
+                                                </td>
+                                                <td className="px-3 py-1.5">
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        disabled={isFirst}
+                                                        placeholder="Họ và tên..."
+                                                        className={`w-full text-xs sm:text-sm font-semibold rounded-lg px-2.5 py-1.5 border transition-all ${
+                                                            isFirst 
+                                                                ? 'bg-slate-100/80 border-slate-200 text-slate-500 cursor-not-allowed font-bold' 
+                                                                : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10'
+                                                        }`}
+                                                        value={owner.fullName}
+                                                        onChange={(e) => handleOwnerChange(idx, 'fullName', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-1.5">
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        disabled={isFirst}
+                                                        placeholder="Số CCCD..."
+                                                        className={`w-full text-xs sm:text-sm rounded-lg px-2.5 py-1.5 border transition-all ${
+                                                            isFirst 
+                                                                ? 'bg-slate-100/80 border-slate-200 text-slate-500 cursor-not-allowed font-medium' 
+                                                                : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10'
+                                                        }`}
+                                                        value={owner.cccd}
+                                                        onChange={(e) => handleOwnerChange(idx, 'cccd', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-1.5">
+                                                    <input
+                                                        type="text"
+                                                        disabled={isFirst}
+                                                        placeholder="Địa chỉ..."
+                                                        className={`w-full text-xs sm:text-sm rounded-lg px-2.5 py-1.5 border transition-all ${
+                                                            isFirst 
+                                                                ? 'bg-slate-100/80 border-slate-200 text-slate-500 cursor-not-allowed font-medium' 
+                                                                : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10'
+                                                        }`}
+                                                        value={owner.address || ''}
+                                                        onChange={(e) => handleOwnerChange(idx, 'address', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-1.5 text-center">
+                                                    {!isFirst ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveOwner(idx)}
+                                                            className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                                            title="Xóa dòng này"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[10px] font-bold text-indigo-500 select-none uppercase font-mono">Đại diện</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 {/* Thông tin giấy chứng nhận */}
                 <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 flex items-center gap-1.5 border-b pb-2 border-slate-100">
@@ -561,8 +717,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                             <div className="bg-green-50/60 p-2.5 rounded-xl border border-green-100 grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
                                 <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Tờ bản đồ</label><input type="text" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.mapSheet || ''} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
                                 <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Thửa đất</label><input type="text" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.landPlot || ''} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
-                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Tổng dt (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.area || ''} onChange={(e) => handleChange('area', e.target.value)} /></div>
-                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">ONT/ODT (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Tổng dt (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.area || ''} onChange={(e) => handleChange('area', e.target.value === '' ? null : parseFloat(e.target.value))} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">ONT/ODT (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value === '' ? null : parseFloat(e.target.value))} /></div>
                             </div>
                         </div>
                     )}

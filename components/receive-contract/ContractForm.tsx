@@ -15,14 +15,13 @@ interface ContractFormProps {
   generateCode: (contractType?: string, customYear?: number) => Promise<string>;
   mode: 'contract' | 'liquidation'; // New prop
   contracts?: Contract[];
-  onOpenGetNumberModal?: () => void;
 }
 
 function _nd(s: string | undefined | null): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts, onOpenGetNumberModal }) => {
+const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts }) => {
   const [activeTab, setActiveTab] = useState<'dd' | 'tt' | 'cm' | 'tl'>('dd');
   const [tachThuaItems, setTachThuaItems] = useState<SplitItem[]>([]);
   const [searchCode, setSearchCode] = useState('');
@@ -528,7 +527,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id);
       if (isExistingContract && !formData.code) {
-          setNotification({ type: 'error', message: "Vui lòng kiểm tra Mã hợp đồng." }); 
+          setNotification({ type: 'error', message: "Vui lòng kiểm tra Số hợp đồng." }); 
           return; 
       }
       if (!formData.customerName) { 
@@ -608,7 +607,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       if (savedCode) {
           const msg = initialData ? 'Cập nhật thành công!' : 'Đã tạo mới thành công!';
-          setNotification({ type: 'success', message: `${msg} Mã hợp đồng: ${savedCode}` });
+          setNotification({ type: 'success', message: `${msg} Số hợp đồng: ${savedCode}` });
           
           // Cập nhật lại code mới chốt chính thức vào form
           setFormData(prev => ({ 
@@ -864,43 +863,38 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-3.5 space-y-3.5">
                     {/* Basic Info */}
-                    <div className={`grid ${mode === 'liquidation' ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200`}>
+                    <div className={`grid ${mode === 'liquidation' ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 items-start`}>
                         {mode !== 'liquidation' && (
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className={labelClass}>Mã Hợp Đồng (Nhập tay / Tự động)</label>
-                                    {onOpenGetNumberModal && (
-                                        <button
-                                            type="button"
-                                            onClick={onOpenGetNumberModal}
-                                            className="text-[11px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1 transition-all"
-                                        >
-                                            <Wand2 size={12} /> Lấy số
-                                        </button>
-                                    )}
-                                </div>
+                            <div className="flex flex-col">
+                                <label className={labelClass}>Số hợp đồng</label>
                                 <div>
                                     <input 
                                         type="text" 
-                                        className={`${inputClass} font-mono font-bold text-purple-700 bg-white border-purple-300 focus:border-purple-500`} 
+                                        className={`${inputClass} font-bold text-purple-700 bg-slate-100/90 border-slate-300 cursor-not-allowed select-all`} 
                                         value={formData.code ?? ''} 
-                                        onChange={e => handleChange('code', e.target.value)}
-                                        placeholder="Để trống để tự động cấp số..."
+                                        readOnly
+                                        title="Số hợp đồng được hệ thống cấp tự động"
+                                        placeholder="Đang cấp số tự động..."
                                     />
                                 </div>
                             </div>
                         )}
                         {mode !== 'liquidation' && (
-                            <div>
+                            <div className="flex flex-col">
                                 <label className={labelClass}>Ngày lập</label>
                                 <div>
-                                    <input type="date" className={inputClass} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
+                                    <input 
+                                        type="date" 
+                                        className={inputClass} 
+                                        value={dateVal(formData.createdDate)} 
+                                        onChange={e => handleChange('createdDate', e.target.value)} 
+                                    />
                                 </div>
                             </div>
                         )}
 
                         {mode === 'liquidation' && (
-                            <div>
+                            <div className="flex flex-col">
                                 <label className={labelClass}>Ngày thanh lý HĐ</label>
                                 <div>
                                     <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />

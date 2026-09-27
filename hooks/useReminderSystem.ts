@@ -5,19 +5,9 @@ import { updateRecordFieldsApi } from '../services/api';
 const REMINDER_INTERVAL = 60000; // Kiểm tra mỗi 1 phút
 const REPEAT_HOURS = 2; // Nhắc lại mỗi 2 giờ
 
-// Helper gửi thông báo hệ thống (Notification API)
-const triggerSystemNotification = (title: string, body: string) => {
-    if (window.electronAPI && window.electronAPI.showNotification) {
-        window.electronAPI.showNotification(title, body);
-    } else if (Notification.permission === 'granted') {
-        new Notification(title, { body });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                new Notification(title, { body });
-            }
-        });
-    }
+// Helper gửi thông báo hệ thống đã được tắt theo yêu cầu (toàn bộ hiển thị nội bộ trong phần mềm)
+const triggerSystemNotification = (_title: string, _body: string) => {
+    // Đã tắt hoàn toàn thông báo thời gian thực ngoài phần mềm (desktop / browser notification)
 };
 
 export const useReminderSystem = (
@@ -25,16 +15,24 @@ export const useReminderSystem = (
     onUpdateRecord: (id: string, fields: Partial<RecordFile>) => void,
     currentUser: User | null
 ) => {
-    // Tính toán số lượng nhắc nhở active bằng useMemo thay vì useEffect + useState
+    // Tính toán số lượng nhắc nhở active phân luồng chặt chẽ theo tài khoản người dùng
     const activeRemindersCount = useMemo(() => {
         const now = Date.now();
         return records.filter(r => {
             if (!r.reminderDate) return false;
-            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) return false;
+            if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED) return false;
+            
+            // Phân luồng theo tài khoản: Nhân viên chỉ thấy việc của mình
+            if (currentUser && currentUser.role === UserRole.EMPLOYEE) {
+                const isAssigned = currentUser.employeeId && r.assignedTo === currentUser.employeeId;
+                const isReceived = currentUser.username && r.receivedBy === currentUser.username;
+                if (!isAssigned && !isReceived) return false;
+            }
+
             const reminderTime = new Date(r.reminderDate).getTime();
             return reminderTime <= now;
         }).length;
-    }, [records]);
+    }, [records, currentUser]);
 
     // Dùng ref để tránh việc effect chạy lại mỗi khi records thay đổi
     const recordsRef = useRef(records);

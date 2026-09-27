@@ -5,7 +5,7 @@ import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRec
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown, Filter, SlidersHorizontal } from 'lucide-react';
-import { confirmAction, toTitleCase } from '../../utils/appHelpers';
+import { confirmAction, toTitleCase, resolveEmployeeName } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
@@ -234,8 +234,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
     // Helper để lấy tên nhân viên từ ID
     const getEmployeeName = (id?: string) => {
         if (!id) return '-';
-        const emp = employees.find(e => e.id === id);
-        return emp ? emp.name : id;
+        return resolveEmployeeName(id, employees) || id;
     };
 
     const handleSave = async (e: React.FormEvent) => {

@@ -8,7 +8,6 @@ interface NetworkPingIndicatorProps {
 
 export const NetworkPingIndicator: React.FC<NetworkPingIndicatorProps> = ({
   className = '',
-  isCompact = false,
 }) => {
   const [latency, setLatency] = useState<number | null>(null);
   const [isPinging, setIsPinging] = useState<boolean>(false);

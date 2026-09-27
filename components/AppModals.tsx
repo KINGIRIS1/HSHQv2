@@ -106,7 +106,7 @@ interface AppModalsProps {
     // Handlers
     handleAddOrUpdate: (data: any) => Promise<RecordFile | null>;
     handleImportRecords: (data: RecordFile[], mode: 'create' | 'update') => Promise<boolean>;
-    handleSaveEmployee: (emp: Employee) => void;
+    handleSaveEmployee: (emp: Employee, originalId?: string) => void | Promise<void>;
     handleDeleteEmployee: (id: string) => void;
     handleDeleteAllData: () => void;
     onRefreshData?: () => void; // New callback
@@ -141,6 +141,8 @@ interface AppModalsProps {
     currentView: string;
     rolePermissions?: RolePermissions;
     departmentPermissions?: DepartmentPermissions;
+    reportMainTab?: any;
+    setReportMainTab?: any;
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {

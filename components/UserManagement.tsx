@@ -217,7 +217,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
             {/* Desktop Table View */}
             <div className="hidden md:block">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-white sticky top-0 shadow-sm z-10 text-sm font-medium text-gray-600">
+                    <thead className="bg-slate-100 sticky top-0 shadow-xs z-20 text-xs font-bold uppercase text-slate-700">
                         <tr>
                             <th className="p-4 border-b">Tên đăng nhập</th>
                             <th className="p-4 border-b">Tên hiển thị</th>

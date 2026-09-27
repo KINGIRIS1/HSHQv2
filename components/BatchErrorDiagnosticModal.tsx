@@ -2,7 +2,26 @@ import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, User, RecordStatus } from '../types';
 import { X, AlertTriangle, CheckCircle, FileSpreadsheet, RefreshCw, Wrench, ChevronDown, ChevronUp, Search, Info, Check, Filter, Edit3, Save, Trash2, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
+
+const findEmployeeMatchLocal = (raw: string, emps: Employee[], usrs?: User[]): Employee | null => {
+  if (!raw) return null;
+  const target = raw.trim().toLowerCase();
+  const direct = emps.find((e) => e.id?.toLowerCase() === target || e.name?.toLowerCase() === target);
+  if (direct) return direct;
+  if (usrs && usrs.length > 0) {
+    const userMatch = usrs.find((u) => u.username?.toLowerCase() === target || u.name?.toLowerCase() === target);
+    if (userMatch) {
+      if (userMatch.employeeId) {
+        const byId = emps.find((e) => e.id === userMatch.employeeId);
+        if (byId) return byId;
+      }
+      const byName = emps.find((e) => e.name?.toLowerCase() === userMatch.name?.toLowerCase());
+      if (byName) return byName;
+    }
+  }
+  return null;
+};
 
 export interface RecordError {
   code: string;
@@ -12,7 +31,7 @@ export interface RecordError {
   message: string;
   suggestion: string;
   canAutoFix: boolean;
-  autoFixKey?: 'checkedBy' | 'checkDate' | 'completedWorkDate' | 'deadline';
+  autoFixKey?: 'checkedBy' | 'checkDate' | 'completedWorkDate' | 'deadline' | 'status' | 'assignedTo';
 }
 
 export interface DiagnosticItem {
@@ -323,14 +342,43 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
         employees.length > 0 &&
         !employees.some((e) => e.name === r.assignedTo || e.id === r.assignedTo)
       ) {
+        const empMatch = findEmployeeMatchLocal(r.assignedTo, employees, users);
+        if (empMatch && r.assignedTo !== empMatch.name) {
+          errors.push({
+            code: 'ERR_RAW_STAFF_CODE',
+            category: 'assign',
+            categoryLabel: 'Phân công & Nhân sự',
+            severity: 'medium',
+            message: `Mã nhân viên/Username "${r.assignedTo}" chưa quy đổi thành Tên nhân viên ("${empMatch.name}").`,
+            suggestion: 'Bấm nút "Sửa tự động" để chuyển mã sang Tên cán bộ chính thức.',
+            canAutoFix: true,
+            autoFixKey: 'assignedTo',
+          });
+        } else {
+          errors.push({
+            code: 'ERR_UNKNOWN_EMPLOYEE',
+            category: 'assign',
+            categoryLabel: 'Phân công & Nhân sự',
+            severity: 'low',
+            message: `Nhân viên "${r.assignedTo}" không thuộc danh sách nhân sự active.`,
+            suggestion: 'Kiểm tra lại danh sách cán bộ hoặc gán lại nhân viên.',
+            canAutoFix: false,
+          });
+        }
+      }
+
+      // Kiểm tra hồ sơ Đo đạc còn mang trạng thái cũ "Đang thực hiện" (IN_PROGRESS)
+      const isSurveyRecord = (r.recordType || '').startsWith('2.') || r.sourceTable === 'land_records' || (r.group || '').includes('2.');
+      if (isSurveyRecord && r.status === RecordStatus.IN_PROGRESS) {
         errors.push({
-          code: 'ERR_UNKNOWN_EMPLOYEE',
+          code: 'ERR_DODAC_IN_PROGRESS',
           category: 'assign',
-          categoryLabel: 'Phân công & Nhân sự',
-          severity: 'low',
-          message: `Nhân viên "${r.assignedTo}" không thuộc danh sách nhân sự active.`,
-          suggestion: 'Kiểm tra lại danh sách cán bộ hoặc gán lại nhân viên.',
-          canAutoFix: false,
+          categoryLabel: 'Trạng thái Đo đạc',
+          severity: 'high',
+          message: 'Hồ sơ đo đạc còn ở trạng thái "Đang thực hiện" (cũ), làm người dùng không chuyển bước tiếp theo được.',
+          suggestion: 'Bấm "Sửa tự động" để chuẩn hóa về bước Đo đạc thực địa (FIELD_WORK) hoặc Biên tập bản đồ (OFFICE_WORK).',
+          canAutoFix: true,
+          autoFixKey: 'status',
         });
       }
 
@@ -522,6 +570,19 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
           if (!isNaN(recD.getTime())) {
             const fixDeadline = new Date(recD.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString();
             existing.deadline = fixDeadline;
+          }
+        }
+
+        if (err.code === 'ERR_DODAC_IN_PROGRESS') {
+          const isOfficeOnly = isOfficeOnlySurveyProcedure(item.record.recordType);
+          const hasOfficeAssigned = item.record.officeAssignedDate || item.record.drafterId;
+          existing.status = (isOfficeOnly || hasOfficeAssigned) ? RecordStatus.OFFICE_WORK : RecordStatus.FIELD_WORK;
+        }
+
+        if (err.code === 'ERR_RAW_STAFF_CODE' && item.record.assignedTo) {
+          const empMatch = findEmployeeMatchLocal(item.record.assignedTo, employees, users);
+          if (empMatch) {
+            existing.assignedTo = empMatch.name;
           }
         }
 

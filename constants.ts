@@ -49,9 +49,10 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 
   // Nhãn hiển thị cho Module Cấp giấy
   [RecordStatus.APPRAISAL]: 'Chờ thẩm định',
-  [RecordStatus.PENDING_POSTING]: 'Chờ niêm yết (30 ngày)',
+  [RecordStatus.PENDING_POSTING]: 'Chờ niêm yết',
   [RecordStatus.TAX_TRANSFER]: 'Chờ chuyển thuế',
   [RecordStatus.PENDING_TAX_KV7]: 'Chờ thuế khu vực 7',
+  [RecordStatus.PENDING_TAX_NOTICE]: 'Chờ Ngày TBT',
   [RecordStatus.PENDING_TAX_PAYMENT]: 'Chờ Giấy nộp tiền',
   [RecordStatus.PENDING_PRINT_CERT]: 'Chờ in giấy chứng nhận',
   [RecordStatus.PENDING_HANDOVER]: 'Chờ bàn giao',
@@ -60,8 +61,10 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 export const CAP_GIAY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận hồ sơ' },
   { key: RecordStatus.APPRAISAL, label: 'Chờ thẩm định' },
+  { key: RecordStatus.PENDING_POSTING, label: 'Chờ niêm yết' },
   { key: RecordStatus.TAX_TRANSFER, label: 'Chờ chuyển thuế' },
   { key: RecordStatus.PENDING_TAX_KV7, label: 'Chờ thuế khu vực 7' },
+  { key: RecordStatus.PENDING_TAX_NOTICE, label: 'Chờ Ngày TBT' },
   { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Chờ Giấy nộp tiền' },
   { key: RecordStatus.PENDING_PRINT_CERT, label: 'Chờ in giấy chứng nhận' },
   { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
@@ -136,6 +139,7 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.PENDING_POSTING]: 'bg-amber-100 text-amber-800 border border-amber-200',
   [RecordStatus.TAX_TRANSFER]: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
   [RecordStatus.PENDING_TAX_KV7]: 'bg-violet-100 text-violet-800 border border-violet-200',
+  [RecordStatus.PENDING_TAX_NOTICE]: 'bg-amber-100 text-amber-800 border border-amber-200',
   [RecordStatus.PENDING_TAX_PAYMENT]: 'bg-amber-100 text-amber-800 border border-amber-200',
   [RecordStatus.PENDING_PRINT_CERT]: 'bg-teal-100 text-teal-800 border border-teal-200',
   [RecordStatus.PENDING_HANDOVER]: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
@@ -476,14 +480,17 @@ export const isRecordType11 = (recordOrType: Partial<RecordFile> | string | null
 
 // Kiểm tra hồ sơ có thuộc module Đo đạc (nhóm 2.x) hay không
 export const isSurveyRecordType = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
-  if (!recordOrType) return true;
+  if (!recordOrType) return false;
   const str = typeof recordOrType === 'string' 
     ? recordOrType 
     : String(recordOrType.recordType || recordOrType.content || '');
   const t = str.trim();
+  if (!t) return false;
   if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
   if (t.startsWith('3.') || isCertificateRecordType(str)) return false;
-  return true;
+  if (t.startsWith('2.') || getShortRecordType(str).startsWith('2.')) return true;
+  const lower = str.toLowerCase();
+  return lower.includes('trích đo') || lower.includes('trích lục') || lower.includes('đo đạc');
 };
 
 // Kiểm tra hồ sơ có thuộc module Cấp giấy / Đăng ký đất đai (nhóm 3.x) hay không
@@ -556,46 +563,62 @@ export const getSurveyRecordPrefix = (
     );
 
     if (emp && emp.managedWards && emp.managedWards.length > 0) {
-      // Nếu Cán bộ phụ trách TRÊN 1 địa bàn (> 1 xã) -> BỎ MÃ ĐỊA BÀN ở đầu mã hồ sơ!
+      // Đối với cá nhân được giao nhiều địa bàn thụ lý (> 1 địa bàn) -> Lấy TK làm mã mặc định!
       if (emp.managedWards.length > 1) {
-        return '';
+        return 'TK';
       }
 
-      // Nếu Cán bộ phụ trách ĐÚNG 1 địa bàn -> Lấy mã địa bàn của xã duy nhất đó
+      // Nếu Cán bộ phụ trách ĐÚNG 1 địa bàn -> Lấy mã địa bàn của xã duy nhất đó (chỉ 4 mã: TK, TQ, TH, MD)
       const singleWard = emp.managedWards[0].trim().toLowerCase();
       if (singleWard.includes('khai')) return 'TK';
       if (singleWard.includes('quan')) return 'TQ';
       if (singleWard.includes('hưng') || singleWard.includes('hung')) return 'TH';
       if (singleWard.includes('đức') || singleWard.includes('duc')) return 'MD';
-      if (singleWard.includes('chơn thành') || singleWard.includes('chonthanh')) return 'CT';
-      if (singleWard.includes('nha bích') || singleWard.includes('nhabich')) return 'NB';
-      if (singleWard.includes('lập') || singleWard.includes('lap')) return 'ML';
-      if (singleWard.includes('thắng') || singleWard.includes('thang')) return 'MT';
-      if (singleWard.includes('quang minh')) return 'QM';
-      if (singleWard.includes('thành tâm')) return 'TT';
-      if (singleWard.includes('minh long') || singleWard.includes('minhlong')) return 'MLO';
-      if (singleWard.includes('minh hưng') || singleWard.includes('minhhung')) return 'MH';
     }
   }
 
-  // 2. Nếu không chọn Người tiếp nhận hoặc Cán bộ không có cấu hình địa bàn, mới lấy theo tên Xã/Phường trên form
+  // 2. Nếu không chọn Người tiếp nhận hoặc Cán bộ không có cấu hình địa bàn, lấy theo tên Xã/Phường trên form (chỉ 4 mã: TK, TQ, TH, MD)
   if (wardName) {
     const w = wardName.trim().toLowerCase();
     if (w.includes('khai')) return 'TK';
     if (w.includes('quan')) return 'TQ';
     if (w.includes('hưng') || w.includes('hung')) return 'TH';
     if (w.includes('đức') || w.includes('duc')) return 'MD';
-    if (w.includes('chơn thành') || w.includes('chonthanh')) return 'CT';
-    if (w.includes('nha bích') || w.includes('nhabich')) return 'NB';
-    if (w.includes('lập') || w.includes('lap')) return 'ML';
-    if (w.includes('thắng') || w.includes('thang')) return 'MT';
-    if (w.includes('quang minh')) return 'QM';
-    if (w.includes('thành tâm')) return 'TT';
-    if (w.includes('minh long') || w.includes('minhlong')) return 'MLO';
-    if (w.includes('minh hưng') || w.includes('minhhung')) return 'MH';
   }
 
-  return '';
+  // Mặc định lấy TK cho hồ sơ Đo đạc khi không xác định được địa bàn cụ thể
+  return 'TK';
+};
+
+/**
+ * Lấy tiền tố mã hồ sơ theo quy ước phân loại thủ tục đồng bộ:
+ * - Nhóm 1.x (Lưu trữ): Trả về 'LT' (hoặc 'CV' nếu là Công văn)
+ * - Nhóm 3.x (Cấp giấy / Đăng ký): Trả về 'H19.151.11.22'
+ * - Nhóm 2.x (Đo đạc) & Mặc định: Lấy mã tiền tố địa bàn thuộc 4 xã (TK, TQ, TH, MD)
+ */
+export const getRecordPrefixByProcedure = (
+  procedureType: string | null | undefined,
+  receivedBy?: string | null,
+  employeesList: Employee[] = [],
+  wardName?: string | null
+): string => {
+  const pStr = String(procedureType || '').trim();
+  
+  // 1. Nhóm 1.x (Lưu trữ / Sao lục / Công văn)
+  if (pStr.startsWith('1.') || isArchiveRecordType(pStr)) {
+    if (pStr.toLowerCase().includes('công văn') || pStr.includes('1.2')) {
+      return 'CV';
+    }
+    return 'LT';
+  }
+
+  // 2. Nhóm 3.x (Cấp giấy / Đăng ký đất đai)
+  if (pStr.startsWith('3.') || isCertificateRecordType(pStr)) {
+    return 'H19.151.11.22';
+  }
+
+  // 3. Nhóm 2.x (Đo đạc bản đồ) & Mặc định
+  return getSurveyRecordPrefix(receivedBy, employeesList, wardName);
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [

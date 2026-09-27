@@ -1,11 +1,12 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign, FileCheck } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType, mapStatusToRecordStatus } from '../constants';
+import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType, isCertificateRecordType, mapStatusToRecordStatus } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate, cleanSyncNotes } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords, fetchAllArchiveRecordsAsRecordFiles, getCachedArchiveRecords } from '../services/apiArchive';
+import { fetchDangkyRecords } from '../services/apiRegistration';
 import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
@@ -22,6 +23,7 @@ interface ReportSectionProps {
     wards: string[]; 
     employees: Employee[];
     currentUser?: User;
+    initialMainTab?: 'measurement' | 'archive' | 'registration';
 }
 
 const getFormattedNotesAndDocs = (r: RecordFile): string => {
@@ -43,7 +45,7 @@ const formatDateDDMMYYYY = (isoStr?: string | null) => {
     return isoStr;
 };
 
-const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees, currentUser }) => {
+const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees, currentUser, initialMainTab = 'measurement' }) => {
     const [fromDate, setFromDate] = useState(() => {
         return '1970-01-01';
     });
@@ -54,7 +56,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // State chọn xã phường
     const [selectedWard, setSelectedWard] = useState<string>('all');
     
-    // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
+    // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ vs Cấp giấy) ---
     // Tìm nhân sự ứng với tài khoản hiện tại linh hoạt theo employeeId, name hoặc username
     const userEmployee = useMemo(() => {
         if (!currentUser) return null;
@@ -103,9 +105,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return deptLower.includes('hành chính') || deptLower.includes('một cửa');
     }, [currentUser, userDept, userRole]);
 
-    const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
+    const [mainTab, setMainTab] = useState<'measurement' | 'archive' | 'registration'>(initialMainTab);
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
     const [isArchiveLoading, setIsArchiveLoading] = useState<boolean>(false);
+    const [dangkyRecords, setDangkyRecords] = useState<RecordFile[]>([]);
+    const [isDangkyLoading, setIsDangkyLoading] = useState<boolean>(false);
 
     // Tự động chuyển tab chính nếu người dùng bị giới hạn quyền theo tổ
     useEffect(() => {
@@ -115,6 +119,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 setMainTab('measurement');
             } else if (deptLower.includes('lưu trữ') && mainTab !== 'archive') {
                 setMainTab('archive');
+            } else if ((deptLower.includes('cấp giấy') || deptLower.includes('đăng ký') || deptLower.includes('thẩm định')) && mainTab !== 'registration') {
+                setMainTab('registration');
             }
         }
     }, [isHanhChinhOrAdmin, userDept, mainTab]);
@@ -275,26 +281,54 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 }
             };
             loadArchive();
+        } else if (mainTab === 'registration') {
+            const loadDangky = async () => {
+                if (dangkyRecords.length === 0) {
+                    setIsDangkyLoading(true);
+                }
+                try {
+                    const directDangkyRecords = await fetchDangkyRecords();
+                    setDangkyRecords(directDangkyRecords);
+                } catch (e) {
+                    console.error("Error loading dangky records for report", e);
+                } finally {
+                    setIsDangkyLoading(false);
+                }
+            };
+            loadDangky();
         }
     }, [mainTab]);
 
     const activeRecords = useMemo(() => {
-        let base = mainTab === 'measurement' 
-            ? records.filter(r => {
+        let base: RecordFile[] = [];
+        if (mainTab === 'measurement') {
+            base = records.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
-                return !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
-            }) 
-            : archiveRecords;
+                return !isArchiveRecordType(r.recordType) && !isCertificateRecordType(r.recordType) && r.sourceTable !== 'dangky_records' && !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
+            });
+        } else if (mainTab === 'archive') {
+            base = archiveRecords;
+        } else {
+            // mainTab === 'registration' - Chỉ lấy dữ liệu từ bảng dangky_records
+            base = dangkyRecords;
+        }
 
         // Nếu là tài khoản EMPLOYEE, chỉ hiển thị những hồ sơ mình được giao việc
         if (currentUser?.role === 'EMPLOYEE' && userEmployee) {
             const empId = userEmployee.id;
             const empName = userEmployee.name;
-            base = base.filter(r => r.assignedTo === empId || r.assignedTo === empName);
+            base = base.filter(r => 
+                r.assignedTo === empId || 
+                r.assignedTo === empName ||
+                r.checkedBy === empId || 
+                r.checkedBy === empName ||
+                r.printStaffId === empId ||
+                r.printStaffId === empName
+            );
         }
 
         return base;
-    }, [records, mainTab, archiveRecords, currentUser, userEmployee]);
+    }, [records, mainTab, archiveRecords, dangkyRecords, currentUser, userEmployee]);
 
     const activeEmployees = useMemo(() => {
         if (currentUser?.role === 'EMPLOYEE' && userEmployee) {
@@ -302,16 +336,70 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
         if (mainTab === 'measurement') {
             return employees.filter(e => {
-                const dept = e.department?.toLowerCase() || '';
+                const dept = (e.department || '').toLowerCase();
+                const pos = (e.position || '').toLowerCase();
+                if (pos.includes('giám đốc') || dept.includes('ban giám đốc') || dept.includes('hành chính') || dept.includes('một cửa')) return false;
                 return dept.includes('đo đạc') || dept.includes('kỹ thuật');
             });
-        } else {
+        } else if (mainTab === 'archive') {
             return employees.filter(e => {
-                const dept = e.department?.toLowerCase() || '';
-                return dept.includes('lưu trữ') && !dept.includes('một cửa') && !dept.includes('hành chính');
+                const dept = (e.department || '').toLowerCase();
+                const pos = (e.position || '').toLowerCase();
+                if (pos.includes('giám đốc') || dept.includes('ban giám đốc') || dept.includes('hành chính') || dept.includes('một cửa')) return false;
+                return dept.includes('lưu trữ');
             });
+        } else {
+            // mainTab === 'registration' (Báo cáo Cấp giấy)
+            // 1. Loại bỏ toàn bộ nhân sự các tổ khác: Tổ Đo đạc, Tổ Lưu trữ, Ban Giám đốc, Tổ Hành chính...
+            // 2. Chỉ giữ lại đúng Nhân sự Tổ Cấp giấy / Đăng ký & Cấp GCN / Thẩm định
+            const capGiayDeptEmployees = employees.filter(e => {
+                const dept = (e.department || '').toLowerCase();
+                const pos = (e.position || '').toLowerCase();
+                const isExcluded = 
+                    dept.includes('đo đạc') || 
+                    dept.includes('kỹ thuật') || 
+                    dept.includes('lưu trữ') || 
+                    dept.includes('hành chính') || 
+                    dept.includes('một cửa') || 
+                    dept.includes('ban giám đốc') ||
+                    pos.includes('giám đốc');
+                if (isExcluded) return false;
+
+                return dept.includes('cấp giấy') || dept.includes('đăng ký') || dept.includes('thẩm định') || dept.includes('đkđđ') || dept.includes('gcn');
+            });
+
+            // 3. Lấy thêm cán bộ được phân công thụ lý/thẩm định/in thực tế trên bảng dangky_records
+            const assignedStaffNamesOrIds = new Set<string>();
+            const recordsToCheck = dangkyRecords.length > 0 ? dangkyRecords : records.filter(r => isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records');
+            recordsToCheck.forEach(r => {
+                if (r.assignedTo) assignedStaffNamesOrIds.add(r.assignedTo.trim().toLowerCase());
+                if (r.checkedBy) assignedStaffNamesOrIds.add(r.checkedBy.trim().toLowerCase());
+                if (r.printStaffId) assignedStaffNamesOrIds.add(r.printStaffId.trim().toLowerCase());
+            });
+
+            const practicalAssignedEmployees = employees.filter(e => {
+                const dept = (e.department || '').toLowerCase();
+                const pos = (e.position || '').toLowerCase();
+                const isExcluded = 
+                    dept.includes('đo đạc') || 
+                    dept.includes('kỹ thuật') || 
+                    dept.includes('lưu trữ') || 
+                    dept.includes('hành chính') || 
+                    dept.includes('ban giám đốc') ||
+                    pos.includes('giám đốc');
+                if (isExcluded) return false;
+
+                const idLower = (e.id || '').toLowerCase();
+                const nameLower = (e.name || '').toLowerCase();
+                return assignedStaffNamesOrIds.has(idLower) || assignedStaffNamesOrIds.has(nameLower);
+            });
+
+            const map = new Map<string, Employee>();
+            capGiayDeptEmployees.forEach(e => map.set(e.id, e));
+            practicalAssignedEmployees.forEach(e => map.set(e.id, e));
+            return Array.from(map.values());
         }
-    }, [employees, mainTab, currentUser, userEmployee]);
+    }, [employees, mainTab, currentUser, userEmployee, dangkyRecords, records]);
 
     useEffect(() => {
         if (isKeyModalOpen) {
@@ -477,10 +565,32 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
         setActiveTab('ai');
         
-        let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
-        if (reportType === 'today') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC HÔM NAY" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ HÔM NAY";
-        if (reportType === 'week') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC TUẦN" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ TUẦN";
-        if (reportType === 'month') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC THÁNG" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ THÁNG";
+        let title = mainTab === 'measurement' 
+            ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" 
+            : mainTab === 'archive' 
+            ? "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ" 
+            : "BÁO CÁO KẾT QUẢ CÔNG TÁC CẤP GIẤY";
+        if (reportType === 'today') {
+            title = mainTab === 'measurement' 
+                ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC HÔM NAY" 
+                : mainTab === 'archive' 
+                ? "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ HÔM NAY" 
+                : "BÁO CÁO KẾT QUẢ CÔNG TÁC CẤP GIẤY HÔM NAY";
+        }
+        if (reportType === 'week') {
+            title = mainTab === 'measurement' 
+                ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC TUẦN" 
+                : mainTab === 'archive' 
+                ? "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ TUẦN" 
+                : "BÁO CÁO KẾT QUẢ CÔNG TÁC CẤP GIẤY TUẦN";
+        }
+        if (reportType === 'month') {
+            title = mainTab === 'measurement' 
+                ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC THÁNG" 
+                : mainTab === 'archive' 
+                ? "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ THÁNG" 
+                : "BÁO CÁO KẾT QUẢ CÔNG TÁC CẤP GIẤY THÁNG";
+        }
 
         // Pass filteredData to onGenerate
         onGenerate(fromDate, toDate, title, filteredData);
@@ -509,7 +619,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
         
-        let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
+        let title = mainTab === 'measurement' 
+            ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" 
+            : mainTab === 'archive' 
+            ? "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ" 
+            : "BÁO CÁO KẾT QUẢ CÔNG TÁC CẤP GIẤY";
         
         if (activeTab === 'daily_stats') {
             title += " - THỐNG KÊ THEO NGÀY";
@@ -608,6 +722,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         <FolderArchive size={18} /> Báo cáo Lưu trữ
                     </button>
                 )}
+                <button 
+                    onClick={() => setMainTab('registration')}
+                    className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'registration' ? 'bg-emerald-50 border-gray-200 text-emerald-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                >
+                    <FileCheck size={18} /> Báo cáo Cấp giấy
+                </button>
             </div>
 
             {/* ROW 1: Content Sub-Tabs Navigation */}
@@ -673,7 +793,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             </div>
 
             {/* ROW 2: Shared Date Selection & Global Export Toolbar */}
-            <div className={`p-3 md:p-3.5 border-b border-gray-200 shadow-xs flex flex-col gap-3 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50/80' : 'bg-orange-50/80'}`}>
+            <div className={`p-3 md:p-3.5 border-b border-gray-200 shadow-xs flex flex-col gap-3 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50/80' : mainTab === 'archive' ? 'bg-orange-50/80' : 'bg-emerald-50/80'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
                         <button 
@@ -682,17 +802,17 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                 setToDate(new Date().toISOString().split('T')[0]);
                                 setReportType('custom');
                             }} 
-                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${(fromDate === '1970-01-01' && reportType === 'custom') ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}
+                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${(fromDate === '1970-01-01' && reportType === 'custom') ? (mainTab === 'measurement' ? 'bg-blue-600' : mainTab === 'archive' ? 'bg-orange-600' : 'bg-emerald-600') + ' text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}
                         >
                             <CalendarRange size={13} /> Tất cả
                         </button>
-                        <button onClick={() => handleQuickReport('week')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'week' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
+                        <button onClick={() => handleQuickReport('week')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'week' ? (mainTab === 'measurement' ? 'bg-blue-600' : mainTab === 'archive' ? 'bg-orange-600' : 'bg-emerald-600') + ' text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
                             <CalendarDays size={13} /> Tuần này
                         </button>
-                        <button onClick={() => handleQuickReport('month')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'month' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
+                        <button onClick={() => handleQuickReport('month')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'month' ? (mainTab === 'measurement' ? 'bg-blue-600' : mainTab === 'archive' ? 'bg-orange-600' : 'bg-emerald-600') + ' text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
                             <Layout size={13} /> Tháng này
                         </button>
-                        <button onClick={() => handleQuickReport('today')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'today' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
+                        <button onClick={() => handleQuickReport('today')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'today' ? (mainTab === 'measurement' ? 'bg-blue-600' : mainTab === 'archive' ? 'bg-orange-600' : 'bg-emerald-600') + ' text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
                             <Clock size={13} /> Hôm nay
                         </button>
                     </div>
@@ -1033,12 +1153,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 {activeTab === 'employee' && (
                     <EmployeeStatsView 
                         records={activeRecords}
-                        employees={employees}
+                        employees={activeEmployees}
                         fromDate={fromDate}
                         toDate={toDate}
                         selectedEmpId={selectedEmpId}
                         setSelectedEmpId={setSelectedEmpId}
-                        defaultDeptFilter={mainTab === 'archive' ? 'archive' : mainTab === 'measurement' ? 'measurement' : 'all'}
+                        defaultDeptFilter={mainTab === 'archive' ? 'archive' : mainTab === 'measurement' ? 'measurement' : 'registration'}
                         isEmployee={currentUser?.role === 'EMPLOYEE'}
                     />
                 )}
@@ -1161,6 +1281,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

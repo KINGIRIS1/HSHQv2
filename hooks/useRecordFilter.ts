@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType, isArchiveRecord } from '../constants';
+import { getShortRecordType, isArchiveRecord } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],

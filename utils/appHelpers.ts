@@ -77,7 +77,7 @@ export const confirmAction = async (message: string, title: string = 'Xác nhậ
 // Updated: Căn giữa tiêu đề và điều chỉnh độ rộng theo yêu cầu
 // Updated: Gộp cột Đợt vào cột Hoàn thành
 export const COLUMN_DEFS = [
-  { key: 'code', label: 'MÃ HỒ SƠ', sortKey: 'code', className: 'w-[110px] text-center' },
+  { key: 'code', label: 'MÃ HỒ SƠ', sortKey: 'code', className: 'w-[140px] text-center' },
   { key: 'customer', label: 'THÔNG TIN CHỦ SỬ DỤNG', sortKey: 'customerName', className: 'w-64 text-center' }, 
   { key: 'type', label: 'LOẠI HỒ SƠ', sortKey: 'recordType', className: 'w-[115px] text-center' },
   { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },

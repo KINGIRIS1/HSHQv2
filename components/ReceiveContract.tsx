@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, Contract, PriceItem, SplitItem, User, Employee } from '../types';
 import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi, fetchContracts, getPreviewContractCode, consumeNextContractCode, getPreviewHDKTCode, consumeNextHDKTCode } from '../services/api';
-import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList, Hash, ShieldAlert } from 'lucide-react';
+import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList, Hash, ShieldAlert, CalendarCheck2 } from 'lucide-react';
 import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
-import GetContractNumberModal from './GetContractNumberModal';
+import { FixContractDatesModal } from './receive-contract/FixContractDatesModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
 import saveAs from 'file-saver'; // Import saveAs
 
@@ -71,7 +71,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
   // Modal States
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [isGetContractNumberOpen, setIsGetContractNumberOpen] = useState(false);
+  const [isFixDatesOpen, setIsFixDatesOpen] = useState(false);
   
   // Không dùng Modal Preview nữa, nhưng vẫn giữ state để tránh lỗi biên dịch nếu cần
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -679,11 +679,13 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
         {/* UTILITY BUTTONS */}
         <div className="flex gap-2 shrink-0">
-            {activeModule !== 'liquidation' && (
-                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" title="Lấy số Hợp đồng Tự động">
-                    <Hash size={18} />
-                </button>
-            )}
+            <button 
+                onClick={() => setIsFixDatesOpen(true)} 
+                className="p-2 bg-white border border-purple-200 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" 
+                title="Công cụ Quét & Chuẩn hóa Ngày lập Hợp đồng (Sửa lỗi Ngày/Tháng bị ngược)"
+            >
+                <CalendarCheck2 size={18} />
+            </button>
             <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-xs" title="Cấu hình Bảng giá Dịch vụ">
                 <Settings2 size={18} />
             </button>
@@ -706,7 +708,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='contract'
                     contracts={contracts}
-                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 
@@ -721,7 +722,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='liquidation'
                     contracts={contracts}
-                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 
@@ -771,41 +771,13 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           docxBlob={previewBlob} 
           fileName={previewFileName} 
       />
-      <GetContractNumberModal
-          isOpen={isGetContractNumberOpen}
-          onClose={() => setIsGetContractNumberOpen(false)}
-          currentUser={currentUser}
-          onSelectCode={(selectedCode) => {
-              if (editingContract) {
-                  setEditingContract({ ...editingContract, code: selectedCode });
-              } else {
-                  setEditingContract({
-                      id: Math.random().toString(36).substr(2, 9),
-                      code: selectedCode,
-                      customerName: '',
-                      phoneNumber: '',
-                      address: '',
-                      ward: '',
-                      landPlot: '',
-                      mapSheet: '',
-                      area: 0,
-                      contractType: selectedCode.includes('HĐKT') ? 'Đo đạc' : 'Tách thửa',
-                      serviceType: '',
-                      areaType: '',
-                      plotCount: 1,
-                      markerCount: 1,
-                      quantity: 1,
-                      unitPrice: 0,
-                      vatRate: 8,
-                      vatAmount: 0,
-                      totalAmount: 0,
-                      deposit: 0,
-                      createdDate: new Date().toISOString(),
-                      status: 'PENDING'
-                  });
-              }
-              setActiveModule('contract');
-              setIsGetContractNumberOpen(false);
+      <FixContractDatesModal
+          isOpen={isFixDatesOpen}
+          onClose={() => setIsFixDatesOpen(false)}
+          contracts={contracts}
+          records={records}
+          onUpdateSuccess={() => {
+              loadContracts();
           }}
       />
     </div>

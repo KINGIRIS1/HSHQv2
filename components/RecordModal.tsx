@@ -994,16 +994,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </label>
                             <select 
                                 required
-                                className={`w-full border rounded-md px-3 py-2 bg-white ${!formData.recordType ? 'border-amber-400 bg-amber-50/40 text-amber-900 font-semibold ring-1 ring-amber-300' : 'border-gray-300'}`} 
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" 
                                 value={formData.recordType ? getShortRecordType(formData.recordType) : ''} 
                                 onChange={(e) => handleChange('recordType', e.target.value)}
                             >
                                 <option value="">-- Chọn loại hồ sơ / thủ tục --</option>
                                 {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            {!formData.recordType && (
-                                <p className="text-[11px] text-amber-600 mt-1 font-medium">* Bắt buộc chọn loại hồ sơ để kích hoạt chức năng lưu</p>
-                            )}
                         </div>
                         {hasAdminRights ? (
                             <>
@@ -1241,10 +1238,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
                                 </select>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 md:col-span-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Diện tích (m2)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Diện tích (m²)</label><input type="number" step="any" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right font-medium" value={formData.area || ''} onChange={(e) => handleChange('area', parseFloat(e.target.value) || 0)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Đất ở ONT/ODT (m²)</label><input type="number" step="any" className="w-full border border-emerald-300 rounded-md px-3 py-2 text-right font-medium text-emerald-800 bg-emerald-50/40 focus:bg-white" placeholder="0" value={formData.residentialArea !== undefined && formData.residentialArea !== null ? formData.residentialArea : ''} onChange={(e) => handleChange('residentialArea', e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0))} /></div>
                             </div>
                             <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Số phát hành</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="VD: CD 123456" value={val(formData.issueNumber)} onChange={(e) => handleChange('issueNumber', e.target.value)} /></div>

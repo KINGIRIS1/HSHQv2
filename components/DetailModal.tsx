@@ -4,7 +4,7 @@ import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus, DossierC
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Paperclip, Eye, Download, ExternalLink, FolderOpen } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, FilePenLine, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Paperclip, Eye, Download, ExternalLink, FolderOpen } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
@@ -621,6 +621,26 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
+                {onCreateContract && record && !matchedContract && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5') || getShortRecordType(record.recordType).startsWith('2.1')) && (
+                    <button
+                        onClick={() => { onClose(); onCreateContract(record); }}
+                        className="p-1.5 text-purple-600 hover:bg-purple-50 active:bg-purple-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        title="Lập hợp đồng cho hồ sơ"
+                    >
+                        <FileSignature size={18} />
+                    </button>
+                )}
+
+                {onCreateContract && record && matchedContract && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5') || getShortRecordType(record.recordType).startsWith('2.1')) && (
+                    <button
+                        onClick={() => { onClose(); onCreateContract(record); }}
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        title={`Sửa hợp đồng: ${matchedContract.code}`}
+                    >
+                        <FilePenLine size={18} />
+                    </button>
+                )}
+
                 {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
@@ -788,7 +808,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     {/* HỢP ĐỒNG SỐ & SỐ TRÍCH ĐO / TRÍCH LỤC (NGAY SAU THÔNG TIN ĐỊA CHÍNH) */}
                     {(() => {
                         const isArchive = isArchiveRecordType(record?.recordType || '');
-                        const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
+                        const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5') || getShortRecordType(record.recordType).startsWith('2.1')));
                         const excerptNum = recordTypeLower.includes('trích lục')
                             ? (record.excerptNumber?.trim() || '')
                             : (record.measurementNumber?.trim() || record.excerptNumber?.trim() || '');
@@ -812,7 +832,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                 <div className="text-left truncate">
                                                     <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng số:</span>
                                                     <p className="text-xs font-bold text-indigo-950 truncate">
-                                                        {matchedContract ? matchedContract.code : 'Chưa có HĐ'}
+                                                        {matchedContract ? matchedContract.code : '---'}
                                                     </p>
                                                 </div>
                                             </div>

@@ -207,9 +207,46 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       return DEPARTMENTS_CONFIG.map(c => c.id);
   }, []);
 
-  // Xác định tổ chuyên môn mặc định cho hồ sơ dựa theo Tab/View hiện tại hoặc loại hồ sơ
+  // Xác định tổ chuyên môn mặc định cho hồ sơ dựa theo loại hồ sơ thực tế, filterDepartment hoặc View hiện tại
   const getRecordDefaultDepartment = (records: RecordFile[], view?: string, filterDept?: string): string => {
-      // 1. Kiểm tra filterDepartment truyền vào
+      // 1. Nếu có hồ sơ chọn, ƯU TIÊN HÀNG ĐẦU phân loại dựa theo hồ sơ thực tế!
+      if (records && records.length > 0) {
+          const record = records[0];
+          const type = (record.recordType || '').trim().toLowerCase();
+          const code = (record.code || '').trim().toLowerCase();
+          const content = (record.content || '').trim().toLowerCase();
+          const combined = `${type} ${code} ${content}`;
+
+          // Kiểm tra nhóm Cấp giấy (3.x hoặc từ khóa Cấp giấy/Đăng ký)
+          if (
+              type.startsWith('3.') || code.startsWith('3.') ||
+              combined.includes('cấp giấy') || combined.includes('chuyển quyền') || combined.includes('thừa kế') ||
+              combined.includes('tặng cho') || combined.includes('phân chia') || combined.includes('cấp đổi') ||
+              combined.includes('cấp lại') || combined.includes('gia hạn') || combined.includes('đính chính') ||
+              combined.includes('đổi thông tin') || combined.includes('thế chấp') || combined.includes('gdbd') ||
+              combined.includes('giải chấp') || combined.includes('chuyển mục đích')
+          ) {
+              return 'Tổ Cấp giấy';
+          }
+
+          // Kiểm tra nhóm Lưu trữ (1.x hoặc từ khóa Lưu trữ/Sao lục)
+          if (
+              type.startsWith('1.') || code.startsWith('1.') ||
+              combined.includes('lưu trữ') || combined.includes('sao lục') || combined.includes('cung cấp dữ liệu') || combined.includes('khai thác')
+          ) {
+              return 'Tổ Lưu trữ';
+          }
+
+          // Kiểm tra nhóm Đo đạc (2.x hoặc từ khóa Đo đạc/Trích đo)
+          if (
+              type.startsWith('2.') || code.startsWith('2.') ||
+              combined.includes('đo đạc') || combined.includes('trích đo') || combined.includes('cắm mốc') || combined.includes('bản đồ')
+          ) {
+              return 'Tổ Đo đạc';
+          }
+      }
+
+      // 2. Kiểm tra filterDepartment truyền vào
       if (filterDept) {
           const normFilter = filterDept.toLowerCase();
           if (normFilter.includes('đo đạc') || normFilter.includes('đo dạc')) return 'Tổ Đo đạc';
@@ -218,38 +255,21 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
           if (normFilter.includes('hành chính') || normFilter.includes('một cửa')) return 'Tổ Hành chính';
       }
 
-      // 2. Ưu tiên kiểm tra tab/view chuyên môn đang làm việc
+      // 3. Kiểm tra tab/view chuyên môn đang làm việc
       if (view) {
           const normView = view.toLowerCase();
           if (normView.includes('archive') || normView.includes('saoluc') || normView.includes('congvan')) {
               return 'Tổ Lưu trữ';
           }
-          if (normView.includes('other')) {
+          if (normView.includes('registration') || normView.includes('capgiay') || normView.includes('other')) {
               return 'Tổ Cấp giấy';
           }
-          if (normView.includes('all_records') || normView.includes('assign_tasks') || normView.includes('check_list') || normView.includes('handover_list') || normView.includes('completed')) {
+          if (normView.includes('survey') || normView.includes('dodac')) {
               return 'Tổ Đo đạc';
           }
       }
 
-      // 3. Nếu có hồ sơ chọn, kiểm tra theo mã thủ tục (1.x -> Lưu trữ, 2.x -> Đo đạc, 3.x -> Cấp giấy)
-      if (records && records.length > 0) {
-          const record = records[0];
-          const type = (record.recordType || '').trim();
-          const code = (record.code || '').trim();
-          
-          if (type.startsWith('1.') || code.startsWith('1.')) {
-              return 'Tổ Lưu trữ';
-          }
-          if (type.startsWith('2.') || code.startsWith('2.')) {
-              return 'Tổ Đo đạc';
-          }
-          if (type.startsWith('3.') || code.startsWith('3.')) {
-              return 'Tổ Cấp giấy';
-          }
-      }
-
-      return 'Tổ Đo đạc';
+      return 'Tổ Cấp giấy';
   };
 
   // Hàm kiểm tra nhân viên có thuộc tổ chuyên môn được chọn hay không
@@ -278,9 +298,31 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       return localStorage.getItem(`last_assigned_${selectedDept}`);
   }, [selectedDept, isOpen]);
 
-  // Mỗi khi đổi tổ chuyên môn, tự động khôi phục người được giao gần nhất của tổ đó làm mặc định chọn
+  // Xác định nhân viên phụ trách đúng địa bàn của hồ sơ
+  const isWardMatch = (emp: Employee) => {
+      if (!targetWardName) return false;
+      const targetNorm = removeVietnameseTones(targetWardName);
+      return !!(emp.managedWards && emp.managedWards.some(w => removeVietnameseTones(w) === targetNorm));
+  };
+
+  // Mỗi khi đổi tổ chuyên môn, tự động chọn người khớp địa bàn hoặc người được giao gần nhất
   useEffect(() => {
       if (isOpen && selectedDept) {
+          // Ưu tiên 1: Cán bộ thuộc tổ đang chọn mà khớp địa bàn (Xã/Phường) của hồ sơ
+          if (targetWardName) {
+              const targetNorm = removeVietnameseTones(targetWardName);
+              const wardMatchEmp = employees.find(e => 
+                  isEmployeeInDept(e, selectedDept) &&
+                  e.managedWards &&
+                  e.managedWards.some(w => removeVietnameseTones(w) === targetNorm)
+              );
+              if (wardMatchEmp) {
+                  setSelectedEmpId(wardMatchEmp.id);
+                  return;
+              }
+          }
+
+          // Ưu tiên 2: Cán bộ được giao việc gần nhất của tổ đó
           if (lastAssignedIdForCurrentDept) {
               const isValid = employees.some(e => e.id === lastAssignedIdForCurrentDept && isEmployeeInDept(e, selectedDept));
               if (isValid) {
@@ -288,11 +330,18 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                   return;
               }
           }
-          setSelectedEmpId('');
-      }
-  }, [isOpen, selectedDept, employees, lastAssignedIdForCurrentDept]);
 
-  // Lọc và tìm kiếm nhân viên thuộc tổ chuyên môn hiện tại (Đưa người giao gần nhất lên đầu tiên)
+          // Ưu tiên 3: Cán bộ đầu tiên trong tổ
+          const firstInDept = employees.find(e => isEmployeeInDept(e, selectedDept));
+          if (firstInDept) {
+              setSelectedEmpId(firstInDept.id);
+          } else {
+              setSelectedEmpId('');
+          }
+      }
+  }, [isOpen, selectedDept, employees, lastAssignedIdForCurrentDept, targetWardName]);
+
+  // Lọc và tìm kiếm nhân viên thuộc tổ chuyên môn hiện tại (Đưa người khớp địa bàn & người giao gần nhất lên đầu tiên)
   const filteredEmployees = useMemo(() => {
       const list = employees.filter(emp => {
           const deptMatch = isEmployeeInDept(emp, selectedDept);
@@ -310,24 +359,24 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
           return true;
       });
 
-      // Luôn sắp xếp người được giao gần nhất lên vị trí đầu tiên
-      if (lastAssignedIdForCurrentDept) {
-          list.sort((a, b) => {
+      // Luôn sắp xếp:
+      // 1. Cán bộ khớp đúng địa bàn Xã/Phường lên ĐẦU TIÊN
+      // 2. Cán bộ được giao việc gần nhất lên tiếp theo
+      list.sort((a, b) => {
+          const aMatch = isWardMatch(a);
+          const bMatch = isWardMatch(b);
+          if (aMatch && !bMatch) return -1;
+          if (!aMatch && bMatch) return 1;
+
+          if (lastAssignedIdForCurrentDept) {
               if (a.id === lastAssignedIdForCurrentDept) return -1;
               if (b.id === lastAssignedIdForCurrentDept) return 1;
-              return 0;
-          });
-      }
+          }
+          return a.name.localeCompare(b.name, 'vi');
+      });
 
       return list;
-  }, [employees, selectedDept, searchTerm, lastAssignedIdForCurrentDept]);
-
-  // Xác định nhân viên phụ trách đúng địa bàn của hồ sơ
-  const isWardMatch = (emp: Employee) => {
-      if (!targetWardName) return false;
-      const targetNorm = removeVietnameseTones(targetWardName);
-      return !!(emp.managedWards && emp.managedWards.some(w => removeVietnameseTones(w) === targetNorm));
-  };
+  }, [employees, selectedDept, searchTerm, lastAssignedIdForCurrentDept, targetWardName]);
 
   // Xác nhận giao việc và lưu thông tin người được giao vào localStorage
   const handleConfirmAssign = async () => {

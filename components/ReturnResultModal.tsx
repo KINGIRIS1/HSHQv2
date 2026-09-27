@@ -44,41 +44,19 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     return;
                 }
 
-                // 2. Tra cứu hợp đồng
-                const type = (record.recordType || '').toLowerCase();
-                const fetchedContracts = await fetchContracts();
-                const match = fetchedContracts.find(c => {
-                    if (!c || !record) return false;
-                    const cAddr = (c.customerAddress || '').trim().toLowerCase();
-                    const cCode = (c.code || '').trim().toLowerCase();
-                    const rCode = (record.code || '').trim().toLowerCase();
-                    const cName = (c.customerName || '').trim().toLowerCase();
-                    const rName = (record.customerName || '').trim().toLowerCase();
-                    const cPlot = (c.landPlot || '').trim().toLowerCase();
-                    const rPlot = (record.landPlot || '').trim().toLowerCase();
-                    const cMap = (c.mapSheet || '').trim().toLowerCase();
-                    const rMap = (record.mapSheet || '').trim().toLowerCase();
-
-                    const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
-
-                    if (rCode && (cAddr === rCode || cCode === rCode)) return true;
-                    if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
-                    if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
-                    if (rName && cName && rName === cName) {
-                        if (rPlot && cPlot && rPlot === cPlot) return true;
-                        if (rMap && cMap && rMap === cMap) return true;
+                // 2. Tra cứu hợp đồng nếu có mã
+                if (record.code) {
+                    const fetchedContracts = await fetchContracts();
+                    const cleanCode = record.code.trim().toLowerCase();
+                    const match = fetchedContracts.find(c => c.code?.trim().toLowerCase() === cleanCode || (c as any).recordCode?.trim().toLowerCase() === cleanCode);
+                    if (match) {
+                        const isLiquidated = Boolean(match.liquidationAmount && match.liquidationAmount > 0 && match.liquidationDate);
+                        const priceVal = (isLiquidated ? match.liquidationAmount : match.totalAmount) ?? 0;
+                        setReturnedPrice(priceVal.toString());
+                        return;
                     }
-                    return false;
-                });
-                
-                if (match) {
-                    const isLiquidated = Boolean(match.liquidationAmount && match.liquidationAmount > 0 && match.liquidationDate);
-                    const priceVal = (isLiquidated ? match.liquidationAmount : match.totalAmount) ?? 0;
-                    setReturnedPrice(priceVal.toString());
-                    return;
                 }
 
-                // 4. Nếu không có giá sẵn, để trống (0) cho người trả kết quả tự nhập
                 setReturnedPrice('0');
             } catch (err) {
                 console.error("Error loading price:", err);

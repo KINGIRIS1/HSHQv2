@@ -4,10 +4,8 @@ import {
   UserCheck,
   Calendar,
   User,
-  Users,
   CheckCircle2,
   AlertCircle,
-  FileText,
   Loader2,
 } from 'lucide-react';
 import { RecordFile, Employee } from '../../types';

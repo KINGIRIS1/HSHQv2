@@ -1,14 +1,15 @@
 
 import React from 'react';
-import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
+import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType, isCertificateRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus, resolveEmployeeName } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
 interface RecordRowProps {
   record: RecordFile;
   employees: Employee[];
+  users?: User[];
   visibleColumns: Record<string, boolean>;
   isSelected: boolean;
   canPerformAction: boolean;
@@ -36,6 +37,7 @@ const formatDate = (dateStr?: string | null) => {
 const RecordRow: React.FC<RecordRowProps> = ({
   record,
   employees,
+  users,
   visibleColumns,
   isSelected,
   canPerformAction,
@@ -212,13 +214,10 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     break;
             }
 
-            const cleanPerson = (personId || '').trim().toLowerCase();
-            const emp = employees.find(e => 
-                (e.id || '').trim().toLowerCase() === cleanPerson || 
-                (e.name || '').trim().toLowerCase() === cleanPerson
-            );
+            const resolvedName = resolveEmployeeName(personId, employees, users);
+
             return {
-                name: emp && emp.name ? emp.name : (personId || ''),
+                name: resolvedName,
                 date: dateVal
             };
         })();
@@ -471,7 +470,8 @@ export default React.memo(RecordRow, (prevProps, nextProps) => {
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.visibleColumns === nextProps.visibleColumns &&
     prevProps.columnOrder === nextProps.columnOrder &&
-    prevProps.employees.length === nextProps.employees.length &&
+    prevProps.employees === nextProps.employees &&
+    prevProps.users === nextProps.users &&
     prevProps.hasPermission === nextProps.hasPermission &&
     prevProps.currentUser === nextProps.currentUser &&
     prevProps.canPerformAction === nextProps.canPerformAction

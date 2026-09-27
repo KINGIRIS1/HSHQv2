@@ -225,7 +225,7 @@ export const logError = (context: string, error: any, silent: boolean = false) =
          alert(`LỖI TRÙNG LẶP: File Excel có chứa nhiều dòng cùng Mã Hồ Sơ. Hệ thống đã cố gắng xử lý nhưng Server từ chối.\nVui lòng kiểm tra file Excel và xóa các dòng trùng lặp mã.`);
     } else if (code === '42501') {
          console.error(`❌ Lỗi tại ${context}: Lỗi phân quyền bảo mật RLS (Code: 42501)`);
-         alert(`LỖI PHÂN QUYỀN (Row-Level Security): \nSupabase đang từ chối LƯU HOẶC SỬA dữ liệu do bạn đang bật tính năng bảo mật Row-Level Security (RLS) trên bảng dữ liệu nhưng chưa cấu hình Policy.\n\nHƯỚNG DẪN SỬA LỖI:\n1. Mở trang Quản lý Supabase của bạn\n2. Chọn phần "SQL Editor"\n3. Copy và chạy tập lệnh sau để cho phép truy cập:\n\nALTER TABLE land_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE luutru_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE system_settings DISABLE ROW LEVEL SECURITY;`);
+         alert(`LỖI PHÂN QUYỀN (Row-Level Security): \nSupabase đang từ chối LƯU HOẶC SỬA dữ liệu do bạn đang bật tính năng bảo mật Row-Level Security (RLS) trên bảng dữ liệu nhưng chưa cấu hình Policy.\n\nHƯỚNG DẪN SỬA LỖI:\n1. Mở trang Quản lý Supabase của bạn\n2. Chọn phần "SQL Editor"\n3. Copy và chạy tập lệnh sau để mở quyền cho toàn bộ các bảng:\n\nALTER TABLE contracts DISABLE ROW LEVEL SECURITY;\nALTER TABLE land_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE luutru_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE dangky_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE system_settings DISABLE ROW LEVEL SECURITY;\nALTER TABLE price_list DISABLE ROW LEVEL SECURITY;`);
     } else {
         console.error(`❌ [Chi tiết] ${context}: ${msg} ${code ? `(Code: ${code})` : ''} ${details ? `Details: ${details}` : ''}`);
     }
@@ -350,9 +350,26 @@ export const keepOnlyDateTime = (val: any): string | null => {
             const day = parseInt(dmyMatch[1], 10);
             const month = parseInt(dmyMatch[2], 10);
             const year = parseInt(dmyMatch[3], 10);
-            const hours = dmyMatch[4] ? parseInt(dmyMatch[4], 10) : 0;
-            const mins = dmyMatch[5] ? parseInt(dmyMatch[5], 10) : 0;
-            const secs = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
+            const hours = dmyMatch[4] !== undefined ? parseInt(dmyMatch[4], 10) : 7;
+            const mins = dmyMatch[5] !== undefined ? parseInt(dmyMatch[5], 10) : (dmyMatch[4] !== undefined ? 0 : 30);
+            const secs = dmyMatch[6] !== undefined ? parseInt(dmyMatch[6], 10) : 0;
+            if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
+            const d = new Date(year, month - 1, day, hours, mins, secs);
+            if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+                return null;
+            }
+            return d.toISOString();
+        }
+
+        // Kiểm tra dạng YYYY-MM-DD hoặc YYYY-MM-DD HH:mm(:ss)
+        const ymdMatch = cleanStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+        if (ymdMatch) {
+            const year = parseInt(ymdMatch[1], 10);
+            const month = parseInt(ymdMatch[2], 10);
+            const day = parseInt(ymdMatch[3], 10);
+            const hours = ymdMatch[4] !== undefined ? parseInt(ymdMatch[4], 10) : 7;
+            const mins = ymdMatch[5] !== undefined ? parseInt(ymdMatch[5], 10) : (ymdMatch[4] !== undefined ? 0 : 30);
+            const secs = ymdMatch[6] !== undefined ? parseInt(ymdMatch[6], 10) : 0;
             if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
             const d = new Date(year, month - 1, day, hours, mins, secs);
             if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
@@ -408,13 +425,40 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     const numberFields = [
         'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
         'deposit', 'quantity', 'plotCount', 'markerCount', 
-        'minArea', 'maxArea', 'price',
-        'liquidationArea', 'liquidationAmount', 'residentialArea', 'advancePayment'
+        'minArea', 'maxArea', 'price', 'advancePayment',
+        'liquidationArea', 'liquidationAmount', 'residentialArea',
+        'excerptNumber', 'measurementNumber', 'sheetNumber', 'plotNumber',
+        'issueNumber', 'receiptNumber', 'entryNumber', 'exportBatch', 'export_batch',
+        'archiveHandoverBatch', 'archive_handover_batch',
+        'returnBatch', 'return_batch',
+        'returnedPrice', 'returned_price',
+        'printStaffId', 'print_staff_id',
+        'surveyorId', 'surveyor_id',
+        'drafterId', 'drafter_id'
     ];
     numberFields.forEach(field => {
-        if (clean[field] !== undefined) {
-            if (clean[field] === '' || (typeof clean[field] === 'number' && isNaN(clean[field]))) {
+        if (clean[field] !== undefined && clean[field] !== null) {
+            if (clean[field] === '' || clean[field] === 'null' || clean[field] === 'undefined' || clean[field] === 'N/A' || clean[field] === '-') {
                 clean[field] = null;
+            } else if (typeof clean[field] === 'string') {
+                const cleanDigits = clean[field].replace(/[^0-9\.\-]/g, '');
+                if (cleanDigits === '' || cleanDigits === '-') {
+                    clean[field] = null;
+                } else {
+                    const num = parseFloat(cleanDigits);
+                    clean[field] = isNaN(num) ? null : num;
+                }
+            } else if (typeof clean[field] === 'number' && isNaN(clean[field])) {
+                clean[field] = null;
+            }
+        }
+    });
+
+    // Quét bổ sung mọi trường kết thúc bằng Batch, Number, Price, Amount, Area, Rate, Count nếu là chuỗi rỗng ""
+    Object.keys(clean).forEach(k => {
+        if (clean[k] === '' || clean[k] === 'null' || clean[k] === 'undefined') {
+            if (/(Batch|Number|Price|Amount|Area|Rate|Count|batch|number|price|amount|area|rate|count)$/.test(k)) {
+                clean[k] = null;
             }
         }
     });
@@ -568,21 +612,35 @@ export const sanitizePayloadFor22P02 = (payload: any): any => {
         'minArea', 'maxArea', 'price', 'advancePayment',
         'liquidationArea', 'liquidationAmount', 'residentialArea',
         'excerptNumber', 'measurementNumber', 'sheetNumber', 'plotNumber',
-        'issueNumber', 'receiptNumber', 'entryNumber'
+        'issueNumber', 'receiptNumber', 'entryNumber', 'exportBatch', 'export_batch',
+        'archiveHandoverBatch', 'archive_handover_batch',
+        'returnBatch', 'return_batch',
+        'returnedPrice', 'returned_price',
+        'printStaffId', 'print_staff_id',
+        'surveyorId', 'surveyor_id',
+        'drafterId', 'drafter_id'
     ];
 
     numericKeys.forEach(k => {
         if (clean[k] !== undefined && clean[k] !== null) {
-            if (clean[k] === '' || clean[k] === 'null' || clean[k] === 'undefined') {
+            if (clean[k] === '' || clean[k] === 'null' || clean[k] === 'undefined' || clean[k] === 'N/A' || clean[k] === '-') {
                 clean[k] = null;
             } else if (typeof clean[k] === 'string') {
-                const cleanDigits = clean[k].replace(/[^0-9\.]/g, '');
-                if (cleanDigits === '') {
+                const cleanDigits = clean[k].replace(/[^0-9\.\-]/g, '');
+                if (cleanDigits === '' || cleanDigits === '-') {
                     clean[k] = null;
                 } else {
                     const num = parseFloat(cleanDigits);
                     clean[k] = isNaN(num) ? null : num;
                 }
+            }
+        }
+    });
+
+    Object.keys(clean).forEach(k => {
+        if (clean[k] === '' || clean[k] === 'null' || clean[k] === 'undefined') {
+            if (/(Batch|Number|Price|Amount|Area|Rate|Count|batch|number|price|amount|area|rate|count)$/.test(k)) {
+                clean[k] = null;
             }
         }
     });
@@ -693,6 +751,14 @@ export const mapRecordFromDb = (item: any): any => {
         try { rawLogs = JSON.parse(rawLogs); } catch (e) { rawLogs = []; }
     }
     r.statusLogs = Array.isArray(rawLogs) ? rawLogs : [];
+
+    let rawCertOwners = val(r.certificateOwners, r.certificateowners, r.certificate_owners);
+    if (typeof rawCertOwners === 'string') {
+        try { rawCertOwners = JSON.parse(rawCertOwners); } catch (e) { rawCertOwners = []; }
+    }
+    r.certificateOwners = Array.isArray(rawCertOwners) ? rawCertOwners : [];
+    r.certificate_owners = r.certificateOwners;
+
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
 

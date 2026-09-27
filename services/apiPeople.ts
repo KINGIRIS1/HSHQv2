@@ -166,7 +166,7 @@ export const syncEmployeesToCloudConfig = async (employeesList: Employee[]) => {
     }
 };
 
-export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Promise<Employee | null> => {
+export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean, originalId?: string): Promise<Employee | null> => {
     const cleanEmp: Employee = {
         ...employee,
         id: (employee.id || '').trim(),
@@ -186,40 +186,43 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Pr
     try {
         const wardsArr = Array.isArray(cleanEmp.managedWards) ? cleanEmp.managedWards : [];
         const wardsStr = JSON.stringify(wardsArr);
+        const oldId = (originalId && originalId.trim() !== '') ? originalId.trim() : cleanEmp.id;
+        const isIdChanged = oldId.toLowerCase() !== cleanEmp.id.toLowerCase();
         
-        // 1. Thử lưu vào bảng employees SQL (thử payload chuẩn managedWards trước, nếu không được thử managed_wards)
+        // 1. Thử lưu vào bảng employees SQL
         try {
-            const payloadManagedWards = {
+            const payload = {
                 id: cleanEmp.id,
                 name: cleanEmp.name,
                 department: cleanEmp.department,
                 position: cleanEmp.position,
-                managedWards: wardsStr
+                managedWards: wardsStr,
+                managed_wards: wardsStr
             };
             
-            let saveErr: any = null;
             if (isUpdate) {
-                const res = await supabase.from('employees').update(payloadManagedWards).eq('id', cleanEmp.id);
-                saveErr = res.error;
-            } else {
-                const res = await supabase.from('employees').insert([payloadManagedWards]);
-                saveErr = res.error;
-            }
-
-            // Nếu schema CSDL dùng tên cột managed_wards dạng snake_case
-            if (saveErr && (saveErr.code === 'PGRST204' || String(saveErr.message).includes('managedWards'))) {
-                const payloadSnakeCase = {
-                    id: cleanEmp.id,
-                    name: cleanEmp.name,
-                    department: cleanEmp.department,
-                    position: cleanEmp.position,
-                    managed_wards: wardsStr
-                };
-                if (isUpdate) {
-                    await supabase.from('employees').update(payloadSnakeCase).eq('id', cleanEmp.id);
+                if (isIdChanged) {
+                    // Cố gắng cập nhật dòng cũ với ID mới
+                    const { error: updErr } = await supabase.from('employees').update(payload).eq('id', oldId);
+                    if (updErr) {
+                        // Nếu không cập nhật được ID trực tiếp (do khóa chính hoặc xung đột), thực hiện upsert ID mới và xóa ID cũ
+                        await supabase.from('employees').upsert([payload]);
+                        await supabase.from('employees').delete().eq('id', oldId);
+                    }
+                    // Đồng bộ đổi mã nhân viên sang bảng users
+                    try {
+                        await supabase.from('users').update({ employeeId: cleanEmp.id }).eq('employeeId', oldId);
+                    } catch (uErr) {
+                        console.warn("Lỗi cập nhật users.employeeId:", uErr);
+                    }
                 } else {
-                    await supabase.from('employees').insert([payloadSnakeCase]);
+                    const res = await supabase.from('employees').update(payload).eq('id', cleanEmp.id);
+                    if (res.error) {
+                        await supabase.from('employees').upsert([payload]);
+                    }
                 }
+            } else {
+                await supabase.from('employees').upsert([payload]);
             }
         } catch (dbErr) {
             console.warn("Lưu trực tiếp bảng SQL employees gặp lỗi (vẫn tiếp tục đồng bộ vào system_settings và bộ nhớ):", dbErr);
@@ -228,7 +231,10 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Pr
         // 2. ĐỒNG BỘ 100% VÀO system_settings ('employees_config') ĐỂ BẢO ĐẢM TẢI ĐƯỢC TRÊN MỌI THIẾT BỊ / TRÌNH DUYỆT MỚI
         try {
             const currentCloudList = await fetchRawEmployeesOnly();
-            const existingIdx = currentCloudList.findIndex(e => (e.id || '').trim().toLowerCase() === cleanEmp.id.toLowerCase());
+            const existingIdx = currentCloudList.findIndex(e => 
+                (e.id || '').trim().toLowerCase() === oldId.toLowerCase() ||
+                (e.id || '').trim().toLowerCase() === cleanEmp.id.toLowerCase()
+            );
             if (existingIdx >= 0) {
                 currentCloudList[existingIdx] = cleanEmp;
             } else {
@@ -244,6 +250,36 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Pr
     } catch (error) {
         logError("saveEmployeeApi", error, true);
         return cleanEmp;
+    }
+};
+
+export const migrateEmployeeIdInAllTables = async (oldId: string, newId: string): Promise<boolean> => {
+    if (!isConfigured || !supabase) return true;
+    
+    const cleanOld = oldId.trim();
+    const cleanNew = newId.trim();
+    if (!cleanOld || !cleanNew || cleanOld.toLowerCase() === cleanNew.toLowerCase()) return true;
+
+    try {
+        const tables = ['records', 'land_records', 'dangky_records', 'luutru_records'];
+        const fields = ['assignedTo', 'receivedBy', 'surveyorId', 'drafterId', 'checkedBy', 'submittedTo', 'returnedBy'];
+
+        for (const t of tables) {
+            for (const f of fields) {
+                try {
+                    await supabase
+                        .from(t)
+                        .update({ [f]: cleanNew })
+                        .eq(f, cleanOld);
+                } catch (e) {
+                    // Bỏ qua lỗi nếu bảng hoặc cột không tồn tại
+                }
+            }
+        }
+        return true;
+    } catch (err) {
+        console.warn("Lỗi đồng bộ mã nhân viên hàng loạt:", err);
+        return false;
     }
 };
 

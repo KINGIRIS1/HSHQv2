@@ -5,11 +5,8 @@ import {
   Save,
   AlertCircle,
   Paperclip,
-  Calendar,
-  User,
   Clock,
   CheckCircle2,
-  AlertTriangle,
   Send,
   Building,
   DollarSign,
@@ -20,8 +17,6 @@ import { RecordFile, Employee, User as AppUser, RecordStatus, RecordStatusLog } 
 import { RegistrationWorkflowStepper } from './RegistrationWorkflowStepper';
 import { validateCapGiayTransition } from '../../utils/capGiayStateMachine';
 import {
-  getRegistrationWorkflow,
-  WorkflowStep,
   getAppointmentInfo,
   calculateRegistrationDeadline,
 } from '../../utils/registrationWorkflows';
@@ -154,7 +149,6 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     }
   };
 
-  const workflow = getRegistrationWorkflow(formData.recordType);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">

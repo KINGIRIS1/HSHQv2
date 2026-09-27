@@ -339,9 +339,9 @@ const startServer = async () => {
     // Use router AFTER custom routes and Vite middleware (for API fallback)
     server.use(router);
 
-    const PORT = 3000;
+    const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
     server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
     });
 };
 

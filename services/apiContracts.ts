@@ -100,14 +100,13 @@ export const mapContractToDbSnake = (c: Contract) => ({
 });
 
 // --- CONTRACTS ---
-export const fetchContracts = async (): Promise<Contract[]> => {
+export const fetchContracts = async (forceCloud: boolean = false): Promise<Contract[]> => {
     // 1. Ưu tiên lấy ngay lập tức từ RAM cache hoặc IndexedDB / LocalStorage (0 giây chờ)
     const localContracts = await getIndexedDBContracts();
 
     if (!isConfigured) return localContracts;
     
-    // Tải ngầm đồng bộ từ Supabase nếu cần
-    (async () => {
+    const doCloudFetch = async (): Promise<Contract[]> => {
         try {
             let cloudContracts: Contract[] = [];
             const step = 1000;
@@ -163,13 +162,22 @@ export const fetchContracts = async (): Promise<Contract[]> => {
                 const merged = Array.from(map.values()).sort((a, b) => 
                     new Date(b.createdDate || 0).getTime() - new Date(a.createdDate || 0).getTime()
                 );
-                setLocalContracts(merged);
+                await setLocalContracts(merged);
+                return merged;
             }
         } catch (error) {
-            logError("fetchContracts background sync", error, true);
+            logError("fetchContracts cloud sync", error, true);
         }
-    })();
+        return localContracts;
+    };
 
+    // Nếu bộ nhớ cục bộ trống hoặc yêu cầu đồng bộ trực tiếp
+    if (forceCloud || localContracts.length === 0) {
+        return await doCloudFetch();
+    }
+
+    // Nếu đã có cache, trả về tức thì và đồng bộ ngầm
+    doCloudFetch();
     return localContracts;
 };
 
@@ -212,6 +220,53 @@ export const createContractApi = async (contract: Contract): Promise<boolean> =>
         return true;
     } catch (error) {
         logError("createContractApi Local error", error);
+        return false;
+    }
+};
+
+export const createContractBatchApi = async (contractList: Contract[]): Promise<boolean> => {
+    try {
+        if (!Array.isArray(contractList) || contractList.length === 0) return true;
+
+        // 1. Lưu lập tức vào RAM Cache & IndexedDB
+        let contracts = memoryContractsCache;
+        if (!contracts || contracts.length === 0) {
+            contracts = await getIndexedDBContracts();
+        }
+        const updatedContracts = [...contracts];
+        contractList.forEach(contract => {
+            const index = updatedContracts.findIndex(c => c.id === contract.id || (c.code && c.code === contract.code));
+            if (index >= 0) {
+                updatedContracts[index] = contract;
+            } else {
+                updatedContracts.unshift(contract);
+            }
+        });
+        await setLocalContracts(updatedContracts);
+
+        // 2. Thử đồng bộ lên Cloud Supabase nếu có kết nối
+        if (isConfigured) {
+            try {
+                const payloads = contractList.map(mapContractToDb);
+                const { error } = await supabase.from('contracts').insert(payloads);
+                if (error) {
+                    if (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist'))) {
+                        console.warn("⚠️ Bảng contracts thiếu cột camelCase. Đang thử lại với kiểu cột snake_case...");
+                        const snakePayloads = contractList.map(mapContractToDbSnake);
+                        const { error: err2 } = await supabase.from('contracts').insert(snakePayloads);
+                        if (err2) logError("createContractBatchApi snake_case", err2);
+                    } else {
+                        logError("createContractBatchApi camelCase", error);
+                    }
+                }
+            } catch (cloudErr) {
+                logError("createContractBatchApi Cloud sync", cloudErr);
+            }
+        }
+
+        return true;
+    } catch (error) {
+        logError("createContractBatchApi Local error", error);
         return false;
     }
 };
@@ -378,6 +433,37 @@ export const savePriceListBatch = async (items: PriceItem[]): Promise<boolean> =
     } catch (error) {
         logError("savePriceListBatch", error, true);
         return true; // Vẫn trả về true vì đã bảo vệ dữ liệu ở Local Cache & system_settings
+    }
+};
+
+export const parseContractDateMs = (dateStr?: any): number => {
+    if (!dateStr) return 0;
+    if (typeof dateStr === 'number') return dateStr;
+    if (dateStr instanceof Date) return dateStr.getTime();
+    if (typeof dateStr !== 'string') {
+        try {
+            dateStr = String(dateStr);
+        } catch {
+            return 0;
+        }
+    }
+    const parsed = new Date(dateStr).getTime();
+    if (!isNaN(parsed)) return parsed;
+    const parts = dateStr.split(/[\/\-]/);
+    if (parts.length === 3) {
+        const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
+        if (!isNaN(d)) return d;
+    }
+    return 0;
+};
+
+export const fixContractDateString = (dateStr?: any): string => {
+    if (!dateStr) return '';
+    if (typeof dateStr === 'string') return dateStr;
+    try {
+        return String(dateStr);
+    } catch {
+        return '';
     }
 };
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen } from 'lucide-react';
-import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User } from '../types';
+import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Database } from 'lucide-react';
+import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User, UserRole } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
@@ -46,7 +46,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     onDeleteBatchRecords,
     onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'vaoloi'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)

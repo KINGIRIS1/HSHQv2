@@ -2063,6 +2063,10 @@ function App() {
           unreadMessages={unreadMessages}
           activeRemindersCount={activeRemindersCount}
           onOpenRecordModal={() => { setEditingRecord(null); setIsModalOpen(true); }}
+          records={records}
+          onViewRecord={(r) => setViewingRecord(r)}
+          onClearReminder={handleClearReminder}
+          onClearAllReminders={handleClearAllReminders}
         >
         <MobileRoutes
           currentView={currentView}

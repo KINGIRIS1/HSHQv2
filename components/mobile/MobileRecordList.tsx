@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../../types';
 import { STATUS_LABELS, SELECTABLE_STATUSES, RECORD_TYPES, getShortRecordType, DEFAULT_WARDS, getNormalizedWard } from '../../constants';
-import { removeVietnameseTones, groupEmployeesByDepartment } from '../../utils/appHelpers';
+import { removeVietnameseTones, groupEmployeesByDepartment, resolveEmployeeName } from '../../utils/appHelpers';
 import StatusBadge from '../StatusBadge';
 import { 
   Search, 
@@ -22,6 +22,7 @@ import {
 interface MobileRecordListProps {
   records: RecordFile[];
   employees: Employee[];
+  users?: User[];
   currentUser?: User;
   wards?: string[];
   onViewRecord: (r: RecordFile) => void;
@@ -33,6 +34,7 @@ interface MobileRecordListProps {
 const MobileRecordList: React.FC<MobileRecordListProps> = ({ 
   records, 
   employees, 
+  users = [],
   currentUser,
   wards,
   onViewRecord, 
@@ -353,7 +355,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                       default: return record.assignedTo;
                     }
                   })();
-                  const emp = activeEmpId ? employees.find(e => e.id === activeEmpId || e.name === activeEmpId) : null;
+                  const empDisplayName = resolveEmployeeName(activeEmpId, employees, users) || 'Chưa giao';
 
                   return (
                     <div 
@@ -421,7 +423,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                         <div className="flex items-center gap-1.5 col-span-2 text-slate-500">
                           <span className="text-slate-400 font-bold">👤 NV xử lý:</span>
                           <span className="font-medium text-slate-800 truncate">
-                            {emp ? emp.name : 'Chưa giao'}
+                            {empDisplayName}
                           </span>
                         </div>
                       </div>

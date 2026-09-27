@@ -4,6 +4,7 @@ import { X, MapPin, FileText, User as UserIcon, CheckCircle2, Circle, Send, File
 import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
 import { RecordStatus } from '../../types';
 import StatusBadge from '../StatusBadge';
+import { formatDateTimeVN } from '../../utils/appHelpers';
 
 interface ArchiveDetailModalProps {
     isOpen: boolean;
@@ -161,7 +162,7 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                                 </p>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`text-sm font-medium ${idx === history.length - 1 ? 'text-gray-800' : 'text-gray-500'}`}>
-                                                        {new Date(h.timestamp).toLocaleString('vi-VN')}
+                                                        {formatDateTimeVN(h.timestamp)}
                                                     </span>
                                                 </div>
                                                 <p className="text-[11px] text-indigo-600 mt-1 italic">Bởi: {h.user || 'Hệ thống'}</p>

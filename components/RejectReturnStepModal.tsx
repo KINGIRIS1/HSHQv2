@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare, Loader2 } from 'lucide-react';
 import { RecordFile, User, Employee, RecordStatus } from '../types';
+import { resolveEmployeeName } from '../utils/appHelpers';
 
 export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler' | 'withdraw_citizen';
 
@@ -77,10 +78,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
 
   const getEmployeeName = (empId?: string | null) => {
     if (!empId) return 'Chưa phân công';
-    const emp = employees.find(e => e.id === empId);
-    if (emp) return emp.name;
-    const usr = users.find(u => u.username === empId || u.employeeId === empId);
-    return usr ? usr.name : empId;
+    return resolveEmployeeName(empId, employees, users) || 'Chưa phân công';
   };
 
   return (

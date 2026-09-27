@@ -146,6 +146,51 @@ export function getLuuTruWorkflowStage(record: Partial<RecordFile>): { stageInde
   }
 }
 
+export function getLuuTruWorkflow(procedureCode?: string | null): {
+  code: string;
+  name: string;
+  standardDays: number;
+  steps: { stepNumber: number; name: string; durationDays: number; durationHours: number }[];
+} {
+  const code = (procedureCode || '').trim();
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('registration_sla_full_config') : null;
+    if (raw) {
+      const fullConfig = JSON.parse(raw);
+      if (Array.isArray(fullConfig?.procedureItems)) {
+        const matchedItem = fullConfig.procedureItems.find((p: any) => p.module === 'luutru' && (p.code === code || code.includes(p.code)));
+        if (matchedItem && Array.isArray(matchedItem.steps)) {
+          const totalDays = matchedItem.steps.reduce((sum: number, s: any) => sum + (s.durationDays || 0), 0);
+          return {
+            code: matchedItem.code,
+            name: matchedItem.name,
+            standardDays: totalDays,
+            steps: matchedItem.steps.map((s: any) => ({
+              stepNumber: s.stepNumber ?? 1,
+              name: s.name,
+              durationDays: s.durationDays ?? 1,
+              durationHours: s.durationHours || 8,
+            })),
+          };
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    code: 'LUU_TRU_STANDARD',
+    name: 'Quy trình Lưu trữ (1.1, 1.2)',
+    standardDays: 3,
+    steps: [
+      { stepNumber: 1, name: 'Tiếp nhận mới', durationDays: 0.5, durationHours: 4 },
+      { stepNumber: 2, name: 'Đang thực hiện', durationDays: 1.5, durationHours: 12 },
+      { stepNumber: 3, name: 'Trình ký', durationDays: 0.5, durationHours: 4 },
+      { stepNumber: 4, name: 'Hoàn Thành', durationDays: 0.25, durationHours: 2 },
+      { stepNumber: 5, name: 'Trả kết quả', durationDays: 0.25, durationHours: 2 },
+    ]
+  };
+}
+
 export function handleLuuTruSupplement(
   record: Partial<RecordFile>,
   reason?: string,

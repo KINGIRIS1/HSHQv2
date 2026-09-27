@@ -1,12 +1,8 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { RecordFile, RecordStatus } from "../types";
-import { STATUS_LABELS, getNormalizedWard, getShortRecordType } from "../constants";
+import { getNormalizedWard, getShortRecordType } from "../constants";
 
-interface OverdueRecord {
-  date: string;
-  code: string;
-}
 
 const GEMINI_KEY_STORAGE = 'USER_GEMINI_API_KEY';
 
@@ -48,7 +44,7 @@ export const testApiConnection = async (): Promise<boolean> => {
 export const generateReport = async (
   records: RecordFile[], 
   timeLabel: string, 
-  scope: 'general' | 'personal' = 'general', 
+  _scope: 'general' | 'personal' = 'general', 
   userName?: string,
   customTitle?: string
 ): Promise<string> => {

@@ -37,7 +37,7 @@ export const getExcelBackupDirectory = async (): Promise<string> => {
 /**
  * Lưu đường dẫn thư mục sao lưu Excel vào hệ thống
  */
-export const saveExcelBackupDirectory = async (dir: string): Promise<boolean> => {
+export const saveExcelBackupDirectory = async (): Promise<boolean> => {
     return true;
 };
 
