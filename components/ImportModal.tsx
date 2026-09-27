@@ -45,24 +45,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     }
   }, [isOpen, initialMode]);
 
-  const parseExcelDate = (input: any, fieldLabel?: string, errorsList?: string[], isDeadline: boolean = false): string | undefined => {
+  const parseExcelDate = (input: any, fieldLabel?: string, errorsList?: string[]): string | undefined => {
       if (input === undefined || input === null || input === '') return undefined;
       const strVal = String(input).trim();
       if (strVal === '' || strVal === '-' || strVal === 'N/A' || strVal === 'null' || strVal === 'undefined') return undefined;
 
       const dateIso = keepOnlyDate(input);
       if (dateIso) {
-          // Kiểm tra xem chuỗi đầu vào có sẵn phần giờ hay không
-          const timeMatch = strVal.match(/[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
-          if (timeMatch) {
-              const hh = String(timeMatch[1]).padStart(2, '0');
-              const mm = String(timeMatch[2]).padStart(2, '0');
-              const ss = timeMatch[3] ? String(timeMatch[3]).padStart(2, '0') : '00';
-              return `${dateIso}T${hh}:${mm}:${ss}`;
-          }
-          // Nếu người dùng nhập chỉ ngày tháng năm -> Lấy mặc định giờ đầu tiên của ngày làm việc (07:30:00), riêng hạn trả là 17:30:00
-          const defaultHour = isDeadline ? 'T17:30:00' : 'T07:30:00';
-          return `${dateIso}${defaultHour}`;
+          return dateIso;
       }
 
       if (fieldLabel && errorsList) {
@@ -218,7 +208,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             const deadlineRaw = getVal(['HẸN TRẢ', 'DEADLINE', 'deadline']);
-            if (deadlineRaw !== undefined) record.deadline = parseExcelDate(deadlineRaw, 'Ngày hẹn trả', errors, true);
+            if (deadlineRaw !== undefined) record.deadline = parseExcelDate(deadlineRaw, 'Ngày hẹn trả', errors);
 
             const completedWorkDateRaw = getVal(['NGÀY THỰC HIỆN', 'NGÀY ĐÃ THỰC HIỆN', 'completedworkdate', 'completed_work_date', 'completedWorkDate']);
             if (completedWorkDateRaw !== undefined) record.completedWorkDate = parseExcelDate(completedWorkDateRaw, 'Ngày thực hiện', errors);
@@ -693,7 +683,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
               <h2 className="text-lg font-bold text-white tracking-wide">
                 {mode === 'create' 
                   ? 'Tiếp nhận hàng loạt từ Excel (Đo đạc / Lưu trữ)' 
-                  : 'Cập nhật hàng loạt từ file Excel (Đo đạc / Lưu trữ)'
+                  : 'Cập nhật hàng loạt'
                 }
               </h2>
               <p className="text-xs text-blue-100/90 font-medium mt-0.5">
@@ -739,26 +729,19 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             >
               <PlusCircle size={15} /> Nhập mới hàng loạt
             </button>
-
-            <button 
-              onClick={handleDownloadTemplate} 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-2xs transition-all cursor-pointer"
-              title="Tải file mẫu Excel"
-            >
-              <FileSpreadsheet size={15} className="text-slate-600" /> Tải file mẫu Excel
-            </button>
           </div>
 
-          {/* Right Side: Upload button & Red Exclamation Notice Button */}
+          {/* Right Side: Tải file mẫu Excel & Red Exclamation Notice Button */}
           <div className="flex items-center gap-2 ml-auto">
             <input type="file" ref={fileInputRef} accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
             
             <button 
-              onClick={() => fileInputRef.current?.click()} 
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-4.5 py-2.5 text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
-              title="Tải lên file Excel"
+              onClick={handleDownloadTemplate} 
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 hover:border-slate-400 font-bold rounded-xl px-4 py-2.5 text-xs flex items-center gap-2 shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-95"
+              title="Tải file mẫu Excel dùng để nhập hoặc cập nhật"
             >
-              <Upload size={15} /> Tải lên file Excel
+              <FileSpreadsheet size={15} className="text-emerald-600" /> 
+              <span>Tải file mẫu Excel</span>
             </button>
 
             <button 

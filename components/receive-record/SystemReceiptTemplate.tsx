@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import Barcode from 'react-barcode';
+import { QRCodeSVG } from 'qrcode.react';
 import { RecordFile, Employee, User, Contract } from '../../types';
 import { getNormalizedWard, getShortRecordType, getFullRecordType, getWardFullLabel } from '../../constants';
 import { getReceiptReceiverName } from '../../utils/appHelpers';
@@ -423,10 +423,15 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                     <div style={{ fontWeight: 'bold', fontSize: '14.5px', whiteSpace: 'nowrap' }}>BỘ PHẬN TIẾP NHẬN VÀ TRẢ KẾT QUẢ</div>
                                     
                                     {data.code && (
-                                        <div style={{ marginTop: '6px', textAlign: 'center', display: 'block' }}>
-                                            <div style={{ fontWeight: 'bold', fontSize: '15px', display: 'block', whiteSpace: 'nowrap' }}>{data.code}</div>
-                                            <div style={{ transform: 'scale(0.8)', transformOrigin: 'top center', marginTop: '-4px', display: 'inline-block' }}>
-                                                <Barcode value={data.code} height={28} displayValue={false} margin={0} width={1.5} />
+                                        <div style={{ marginTop: '5px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div style={{ fontWeight: 'bold', fontSize: '14px', display: 'block', whiteSpace: 'nowrap', marginBottom: '2px' }}>{data.code}</div>
+                                            <div style={{ display: 'inline-flex', padding: '2px', background: '#fff', border: '1px solid #111', borderRadius: '3px' }}>
+                                                <QRCodeSVG 
+                                                    value={data.code} 
+                                                    size={64} 
+                                                    level="M" 
+                                                    includeMargin={false} 
+                                                />
                                             </div>
                                         </div>
                                     )}

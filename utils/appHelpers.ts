@@ -195,7 +195,7 @@ export const formatDateKey = (date: Date): string => {
 };
 
 // Tính hạn trả (deadline) dựa trên loại hồ sơ, ngày nhận, danh sách ngày nghỉ lễ
-export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[]): string => {
+export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[], fullRecord?: Partial<RecordFile>): string => {
     if (!receivedDateStr) return '';
     const cleanDate = receivedDateStr.split('T')[0];
     const lowerType = (type || '').toLowerCase().trim();
@@ -919,6 +919,51 @@ export function getEmployeeName(idOrName?: string | null, employees: Employee[] 
     return trimmed;
 }
 
+export function findMatchingEmployee(idOrName?: string | null, employees: Employee[] = [], users: User[] = []): Employee | undefined {
+    if (!idOrName) return undefined;
+    const trimmed = String(idOrName).trim().toLowerCase();
+    if (!trimmed) return undefined;
+    
+    // Tìm theo Employee id hoặc name
+    const foundEmp = employees.find(e => 
+        (e.id && e.id.toLowerCase() === trimmed) || 
+        (e.name && e.name.toLowerCase() === trimmed)
+    );
+    if (foundEmp) return foundEmp;
+
+    // Tìm theo User id, username hoặc name rồi map qua Employee
+    const foundUser = users.find(u => 
+        (u.id && u.id.toLowerCase() === trimmed) || 
+        (u.username && u.username.toLowerCase() === trimmed) || 
+        (u.name && u.name.toLowerCase() === trimmed)
+    );
+    if (foundUser) {
+        return employees.find(e => 
+            (foundUser.id && e.id && e.id.toLowerCase() === foundUser.id.toLowerCase()) || 
+            (e.name && e.name.toLowerCase() === (foundUser.name || '').toLowerCase())
+        );
+    }
+    return undefined;
+}
+
+export function resolveEmployeeName(idOrName?: string | null, employees: Employee[] = [], users: User[] = []): string {
+    if (!idOrName) return '';
+    const trimmed = String(idOrName).trim();
+    if (!trimmed) return '';
+    
+    const emp = findMatchingEmployee(trimmed, employees, users);
+    if (emp && emp.name) return emp.name;
+
+    const user = users.find(u => 
+        (u.id && u.id.toLowerCase() === trimmed.toLowerCase()) || 
+        (u.username && u.username.toLowerCase() === trimmed.toLowerCase()) || 
+        (u.name && u.name.toLowerCase() === trimmed.toLowerCase())
+    );
+    if (user && user.name) return user.name;
+
+    return trimmed;
+}
+
 export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = []): string {
     if (!idOrName) return '';
     const trimmed = String(idOrName).trim();
@@ -927,6 +972,37 @@ export function resolveEmployeeId(idOrName?: string | null, employees: Employee[
     // Nếu truyền vào trùng ID hoặc Tên trong danh sách, quy đổi về ID chuẩn
     const emp = employees.find(e => (e.id && e.id.toLowerCase() === trimmed.toLowerCase()) || (e.name && e.name.toLowerCase() === trimmed.toLowerCase()));
     return emp ? emp.id : trimmed;
+}
+
+export const normalizeEmployeeId = resolveEmployeeId;
+
+export function formatDateTimeVN(dateVal: any): string {
+    if (!dateVal) return '';
+    try {
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return String(dateVal);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch {
+        return String(dateVal);
+    }
+}
+
+export function getVietnamNowISO(): string {
+    return new Date().toISOString();
+}
+
+export function getVietnamDateString(dateVal?: any): string {
+    const d = dateVal ? new Date(dateVal) : new Date();
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 }
 
 export function cleanSyncNotes(text?: string | null): string {

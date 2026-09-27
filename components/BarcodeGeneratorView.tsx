@@ -5,7 +5,7 @@ import { Download, Printer, QrCode, ScanBarcode } from 'lucide-react';
 
 const BarcodeGeneratorView: React.FC = () => {
     const [receiptNumber, setReceiptNumber] = useState('');
-    const [barcodeType, setBarcodeType] = useState<'barcode' | 'qrcode'>('barcode');
+    const [barcodeType, setBarcodeType] = useState<'barcode' | 'qrcode'>('qrcode');
     const barcodeRef = useRef<HTMLDivElement>(null);
 
     const handlePrint = () => {
@@ -72,16 +72,16 @@ const BarcodeGeneratorView: React.FC = () => {
                     
                     <div className="flex gap-4 mt-4">
                         <button
-                            onClick={() => setBarcodeType('barcode')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-medium transition-colors ${barcodeType === 'barcode' ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                        >
-                            <ScanBarcode size={18} /> Mã Vạch (1D)
-                        </button>
-                        <button
                             onClick={() => setBarcodeType('qrcode')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-medium transition-colors ${barcodeType === 'qrcode' ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
                         >
                             <QrCode size={18} /> Mã QR (2D)
+                        </button>
+                        <button
+                            onClick={() => setBarcodeType('barcode')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-medium transition-colors ${barcodeType === 'barcode' ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                        >
+                            <ScanBarcode size={18} /> Mã Vạch (1D)
                         </button>
                     </div>
                 </div>
