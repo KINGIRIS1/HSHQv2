@@ -26,22 +26,8 @@ if (typeof window !== 'undefined') {
 
       // Các API an toàn để dùng trên trình duyệt
       openExternal: async (url: string) => { window.open(url, '_blank'); },
-      showNotification: async (title: string, body: string) => {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-          const BrowserNotification = (window as any).Notification;
-          if (BrowserNotification.permission === 'granted') {
-            new BrowserNotification(title, { body });
-            return true;
-          } else if (BrowserNotification.permission !== 'denied') {
-            const permission = await BrowserNotification.requestPermission();
-            if (permission === 'granted') {
-              new BrowserNotification(title, { body });
-              return true;
-            }
-          }
-        } else {
-          console.log(`[Notification Muted] ${title}: ${body}`);
-        }
+      showNotification: async (_title: string, _body: string) => {
+        // Tắt hoàn toàn thông báo thời gian thực ngoài phần mềm theo yêu cầu
         return false;
       },
 

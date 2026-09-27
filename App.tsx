@@ -1,7 +1,7 @@
 
-import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from 'react';
-import { RecordFile, RecordStatus, User, UserRole, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, isCertificateRecordType, STATUS_LABELS, APP_VERSION } from './constants';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from 'react';
+import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, isCertificateRecordType, STATUS_LABELS, APP_VERSION, isSurveyRecordType } from './constants';
 import { getCapGiayNextMainStatus, resumeFromSupplement } from './utils/capGiayStateMachine';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
@@ -43,8 +43,8 @@ import BulkSignConfirmModal from './components/BulkSignConfirmModal';
 import { DossierComponentItem } from './types';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
-import { downloadBackupAsFile } from './services/backupService';
-import { checkAndTriggerPeriodicExcelBackup } from './services/excelBackupService';
+import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
+import { checkAndTriggerPeriodicExcelBackup, performExcelBackup } from './services/excelBackupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
 import { DriveSyncToastContainer } from './components/common/DriveSyncToastContainer';
@@ -214,7 +214,7 @@ function App() {
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extendTargetRecords, setExtendTargetRecords] = useState<RecordFile[]>([]);
   const [isBulkSignModalOpen, setIsBulkSignModalOpen] = useState(false);
-  const [bulkSignPendingRecords] = useState<RecordFile[]>([]);
+  const [bulkSignPendingRecords, setBulkSignPendingRecords] = useState<RecordFile[]>([]);
   const [isSignApprovalModalOpen, setIsSignApprovalModalOpen] = useState(false);
   const [signApprovalTargetRecords, setSignApprovalTargetRecords] = useState<RecordFile[]>([]);
 
@@ -272,7 +272,7 @@ function App() {
   // --- CUSTOM HOOKS ---
   const { 
       records: rawRecords, employees, users, wards, holidays, rolePermissions, departmentPermissions, connectionStatus, 
-      handleSyncPendingRecords,
+      pendingSyncCount, handleSyncPendingRecords,
       isUpdateAvailable, latestVersion, updateUrl,
       setEmployees, setUsers, setRecords, setWards,
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleBatchDeleteRecords, handleImportRecords,
@@ -1325,8 +1325,111 @@ function App() {
       }
   }, [currentUser]);
 
+  const exportSurveyBatch = async (batchNumber: number | string, batchDate: string, handoverWard?: string) => {
+      const nowStr = new Date().toISOString();
+      const pureBatch = getPureBatchNumber(batchNumber) || String(batchNumber);
+      const candidates = selectedRecordIds.size > 0 ? rawRecords.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
+      const recordsToExport = candidates.filter(r => 
+          (isSurveyRecordType(r.recordType) || r.sourceTable === 'land_records') && 
+          (r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER || ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch) || r.status === RecordStatus.HANDOVER)
+      );
+      if (recordsToExport.length === 0) return;
+      const updatesToApply = recordsToExport.map(r => {
+          const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
+          const existingLogs = Array.isArray(r.statusLogs) ? r.statusLogs : [];
+          const newLog: RecordStatusLog = {
+              id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              recordId: r.id,
+              previousStatus: r.status,
+              newStatus: nextStatus,
+              changedBy: currentUser?.name || currentUser?.username || 'Hệ thống',
+              changedAt: nowStr,
+              note: `[Đo đạc] Chốt xuất giao 1 cửa - Đợt ${pureBatch}`
+          };
+          const statusLogs = [...existingLogs, newLog];
+          const actualHandoverWard = (handoverWard === 'SAME_AS_WARD' || !handoverWard) ? r.ward : handoverWard;
+          return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, updated_at: nowStr, statusLogs };
+      });
 
+      try {
+          const res = await updateRecordsBatchById(updatesToApply);
+          if (!res.success) throw new Error(res.error || "Không thể lưu chốt đợt vào CSDL");
 
+          const updateMap = new Map<string, RecordFile>();
+          updatesToApply.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+          setSelectedRecordIds(new Set()); 
+          setToast({ type: 'success', message: `[Đo đạc] Đã chốt danh sách ${batchNumber} (${updatesToApply.length} hồ sơ) thành công.` });
+          setExportModalType("handover");
+          setIsExportModalOpen(true);
+      } catch (err: any) {
+          console.error("Lỗi khi chốt đợt xuất giao 1 cửa Đo đạc:", err);
+          setToast({ type: 'error', message: `Chốt đợt thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+      }
+  };
+
+  const exportCertificateBatch = async (batchNumber: number | string, batchDate: string, handoverWard?: string) => {
+      const nowStr = new Date().toISOString();
+      const pureBatch = getPureBatchNumber(batchNumber) || String(batchNumber);
+      const candidates = selectedRecordIds.size > 0 ? rawRecords.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
+      const recordsToExport = candidates.filter(r => 
+          (isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records') && 
+          (r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER || ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch) || r.status === RecordStatus.HANDOVER)
+      );
+      if (recordsToExport.length === 0) return;
+      const updatesToApply = recordsToExport.map(r => {
+          const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
+          const existingLogs = Array.isArray(r.statusLogs) ? r.statusLogs : [];
+          const newLog: RecordStatusLog = {
+              id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              recordId: r.id,
+              previousStatus: r.status,
+              newStatus: nextStatus,
+              changedBy: currentUser?.name || currentUser?.username || 'Hệ thống',
+              changedAt: nowStr,
+              note: `[Cấp giấy] Chốt xuất giao 1 cửa - Đợt ${pureBatch}`
+          };
+          const statusLogs = [...existingLogs, newLog];
+          const actualHandoverWard = (handoverWard === 'SAME_AS_WARD' || !handoverWard) ? r.ward : handoverWard;
+          return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, updated_at: nowStr, statusLogs };
+      });
+
+      try {
+          const res = await updateRecordsBatchById(updatesToApply);
+          if (!res.success) throw new Error(res.error || "Không thể lưu chốt đợt vào CSDL");
+
+          const updateMap = new Map<string, RecordFile>();
+          updatesToApply.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+          setSelectedRecordIds(new Set()); 
+          setToast({ type: 'success', message: `[Cấp giấy] Đã chốt danh sách ${batchNumber} (${updatesToApply.length} hồ sơ) thành công.` });
+          setExportModalType("handover");
+          setIsExportModalOpen(true);
+      } catch (err: any) {
+          console.error("Lỗi khi chốt đợt xuất giao 1 cửa Cấp giấy:", err);
+          setToast({ type: 'error', message: `Chốt đợt thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+      }
+  };
+
+  const exportArchiveBatch = async (batchName: string, batchDate: string) => {
+      const candidates = selectedRecordIds.size > 0 ? rawRecords.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
+      const archiveCandidates = candidates.filter(r => isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records');
+      const archiveIds = archiveCandidates.map(r => r.id);
+      
+      if (archiveIds.length === 0) {
+          setToast({ type: 'error', message: 'Vui lòng chọn các hồ sơ lưu trữ để chốt đợt bàn giao.' });
+          return;
+      }
+
+      const res = await createArchiveBatch(batchName, archiveIds, 'archive', batchDate);
+      if (res.success) {
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `[Lưu trữ] Đã chốt đợt độc lập "${res.batchName}" (${res.count} hồ sơ) thành công.` });
+          loadData();
+      }
+  };
 
   const executeBatchExport = async (batchNumber: number | string, batchDate: string, handoverWard?: string) => {
       const nowStr = new Date().toISOString();
@@ -1713,7 +1816,7 @@ function App() {
       }
   }, [extendTargetRecords, currentUser]);
 
-  const handleConfirmRejectReturnStep = useCallback(async (optionType: ReturnOptionType, reason: string) => {
+  const handleConfirmRejectReturnStep = useCallback(async (optionType: ReturnOptionType, reason: string, returnDateStr: string) => {
       if (rejectReturnTargetRecords.length === 0) return;
       // Luôn lấy ngày giờ thực tế hiện tại làm ngày thực hiện thao tác đồng ý
       const targetDateISO = new Date().toISOString();
@@ -1960,6 +2063,10 @@ function App() {
           unreadMessages={unreadMessages}
           activeRemindersCount={activeRemindersCount}
           onOpenRecordModal={() => { setEditingRecord(null); setIsModalOpen(true); }}
+          records={records}
+          onViewRecord={(r) => setViewingRecord(r)}
+          onClearReminder={handleClearReminder}
+          onClearAllReminders={handleClearAllReminders}
         >
         <MobileRoutes
           currentView={currentView}
