@@ -915,20 +915,81 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 }
 
 // --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ (ID VS TÊN) ---
+export function getNextAvailableEmployeeId(employees: Employee[] = [], temporaryIds: Set<string> = new Set()): string {
+    const usedNumbers = new Set<number>();
+    
+    // Thu thập tất cả các số đã được sử dụng
+    employees.forEach(e => {
+        if (!e.id) return;
+        const match = e.id.match(/^NV(\d+)$/i);
+        if (match) {
+            usedNumbers.add(parseInt(match[1], 10));
+        }
+    });
+
+    temporaryIds.forEach(id => {
+        const match = id.match(/^NV(\d+)$/i);
+        if (match) {
+            usedNumbers.add(parseInt(match[1], 10));
+        }
+    });
+
+    // Tìm số dương i nhỏ nhất chưa xuất hiện (1, 2, 3...)
+    let i = 1;
+    while (usedNumbers.has(i)) {
+        i++;
+    }
+
+    return `NV${String(i).padStart(3, '0')}`;
+}
+
+export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = []): string {
+    if (!idOrName) return '';
+    const trimmed = String(idOrName).trim();
+    if (!trimmed) return '';
+    
+    // Nếu là tên đầy đủ của nhân viên trong danh sách, trả về ID của nhân viên đó
+    const emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    if (emp && emp.id) return emp.id;
+
+    // Tìm theo Employee id hoặc name (không phân biệt hoa thường)
+    const foundEmp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
+    if (foundEmp && foundEmp.id) return foundEmp.id;
+
+    // Nếu giá trị là số thuần túy (VD: "2", "32"), quy đổi thành NV002, NV032
+    if (/^\d+$/.test(trimmed)) {
+        const num = parseInt(trimmed, 10);
+        return `NV${String(num).padStart(3, '0')}`;
+    }
+
+    // Nếu là dạng nv2, NV2, nv02 -> quy đổi thành NV002
+    if (/^nv\s*\d+$/i.test(trimmed)) {
+        const num = parseInt(trimmed.replace(/\D/g, ''), 10);
+        return `NV${String(num).padStart(3, '0')}`;
+    }
+
+    return trimmed;
+}
+
+export const normalizeEmployeeId = resolveEmployeeId;
+
 export function getEmployeeName(idOrName?: string | null, employees: Employee[] = []): string {
     if (!idOrName) return 'Chưa giao';
     const trimmed = String(idOrName).trim();
     if (!trimmed) return 'Chưa giao';
     
-    // 1. Tìm theo ID (không phân biệt hoa thường)
-    let emp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
+    // 1. Chuẩn hóa ID trước (Vd: "2" -> "NV002", "nv2" -> "NV002")
+    const standardizedId = resolveEmployeeId(trimmed, employees);
+    
+    // 2. Tìm theo ID chuẩn hóa
+    let emp = employees.find(e => e.id && e.id.toLowerCase() === standardizedId.toLowerCase());
     if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
     
-    // 2. Tìm theo Tên (không phân biệt hoa thường)
+    // 3. Tìm theo Tên gốc (phòng hờ trường hợp idOrName truyền vào là tên nhân viên gốc)
     emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
     if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
     
-    // 3. Nếu không tìm thấy trong danh mục, trả về chính chuỗi đang lưu (tránh mất tên nếu nhập tự do)
+    // 4. Nếu không tìm thấy trong danh mục, trả về chính chuỗi đang lưu
     return trimmed;
 }
 
@@ -937,40 +998,18 @@ export function findMatchingEmployee(idOrName?: string | null, employees: Employ
     const trimmed = String(idOrName).trim().toLowerCase();
     if (!trimmed) return undefined;
     
-    // Tìm theo Employee id hoặc name
+    // Sử dụng ID chuẩn hóa để tìm kiếm
+    const standardizedId = resolveEmployeeId(trimmed, employees);
+
     const foundEmp = employees.find(e => 
-        (e.id && e.id.toLowerCase() === trimmed) || 
+        (e.id && e.id.toLowerCase() === standardizedId.toLowerCase()) || 
         (e.name && e.name.toLowerCase() === trimmed)
     );
     if (foundEmp) return foundEmp;
 
-    // Nếu giá trị là số thuần túy (VD: "2", "32"), xử lý như index hoặc id số
-    if (/^\d+$/.test(trimmed)) {
-        const num = parseInt(trimmed, 10);
-        // Thử 1-based index (num - 1)
-        if (employees[num - 1]) {
-            return employees[num - 1];
-        }
-        // Thử 0-based index (num)
-        if (employees[num]) {
-            return employees[num];
-        }
-        // Thử tìm nhân viên có ID kết thúc bằng số này hoặc format NV0xx, NVxxx
-        const paddedNum = String(num).padStart(3, '0');
-        const empByNum = employees.find(e => 
-            e.id && (
-                e.id.toLowerCase() === `nv${num}` || 
-                e.id.toLowerCase() === `nv${paddedNum}` ||
-                e.id.toLowerCase() === `nhanvien${num}` ||
-                e.id.endsWith(String(num))
-            )
-        );
-        if (empByNum) return empByNum;
-    }
-
     // Tìm theo User id, username hoặc name rồi map qua Employee
     const foundUser = users.find(u => 
-        (u.id && u.id.toLowerCase() === trimmed) || 
+        (u.id && u.id.toLowerCase() === standardizedId.toLowerCase()) || 
         (u.username && u.username.toLowerCase() === trimmed) || 
         (u.name && u.name.toLowerCase() === trimmed)
     );
@@ -988,46 +1027,25 @@ export function resolveEmployeeName(idOrName?: string | null, employees: Employe
     const trimmed = String(idOrName).trim();
     if (!trimmed) return '';
     
-    const emp = findMatchingEmployee(trimmed, employees, users);
+    // 1. Chuẩn hóa ID trước
+    const standardizedId = resolveEmployeeId(trimmed, employees);
+    
+    const emp = findMatchingEmployee(standardizedId, employees, users);
     if (emp && emp.name) return emp.name;
 
     const user = users.find(u => 
-        (u.id && u.id.toLowerCase() === trimmed.toLowerCase()) || 
-        (u.username && u.username.toLowerCase() === trimmed.toLowerCase()) || 
+        (u.id && u.id.toLowerCase() === standardizedId.toLowerCase()) || 
+        (u.username && u.username.toLowerCase() === standardizedId.toLowerCase()) || 
         (u.name && u.name.toLowerCase() === trimmed.toLowerCase())
     );
     if (user && user.name) return user.name;
 
-    // Nếu là số thuần túy nhưng không map được, thử quy đổi thành NVXXX hoặc trả về rỗng nếu không có ý nghĩa
-    if (/^\d+$/.test(trimmed)) {
-        const num = parseInt(trimmed, 10);
-        if (employees[num - 1]) return employees[num - 1].name;
-        if (employees[num]) return employees[num].name;
-    }
+    // 2. Nếu không tìm thấy, tìm theo tên gốc truyền vào
+    const empByOriginalName = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    if (empByOriginalName) return empByOriginalName.name;
 
     return trimmed;
 }
-
-export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = []): string {
-    if (!idOrName) return '';
-    const trimmed = String(idOrName).trim();
-    if (!trimmed) return '';
-    
-    // Nếu truyền vào trùng ID hoặc Tên trong danh sách, quy đổi về ID chuẩn
-    const emp = findMatchingEmployee(trimmed, employees);
-    if (emp && emp.id) return emp.id;
-
-    if (/^\d+$/.test(trimmed)) {
-        const num = parseInt(trimmed, 10);
-        if (employees[num - 1]) return employees[num - 1].id;
-        if (employees[num]) return employees[num].id;
-        return `NV${String(num).padStart(3, '0')}`;
-    }
-
-    return trimmed;
-}
-
-export const normalizeEmployeeId = resolveEmployeeId;
 
 export function formatDateTimeVN(dateVal: any): string {
     if (!dateVal) return '';

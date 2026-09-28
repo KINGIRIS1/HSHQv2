@@ -400,141 +400,47 @@ export const useRecordFilter = (
             return 0;
         });
 
-        return result;
+        // Tạo bản baseResult (đã lọc qua search, ward, status, employee, date) để tính warningCount chính xác theo đúng bộ lọc
+        const baseResult = [...result];
+
+        let overdue = 0;
+        let approaching = 0;
+        if (currentUser) {
+            baseResult.forEach(r => {
+                if (checkWarningPermission(r)) {
+                    if (isRecordOverdue(r)) overdue++;
+                    else if (isRecordApproaching(r)) approaching++;
+                }
+            });
+        }
+
+        let finalResult = baseResult;
+        if (warningFilter !== 'none' && currentUser) {
+            if (warningFilter === 'overdue') {
+                finalResult = baseResult.filter(r => isRecordOverdue(r) && checkWarningPermission(r));
+            } else if (warningFilter === 'approaching') {
+                finalResult = baseResult.filter(r => isRecordApproaching(r) && checkWarningPermission(r));
+            }
+        }
+
+        return {
+            filteredRecords: finalResult,
+            warningCount: { overdue, approaching }
+        };
     }, [records, searchTerm, filterWard, filterRecordType, filterStatus, filterEmployee, filterDate, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, taxSubTab, currentUser, employees]);
 
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
-        return filteredRecords.slice(start, start + itemsPerPage);
-    }, [filteredRecords, currentPage, itemsPerPage]);
+        return filteredRecords.filteredRecords.slice(start, start + itemsPerPage);
+    }, [filteredRecords.filteredRecords, currentPage, itemsPerPage]);
 
-    const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
-
-    // Warning Counts
-    const warningCount = useMemo(() => {
-        let overdue = 0;
-        let approaching = 0;
-        if (records.length > 0 && currentUser) {
-            const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
-            const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
-            const isTestMeasurementView = ['test_records', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office', 'test_print_cert', 'test_pending_supplement_list', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed'].includes(currentView);
-
-            let candidates = records.filter(r => {
-                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return false; 
-                if (!checkWarningPermission(r)) return false; 
-                
-                const shortType = getShortRecordType(r.recordType);
-                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return false;
-
-                // Filter by recordType based on view group
-                if (isArchiveMeasurementView && !isArchiveRecord(r)) return false;
-                if (isMeasurementView && (isArchiveRecord(r) || r.sourceTable === 'dangky_records')) return false;
-                if (isTestMeasurementView && (r.sourceTable !== 'dangky_records' && r.group !== '3. Đăng ký đất đai, cấp GCN')) return false;
-
-                return true;
-            });
-
-            // If in specific sub-tab view, filter candidates by that sub-tab's conditions
-            if (!['all_records', 'archive_records', 'test_records'].includes(currentView)) {
-                if (currentView === 'check_list' || currentView === 'archive_check_list' || currentView === 'test_check_list') {
-                    const isPendingSign = (r: RecordFile) => {
-                        if (r.status === RecordStatus.PENDING_SIGN) return true;
-                        if ((r.submissionDate || r.submittedTo) && !(r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) return true;
-                        return false;
-                    };
-                    if (isDirector) {
-                        candidates = candidates.filter(r => isPendingSign(r) && r.submittedTo === currentUser?.employeeId);
-                    } else {
-                        candidates = candidates.filter(r => isPendingSign(r));
-                    }
-                } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list' || currentView === 'test_pending_check_list') {
-                    candidates = candidates.filter(r => {
-                        if (r.status === RecordStatus.PENDING_CHECK) return true;
-                        if ((r.pendingCheckDate || r.checkedBy || r.checkedDate) && !(r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) return true;
-                        return false;
-                    });
-                } else if (currentView === 'test_measurement_field') {
-                    candidates = candidates.filter(r => r.status === RecordStatus.APPRAISAL);
-                } else if (currentView === 'test_measurement_office') {
-                    if (taxSubTab === 'transfer') {
-                        candidates = candidates.filter(r => r.status === RecordStatus.TAX_TRANSFER);
-                    } else if (taxSubTab === 'area7') {
-                        candidates = candidates.filter(r => r.status === RecordStatus.PENDING_TAX_KV7);
-                    } else if (taxSubTab === 'notice') {
-                        candidates = candidates.filter(r => r.status === RecordStatus.PENDING_TAX_PAYMENT);
-                    } else {
-                        candidates = candidates.filter(r => 
-                            r.status === RecordStatus.TAX_TRANSFER || 
-                            r.status === RecordStatus.PENDING_TAX_KV7 || 
-                            r.status === RecordStatus.PENDING_TAX_PAYMENT
-                        );
-                    }
-                } else if (currentView === 'measurement_field') {
-                    candidates = candidates.filter(r => {
-                        if (isOfficeOnlySurveyProcedure(r.recordType)) return false;
-                        const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
-                        const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK;
-                        if (!isAssigned && (!r.status || r.status === RecordStatus.RECEIVED)) return false;
-                        if (!isAssigned && !isExecutingStatus && r.status !== RecordStatus.FIELD_WORK) return false;
-                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
-                        if (r.submissionDate || r.submittedTo) return false;
-                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
-                        if (r.status === RecordStatus.OFFICE_WORK) return false;
-                        return true;
-                    });
-                } else if (currentView === 'measurement_office') {
-                    candidates = candidates.filter(r => {
-                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
-                        if (r.submissionDate || r.submittedTo) return false;
-                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
-                        const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
-                        const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
-                        if (r.status === RecordStatus.OFFICE_WORK) return true;
-                        if (isOfficeProcedure && isAssigned) return true;
-                        return false;
-                    });
-                } else if (currentView === 'test_print_cert') {
-                    candidates = candidates.filter(r => {
-                        return r.status === RecordStatus.PENDING_PRINT_CERT || (r.status as string) === 'PENDING_PRINT_CERT';
-                    });
-                } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'test_completed_list') {
-                    candidates = candidates.filter(r => {
-                        const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
-                        const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK || r.status === RecordStatus.OFFICE_WORK || r.status === RecordStatus.COMPLETED_WORK;
-                        if (!isAssigned && (!r.status || r.status === RecordStatus.RECEIVED)) return false;
-                        if (!isAssigned && !isExecutingStatus) return false;
-                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
-                        if (r.submissionDate || r.submittedTo) return false;
-                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
-                        return true;
-                    });
-                } else if (currentView === 'director_completed' || currentView === 'archive_director_completed' || currentView === 'test_director_completed') {
-                    candidates = candidates.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.FIELD_WORK && r.status !== RecordStatus.OFFICE_WORK && r.status !== RecordStatus.COMPLETED_WORK);
-                } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks' || currentView === 'test_assign_tasks') {
-                    candidates = candidates.filter(r => {
-                        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER) return false;
-                        if (r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                        if (r.assignedTo && r.assignedTo.trim() !== '') return false;
-                        return true;
-                    });
-                } else if (currentView === 'pending_supplement_list' || currentView === 'test_pending_supplement_list') {
-                    candidates = candidates.filter(r => r.status === RecordStatus.PENDING_SUPPLEMENT);
-                }
-            }
-
-            candidates.forEach(r => {
-                if (isRecordOverdue(r)) overdue++;
-                else if (isRecordApproaching(r)) approaching++;
-            });
-        }
-        return { overdue, approaching };
-    }, [records, currentUser, employees, currentView, isDirector, taxSubTab]);
+    const totalPages = Math.ceil(filteredRecords.filteredRecords.length / itemsPerPage);
 
     return {
-        filteredRecords, paginatedRecords, totalPages, warningCount,
+        filteredRecords: filteredRecords.filteredRecords, 
+        paginatedRecords, 
+        totalPages, 
+        warningCount: filteredRecords.warningCount,
         searchTerm, setSearchTerm,
         filterDate, setFilterDate,
         filterSpecificDate, setFilterSpecificDate,

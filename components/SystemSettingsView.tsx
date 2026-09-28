@@ -1281,30 +1281,30 @@ function cleanString(str) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full min-h-0 animate-fade-in-up">
         {/* Tabs - Only show when not in fixedTab mode */}
         {!fixedTab && (
-            <div className="flex border-b border-gray-200 bg-gray-50 px-2 overflow-x-auto no-scrollbar shrink-0">
+            <div className="flex border-b border-gray-200 bg-white/95 backdrop-blur px-2 overflow-x-auto no-scrollbar shrink-0 sticky top-0 z-25 shadow-sm">
                 <button 
                     onClick={() => setActiveTab('general')}
-                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'general' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'general' ? 'border-blue-600 text-blue-700 bg-blue-50/50' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                 >
                     <Database size={16} /> Chung
                 </button>
                 <button 
                     onClick={() => setActiveTab('holidays')}
-                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-orange-50/50' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                 >
                     <Calendar size={16} /> Ngày nghỉ lễ
                 </button>
                 <button 
                     onClick={() => setActiveTab('data')}
-                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-red-50/50' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                 >
                     <AlertTriangle size={16} /> Dữ liệu
                 </button>
             </div>
         )}
 
-        <div className={`flex-1 bg-slate-50/30 min-h-0 ${
-            activeTab === 'permissions' ? 'p-2 md:p-3 overflow-hidden flex flex-col' : 'p-4 md:p-6 overflow-y-auto'
+        <div className={`flex-1 bg-slate-50/30 min-h-0 overflow-y-auto ${
+            activeTab === 'permissions' ? 'p-2 md:p-3 flex flex-col' : 'p-4 md:p-6'
         }`}>
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">

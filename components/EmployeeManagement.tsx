@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Employee, User } from '../types';
 import { Plus, Trash2, Save, User as UserIcon, FileSpreadsheet, Download, List, Edit2, CheckSquare, Search, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, normalizeEmployeeId, getNextAvailableEmployeeId } from '../utils/appHelpers';
 import { DEPARTMENTS, POSITIONS } from '../constants';
 
 interface EmployeeManagementProps {
@@ -54,8 +54,9 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   };
 
   const handleAddNewClick = () => {
+      const nextId = getNextAvailableEmployeeId(employees);
       setEditingEmployee({ 
-          id: `NV${Math.floor(Math.random()*1000)}`, 
+          id: nextId, 
           name: '', 
           department: 'Tổ Đo đạc', 
           position: 'Nhân viên',
@@ -79,8 +80,9 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         alert('Vui lòng chọn chức vụ');
         return;
     }
-    const newEmp = editingEmployee as Employee;
-    onSaveEmployee(newEmp, originalId);
+    const normalizedId = normalizeEmployeeId(editingEmployee.id);
+    const newEmp = { ...(editingEmployee as Employee), id: normalizedId };
+    onSaveEmployee(newEmp, originalId || normalizedId);
     alert(isNew ? 'Đã thêm nhân viên mới!' : 'Đã cập nhật thông tin!');
     setActiveTab('list');
   };
@@ -102,13 +104,13 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
   // --- IMPORT EXCEL LOGIC ---
   const handleDownloadSample = () => {
-      const headers = ["MÃ NV", "HỌ TÊN", "PHÒNG BAN", "CHỨC VỤ", "PHỤ TRÁCH"];
+      const headers = ["HỌ TÊN", "PHÒNG BAN", "CHỨC VỤ", "PHỤ TRÁCH"];
       const data = [
-          ["NV001", "Nguyễn Văn A", "Ban Giám đốc", "Giám Đốc", ""],
-          ["NV002", "Trần Văn B", "Tổ Đo đạc", "Tổ Trưởng", "Tân Quan, Minh Đức"],
-          ["NV003", "Lê Thị C", "Tổ Lưu trữ", "Viên chức", ""],
-          ["NV004", "Phạm Văn D", "Tổ Cấp giấy", "Nhân viên", ""],
-          ["NV005", "Hoàng Thị E", "Tổ Hành chính", "Nhân viên", ""]
+          ["Nguyễn Văn A", "Ban Giám đốc", "Giám Đốc", ""],
+          ["Trần Văn B", "Tổ Đo đạc", "Tổ Trưởng", "Tân Quan, Minh Đức"],
+          ["Lê Thị C", "Tổ Lưu trữ", "Viên chức", ""],
+          ["Phạm Văn D", "Tổ Cấp giấy", "Nhân viên", ""],
+          ["Hoàng Thị E", "Tổ Hành chính", "Nhân viên", ""]
       ];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
       const wb = XLSX.utils.book_new();
@@ -130,17 +132,26 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
         const importedEmps: Employee[] = [];
+        const temporaryIds = new Set<string>();
+
         rows.forEach((row: any) => {
            const normalizedRow: Record<string, any> = {};
            Object.keys(row).forEach(k => normalizedRow[k.trim().toUpperCase()] = row[k]);
            
-           const id = String(normalizedRow['MÃ NHÂN VIÊN'] || normalizedRow['MÃ NV'] || normalizedRow['ID'] || '').trim();
+           let id = String(normalizedRow['MÃ NHÂN VIÊN'] || normalizedRow['MÃ NV'] || normalizedRow['ID'] || '').trim();
            const name = String(normalizedRow['HỌ TÊN'] || normalizedRow['TÊN'] || normalizedRow['NAME'] || '').trim();
            const department = String(normalizedRow['PHÒNG BAN'] || normalizedRow['DEPARTMENT'] || 'Tổ Đo đạc');
            const position = String(normalizedRow['CHỨC VỤ'] || normalizedRow['POSITION'] || 'Nhân viên');
            const wardsRaw = String(normalizedRow['PHỤ TRÁCH'] || normalizedRow['XÃ PHƯỜNG'] || normalizedRow['KHU VỰC'] || '');
 
-           if (id && name) {
+           if (name) {
+               if (id) {
+                   id = normalizeEmployeeId(id);
+               } else {
+                   id = getNextAvailableEmployeeId([...employees, ...importedEmps], temporaryIds);
+               }
+               temporaryIds.add(id);
+
                const managedWards = wardsRaw.split(',').map(w => w.trim()).filter(Boolean);
                importedEmps.push({ id, name, department, position, managedWards });
            }
@@ -345,9 +356,9 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                     <input 
                                         type="text" 
                                         value={editingEmployee.id || ''}
-                                        onChange={(e) => handleChange('id', e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                        placeholder="Ví dụ: NV001"
+                                        disabled
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-500 bg-gray-100 cursor-not-allowed outline-none"
+                                        placeholder="Hệ thống tự động phát sinh"
                                     />
                                 </div>
                                 <div>

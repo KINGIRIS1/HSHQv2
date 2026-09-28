@@ -537,10 +537,55 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     return diffDays >= 0 && diffDays <= 3;
   }
 
+  const baseTabRecords = useMemo((): RecordFile[] => {
+    if (activeTab === "all") {
+      return myRecords;
+    }
+    if (activeTab === "pending") {
+      return myRecords.filter((r) => {
+        const isExecuting =
+          r.status === RecordStatus.ASSIGNED ||
+          r.status === RecordStatus.IN_PROGRESS ||
+          r.status === RecordStatus.FIELD_WORK ||
+          r.status === RecordStatus.OFFICE_WORK ||
+          r.status === RecordStatus.COMPLETED_WORK;
+        if (!isExecuting) return false;
+
+        // Nếu là trạng thái Nội nghiệp và người dùng là Ngoại nghiệp (đã bàn giao đi cho người khác)
+        if (
+          r.status === RecordStatus.OFFICE_WORK &&
+          r.surveyorId === user.employeeId &&
+          r.assignedTo !== user.employeeId
+        ) {
+          return false;
+        }
+        return true;
+      });
+    }
+    if (activeTab === "pending_check") {
+      return myRecords.filter((r) => r.status === RecordStatus.PENDING_CHECK);
+    }
+    if (activeTab === "pending_sign") {
+      return myRecords.filter((r) => r.status === RecordStatus.PENDING_SIGN);
+    }
+    if (activeTab === "finished") {
+      return myRecords.filter(
+        (r) =>
+          r.status === RecordStatus.SIGNED ||
+          r.status === RecordStatus.HANDOVER ||
+          r.status === RecordStatus.RETURNED ||
+          r.status === RecordStatus.REJECTED ||
+          r.status === RecordStatus.WITHDRAWN ||
+          (r.surveyorId === user.employeeId && r.assignedTo !== user.employeeId && r.status === RecordStatus.OFFICE_WORK)
+      );
+    }
+    return myRecords;
+  }, [myRecords, activeTab, user.employeeId]);
+
   const warningCount = useMemo(() => {
     let overdue = 0;
     let approaching = 0;
-    myRecords.forEach((r) => {
+    baseTabRecords.forEach((r) => {
       if (getOverdueDetails(r) !== null) {
         overdue++;
       } else if (isRecordApproaching(r)) {
@@ -548,7 +593,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       }
     });
     return { overdue, approaching };
-  }, [myRecords]);
+  }, [baseTabRecords]);
 
   function filterAndSort(list: RecordFile[], term: string, sort: any) {
     // 0. Warning filter
@@ -1492,7 +1537,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       return {
         color: "text-orange-600 font-bold",
         icon: <Clock size={14} />,
-        text: "(Gấp)",
+        text: "",
       };
     return { color: "text-gray-600", icon: null, text: "" };
   };
