@@ -127,14 +127,8 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     const saved = await updateDangkyRecord(updated);
     setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
 
-    // Tự động đồng bộ sang module Vào sổ GCN nếu hồ sơ đã ký, duyệt, chuyển bàn giao hoặc có số vào sổ
-    if (
-      saved.status === RecordStatus.SIGNED ||
-      saved.status === RecordStatus.PENDING_HANDOVER ||
-      saved.status === RecordStatus.HANDOVER ||
-      Boolean(saved.approvalDate) ||
-      Boolean(saved.entryNumber)
-    ) {
+    // Tự động đồng bộ sang module Vào sổ GCN khi hồ sơ đạt bước Chờ bàn giao (PENDING_HANDOVER)
+    if (saved.status === RecordStatus.PENDING_HANDOVER) {
       syncDangKyToVaoSo([saved]).catch((err) => {
         console.warn('[VaoSo AutoSync Error in RegistrationModuleView]:', err);
       });

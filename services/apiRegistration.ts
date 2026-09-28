@@ -49,6 +49,19 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     }
   }
 
+  let certificateOwners: any[] = [];
+  if (Array.isArray(dbItem.certificateOwners)) {
+    certificateOwners = dbItem.certificateOwners;
+  } else if (typeof dbItem.certificateOwners === 'string') {
+    try {
+      certificateOwners = JSON.parse(dbItem.certificateOwners);
+    } catch {
+      certificateOwners = [];
+    }
+  } else if (dbItem.data && Array.isArray(dbItem.data.certificateOwners)) {
+    certificateOwners = dbItem.data.certificateOwners;
+  }
+
   return {
     id: dbItem.id,
     code: dbItem.code || '',
@@ -139,6 +152,7 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     statusLogs,
     dossierComponents,
     attachedFiles,
+    certificateOwners,
     data: dbItem.data || {},
     sourceTable: 'dangky_records',
   };
@@ -267,6 +281,7 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.statusLogs !== undefined) payload.statusLogs = record.statusLogs;
   if (record.dossierComponents !== undefined) payload.dossierComponents = record.dossierComponents;
   if (record.attachedFiles !== undefined) payload.attachedFiles = record.attachedFiles;
+  if (record.certificateOwners !== undefined) payload.certificateOwners = record.certificateOwners;
 
   payload.updatedAt = new Date().toISOString();
   return sanitizePayloadForDateErrors(payload);

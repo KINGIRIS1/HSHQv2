@@ -1591,15 +1591,131 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, parentRecords
                                                                 )}
                                                             </div>
                                                         ) : col.key === 'ten_chu_su_dung' ? (
-                                                            <textarea
-                                                                className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
-                                                                value={r.data?.[col.key] || ''}
-                                                                onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
-                                                                onBlur={() => handleBlur(r)}
-                                                                readOnly={activeTab === 'scanned'}
-                                                                rows={2}
-                                                                style={{ minHeight: '40px' }}
-                                                            />
+                                                            <div className="flex flex-col p-1.5 gap-1.5 w-full">
+                                                                {(() => {
+                                                                    // Parse certificateOwners if available or format from ten_chu_su_dung
+                                                                    let owners = r.data?.certificateOwners;
+                                                                    if (!Array.isArray(owners) || owners.length === 0) {
+                                                                        const rawText = r.data?.[col.key] || '';
+                                                                        owners = rawText.split(/;\s*|\n/).map((item: string) => {
+                                                                            const parts = item.split(' - ');
+                                                                            return {
+                                                                                name: parts[0]?.replace(/^Chủ sử dụng:\s*/i, '').trim() || '',
+                                                                                cccd: parts[1]?.replace(/^CCCD:\s*/i, '').trim() || '',
+                                                                                address: parts[2]?.replace(/^ĐC:\s*/i, '').trim() || ''
+                                                                            };
+                                                                        }).filter((o: any) => o.name);
+                                                                    }
+                                                                    if (owners.length === 0) {
+                                                                        owners = [{ name: r.data?.[col.key] || '', cccd: r.data?.cccd || '', address: r.data?.customerAddress || '' }];
+                                                                    }
+
+                                                                    return owners.map((owner: any, oIdx: number) => (
+                                                                        <div key={oIdx} className="flex flex-col bg-slate-50/80 p-1.5 rounded-lg border border-slate-200 gap-1 group/owner">
+                                                                            <div className="flex items-center justify-between gap-1">
+                                                                                <div className="text-[11px] font-bold text-teal-800 flex items-center gap-1">
+                                                                                    <span>Chủ sử dụng {oIdx + 1}:</span>
+                                                                                </div>
+                                                                                {owners.length > 1 && activeTab !== 'scanned' && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            const updatedOwners = owners.filter((_: any, i: number) => i !== oIdx);
+                                                                                            const newStr = updatedOwners.map((o: any) => [o.name, o.cccd ? `CCCD: ${o.cccd}` : '', o.address ? `ĐC: ${o.address}` : ''].filter(Boolean).join(' - ')).join('; ');
+                                                                                            const newCccds = updatedOwners.map((o: any) => o.cccd).filter(Boolean).join(', ');
+                                                                                            const newAddrs = updatedOwners.map((o: any) => o.address).filter(Boolean).join('; ');
+                                                                                            const newNames = updatedOwners.map((o: any) => o.name).filter(Boolean).join(', ');
+
+                                                                                            handleCellChange(r.id, col.key, newStr);
+                                                                                            handleCellChange(r.id, 'cccd', newCccds);
+                                                                                            handleCellChange(r.id, 'customerAddress', newAddrs);
+                                                                                            handleBlur({
+                                                                                                ...r,
+                                                                                                data: {
+                                                                                                    ...r.data,
+                                                                                                    [col.key]: newStr,
+                                                                                                    ten_chu_su_dung: newStr,
+                                                                                                    customerName: newNames,
+                                                                                                    cccd: newCccds,
+                                                                                                    customerAddress: newAddrs,
+                                                                                                    certificateOwners: updatedOwners
+                                                                                                }
+                                                                                            });
+                                                                                        }}
+                                                                                        className="text-gray-400 hover:text-red-500 p-0.5"
+                                                                                        title="Xóa chủ sử dụng này"
+                                                                                    >
+                                                                                        <X size={12} />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                            <input
+                                                                                type="text"
+                                                                                className="w-full px-2 py-1 text-xs bg-white border border-slate-200 rounded focus:border-teal-500 outline-none font-semibold text-slate-800"
+                                                                                value={owner.name || ''}
+                                                                                onChange={(e) => {
+                                                                                    owners[oIdx].name = e.target.value;
+                                                                                    const newStr = owners.map((o: any) => [o.name, o.cccd ? `CCCD: ${o.cccd}` : '', o.address ? `ĐC: ${o.address}` : ''].filter(Boolean).join(' - ')).join('; ');
+                                                                                    const newNames = owners.map((o: any) => o.name).filter(Boolean).join(', ');
+                                                                                    handleCellChange(r.id, col.key, newStr);
+                                                                                    handleCellChange(r.id, 'customerName', newNames);
+                                                                                }}
+                                                                                onBlur={() => handleBlur({ ...r, data: { ...r.data, certificateOwners: owners } })}
+                                                                                readOnly={activeTab === 'scanned'}
+                                                                                placeholder="Họ tên chủ sử dụng..."
+                                                                            />
+                                                                            <div className="grid grid-cols-2 gap-1">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    className="w-full px-2 py-0.5 text-[11px] bg-white border border-slate-200 rounded focus:border-teal-500 outline-none text-slate-600"
+                                                                                    value={owner.cccd || ''}
+                                                                                    onChange={(e) => {
+                                                                                        owners[oIdx].cccd = e.target.value;
+                                                                                        const newStr = owners.map((o: any) => [o.name, o.cccd ? `CCCD: ${o.cccd}` : '', o.address ? `ĐC: ${o.address}` : ''].filter(Boolean).join(' - ')).join('; ');
+                                                                                        const newCccds = owners.map((o: any) => o.cccd).filter(Boolean).join(', ');
+                                                                                        handleCellChange(r.id, col.key, newStr);
+                                                                                        handleCellChange(r.id, 'cccd', newCccds);
+                                                                                    }}
+                                                                                    onBlur={() => handleBlur({ ...r, data: { ...r.data, certificateOwners: owners } })}
+                                                                                    readOnly={activeTab === 'scanned'}
+                                                                                    placeholder="Số CCCD..."
+                                                                                />
+                                                                                <input
+                                                                                    type="text"
+                                                                                    className="w-full px-2 py-0.5 text-[11px] bg-white border border-slate-200 rounded focus:border-teal-500 outline-none text-slate-600"
+                                                                                    value={owner.address || ''}
+                                                                                    onChange={(e) => {
+                                                                                        owners[oIdx].address = e.target.value;
+                                                                                        const newStr = owners.map((o: any) => [o.name, o.cccd ? `CCCD: ${o.cccd}` : '', o.address ? `ĐC: ${o.address}` : ''].filter(Boolean).join(' - ')).join('; ');
+                                                                                        const newAddrs = owners.map((o: any) => o.address).filter(Boolean).join('; ');
+                                                                                        handleCellChange(r.id, col.key, newStr);
+                                                                                        handleCellChange(r.id, 'customerAddress', newAddrs);
+                                                                                    }}
+                                                                                    onBlur={() => handleBlur({ ...r, data: { ...r.data, certificateOwners: owners } })}
+                                                                                    readOnly={activeTab === 'scanned'}
+                                                                                    placeholder="Địa chỉ thường trú..."
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    ));
+                                                                })()}
+                                                                {activeTab !== 'scanned' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            let owners = r.data?.certificateOwners || [];
+                                                                            if (!Array.isArray(owners)) owners = [];
+                                                                            const updatedOwners = [...owners, { name: '', cccd: '', address: '' }];
+                                                                            const newStr = updatedOwners.map((o: any) => [o.name, o.cccd ? `CCCD: ${o.cccd}` : '', o.address ? `ĐC: ${o.address}` : ''].filter(Boolean).join(' - ')).join('; ');
+                                                                            handleCellChange(r.id, col.key, newStr);
+                                                                            handleBlur({ ...r, data: { ...r.data, [col.key]: newStr, certificateOwners: updatedOwners } });
+                                                                        }}
+                                                                        className="flex items-center justify-center gap-1 text-[11px] bg-teal-50 text-teal-700 py-1 px-2 rounded hover:bg-teal-100 font-bold transition-colors w-full border border-teal-200/60"
+                                                                    >
+                                                                        <Plus size={12} /> Thêm chủ sử dụng
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         ) : col.key === 'loai_gcn' ? (
                                                             <select
                                                                 className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"

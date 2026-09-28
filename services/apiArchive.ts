@@ -1687,16 +1687,25 @@ export const allocateNextVaoSoNumbers = async (
     minBaseNumber?: number
 ): Promise<string[]> => {
     let maxVal = typeof minBaseNumber === 'number' && !isNaN(minBaseNumber) ? minBaseNumber : 0;
+    const cleanPrefix = (prefix || '').trim().toLowerCase();
 
     const extractNum = (val: any) => {
         if (!val) return;
         const str = String(val).trim();
-        const matches = str.match(/\d+/g);
-        if (matches) {
-            matches.forEach(m => {
-                const num = parseInt(m, 10);
-                if (!isNaN(num) && num > maxVal) maxVal = num;
-            });
+        const lowerStr = str.toLowerCase();
+        
+        // Nếu chuỗi chứa prefix hoặc prefix rỗng
+        if (!cleanPrefix || lowerStr.includes(cleanPrefix) || /^\d+$/.test(str)) {
+            // Lấy tất cả các dãy số trong chuỗi
+            const matches = str.match(/\d+/g);
+            if (matches) {
+                matches.forEach(m => {
+                    const num = parseInt(m, 10);
+                    if (!isNaN(num) && num > maxVal && num < 999999) { // Tránh nhầm với năm (2026...)
+                        maxVal = num;
+                    }
+                });
+            }
         }
     };
 
@@ -1715,65 +1724,47 @@ export const allocateNextVaoSoNumbers = async (
         // Fallback offline / demo mode
         const results: string[] = [];
         for (let i = 1; i <= count; i++) {
-            const nextNum = maxVal + i;
-            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+            // Nếu có minBaseNumber và lần lấy đầu tiên, đảm bảo bắt đầu từ minBaseNumber
+            const nextNum = (maxVal === minBaseNumber && i === 1) ? minBaseNumber : (maxVal >= (minBaseNumber || 0) ? maxVal + i : (minBaseNumber || 0) + i - 1);
+            const prefixPart = prefix ? `${prefix.trim()} ` : '';
+            results.push(`${prefixPart}${String(nextNum).padStart(padLength, '0')}`);
         }
         return results;
     }
 
     try {
-        // 1. Quét số MAX thực tế từ DB trước để đảm bảo không bao giờ bị lùi số
-        const [dangkyRes, luutruRes] = await Promise.all([
-            supabase.from('dangky_records').select('entryNumber, data'),
-            supabase.from('luutru_records').select('entryNumber, data, recordType')
-        ]);
-
-        (dangkyRes.data || []).forEach(r => {
-            extractNum(r.entryNumber);
-            extractNum((r as any)?.data?.so_vao_so);
-            extractNum((r as any)?.data?.entryNumber);
-        });
-        (luutruRes.data || []).forEach(r => {
-            extractNum(r.entryNumber);
-            extractNum((r as any)?.data?.so_vao_so);
-            extractNum((r as any)?.data?.entryNumber);
-        });
-
-        // 2. Thử gọi RPC nếu có
+        // 1. Quét số MAX thực tế từ DB trước với try/catch bọc riêng để tránh treo khi mất mạng / Failed to fetch
         try {
-            const { data, error } = await supabase.rpc('allocate_next_vao_so_numbers', {
-                p_prefix: prefix,
-                p_count: count,
-                p_pad_length: padLength
+            const [dangkyRes, luutruRes] = await Promise.all([
+                supabase.from('dangky_records').select('entryNumber, data'),
+                supabase.from('luutru_records').select('entryNumber, data, recordType')
+            ]);
+
+            (dangkyRes.data || []).forEach(r => {
+                extractNum(r.entryNumber);
+                extractNum((r as any)?.data?.so_vao_so);
+                extractNum((r as any)?.data?.entryNumber);
             });
-
-            if (!error && data && Array.isArray(data)) {
-                const rpcNums = data.map((d: any) => d.allocated_number);
-                let rpcMax = 0;
-                rpcNums.forEach((n: string) => {
-                    const matches = String(n).match(/\d+/g);
-                    if (matches) {
-                        matches.forEach(m => {
-                            const num = parseInt(m, 10);
-                            if (!isNaN(num) && num > rpcMax) rpcMax = num;
-                        });
-                    }
-                });
-
-                // Nếu số RPC trả về lớn hơn maxVal thực tế, sử dụng kết quả RPC
-                if (rpcMax > maxVal) {
-                    return rpcNums;
-                }
-            }
-        } catch {
-            // RPC lỗi hoặc không tồn tại, sẽ sử dụng kết quả quét DB + bộ đệm
+            (luutruRes.data || []).forEach(r => {
+                extractNum(r.entryNumber);
+                extractNum((r as any)?.data?.so_vao_so);
+                extractNum((r as any)?.data?.entryNumber);
+            });
+        } catch (dbErr) {
+            console.warn("[VaoSo API Warning] Không thể kết nối DB khi quét số, sử dụng bộ nhớ đệm local:", dbErr);
         }
 
-        // 3. Sử dụng kết quả quét MAX toàn diện (DB + Cache + Memory state)
+        // Nếu người dùng cài đặt minBaseNumber lớn hơn maxVal quét từ DB, ta ưu tiên minBaseNumber
+        if (typeof minBaseNumber === 'number' && !isNaN(minBaseNumber) && minBaseNumber > maxVal) {
+            maxVal = minBaseNumber - 1;
+        }
+
+        // 2. Sử dụng kết quả quét MAX chuẩn xác theo tiền tố
         const results: string[] = [];
         for (let i = 1; i <= count; i++) {
             const nextNum = maxVal + i;
-            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+            const prefixPart = prefix ? `${prefix.trim()} ` : '';
+            results.push(`${prefixPart}${String(nextNum).padStart(padLength, '0')}`);
         }
         return results;
     } catch (err) {
@@ -1781,7 +1772,8 @@ export const allocateNextVaoSoNumbers = async (
         const results: string[] = [];
         for (let i = 1; i <= count; i++) {
             const nextNum = maxVal + i;
-            results.push(`${prefix} ${String(nextNum).padStart(padLength, '0')}`);
+            const prefixPart = prefix ? `${prefix.trim()} ` : '';
+            results.push(`${prefixPart}${String(nextNum).padStart(padLength, '0')}`);
         }
         return results;
     }
@@ -1799,17 +1791,65 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
     try {
         const nowIso = new Date().toISOString();
         const promises = validRecords.map(async (rec) => {
+            // Tổng hợp thông tin chi tiết từ danh sách người đứng tên GCN (certificateOwners) bao gồm tên, CCCD, địa chỉ
+            let ownersNames: string[] = [];
+            let ownersCccds: string[] = [];
+            let ownersAddresses: string[] = [];
+            let detailedOwners: any[] = [];
+
+            if (Array.isArray(rec.certificateOwners) && rec.certificateOwners.length > 0) {
+                rec.certificateOwners.forEach((owner: any) => {
+                    if (!owner) return;
+                    const name = typeof owner === 'string' ? owner : (owner.name || owner.fullName || '');
+                    const cccd = typeof owner === 'object' ? (owner.cccd || owner.idCard || owner.passport || '') : '';
+                    const address = typeof owner === 'object' ? (owner.address || owner.addr || owner.diaChi || '') : '';
+
+                    if (name) ownersNames.push(name.trim());
+                    if (cccd) ownersCccds.push(cccd.trim());
+                    if (address) ownersAddresses.push(address.trim());
+
+                    detailedOwners.push({
+                        name: name.trim(),
+                        cccd: cccd.trim(),
+                        address: address.trim()
+                    });
+                });
+            }
+
+            // Nếu không có trong certificateOwners, fallback về thông tin chính của record
+            if (ownersNames.length === 0 && rec.customerName) {
+                ownersNames.push(rec.customerName.trim());
+            }
+            if (ownersCccds.length === 0 && rec.cccd) {
+                ownersCccds.push(rec.cccd.trim());
+            }
+            if (ownersAddresses.length === 0 && (rec.customerAddress || (rec as any).address)) {
+                ownersAddresses.push(((rec.customerAddress || (rec as any).address) as string).trim());
+            }
+
+            // Tạo chuỗi định dạng đầy đủ hiển thị thông tin chi tiết từng chủ (Tên - CCCD - Địa chỉ)
+            const formattedOwnersString = detailedOwners.length > 0 
+                ? detailedOwners.map(o => [o.name, o.cccd ? `CCCD: ${o.cccd}` : '', o.address ? `ĐC: ${o.address}` : ''].filter(Boolean).join(' - ')).join('; ')
+                : (rec.customerName || '');
+
+            const fullCustomerName = ownersNames.join(', ');
+            const fullCccd = ownersCccds.join(', ');
+            const fullAddress = ownersAddresses.join('; ') || rec.customerAddress || rec.address || '';
+
             // Xác định các trường bổ sung chi tiết theo thiết kế
             const extraData = {
                 ...(typeof rec.data === 'object' && rec.data !== null ? rec.data : {}),
                 ma_ho_so: rec.code,
                 code: rec.code,
                 so_hieu: rec.code,
-                ten_chu_su_dung: rec.customerName,
-                customerName: rec.customerName,
-                cccd: rec.cccd,
+                ten_chu_su_dung: fullCustomerName,
+                customerName: fullCustomerName,
+                certificateOwners: detailedOwners.length > 0 ? detailedOwners : (rec.certificateOwners || []),
+                certificateOwnersFormatted: formattedOwnersString,
+                cccd: fullCccd,
                 phoneNumber: rec.phoneNumber,
-                customerAddress: rec.customerAddress,
+                customerAddress: fullAddress,
+                address: fullAddress,
                 recordType: rec.recordType || 'Vào sổ GCN',
                 receivedDate: rec.receivedDate,
                 deadline: rec.deadline,
@@ -1818,7 +1858,6 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
                 to_ban_do: rec.mapSheet,
                 mapSheet: rec.mapSheet,
                 area: rec.area,
-                address: rec.address,
                 dia_danh: rec.ward,
                 ward: rec.ward,
                 so_phat_hanh: rec.issueNumber || '',
@@ -1832,7 +1871,7 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
             const dangkyPayload: any = {
                 id: rec.id,
                 code: rec.code,
-                customerName: rec.customerName,
+                customerName: fullCustomerName,
                 ward: rec.ward || null,
                 mapSheet: rec.mapSheet || null,
                 landPlot: rec.landPlot || null,
@@ -1843,8 +1882,9 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
                 approvalDate: rec.approvalDate || nowIso.split('T')[0],
                 notes: rec.notes || null,
                 phoneNumber: rec.phoneNumber || null,
-                cccd: rec.cccd || null,
-                customerAddress: rec.customerAddress || null,
+                cccd: fullCccd || null,
+                customerAddress: fullAddress || null,
+                certificateOwners: detailedOwners.length > 0 ? detailedOwners : (rec.certificateOwners || []),
                 data: extraData,
                 updatedAt: nowIso
             };
@@ -1853,11 +1893,15 @@ export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean>
                 return;
             }
 
-            let { error } = await supabase.from('dangky_records').upsert(dangkyPayload);
-            if (error && (error.code === '42703' || String(error.message || '').includes('column') || error.code === 'PGRST204')) {
-                const cleanPayload = { ...dangkyPayload };
-                delete cleanPayload.data;
-                await supabase.from('dangky_records').upsert(cleanPayload);
+            try {
+                let { error } = await supabase.from('dangky_records').upsert(dangkyPayload);
+                if (error && (error.code === '42703' || String(error.message || '').includes('column') || error.code === 'PGRST204')) {
+                    const cleanPayload = { ...dangkyPayload };
+                    delete cleanPayload.data;
+                    await supabase.from('dangky_records').upsert(cleanPayload);
+                }
+            } catch (networkErr) {
+                console.warn("[VaoSo Sync Network Warning] Không thể kết nối mạng khi đồng bộ hồ sơ:", networkErr);
             }
         });
 

@@ -944,6 +944,30 @@ export function findMatchingEmployee(idOrName?: string | null, employees: Employ
     );
     if (foundEmp) return foundEmp;
 
+    // Nếu giá trị là số thuần túy (VD: "2", "32"), xử lý như index hoặc id số
+    if (/^\d+$/.test(trimmed)) {
+        const num = parseInt(trimmed, 10);
+        // Thử 1-based index (num - 1)
+        if (employees[num - 1]) {
+            return employees[num - 1];
+        }
+        // Thử 0-based index (num)
+        if (employees[num]) {
+            return employees[num];
+        }
+        // Thử tìm nhân viên có ID kết thúc bằng số này hoặc format NV0xx, NVxxx
+        const paddedNum = String(num).padStart(3, '0');
+        const empByNum = employees.find(e => 
+            e.id && (
+                e.id.toLowerCase() === `nv${num}` || 
+                e.id.toLowerCase() === `nv${paddedNum}` ||
+                e.id.toLowerCase() === `nhanvien${num}` ||
+                e.id.endsWith(String(num))
+            )
+        );
+        if (empByNum) return empByNum;
+    }
+
     // Tìm theo User id, username hoặc name rồi map qua Employee
     const foundUser = users.find(u => 
         (u.id && u.id.toLowerCase() === trimmed) || 
@@ -974,6 +998,13 @@ export function resolveEmployeeName(idOrName?: string | null, employees: Employe
     );
     if (user && user.name) return user.name;
 
+    // Nếu là số thuần túy nhưng không map được, thử quy đổi thành NVXXX hoặc trả về rỗng nếu không có ý nghĩa
+    if (/^\d+$/.test(trimmed)) {
+        const num = parseInt(trimmed, 10);
+        if (employees[num - 1]) return employees[num - 1].name;
+        if (employees[num]) return employees[num].name;
+    }
+
     return trimmed;
 }
 
@@ -983,8 +1014,17 @@ export function resolveEmployeeId(idOrName?: string | null, employees: Employee[
     if (!trimmed) return '';
     
     // Nếu truyền vào trùng ID hoặc Tên trong danh sách, quy đổi về ID chuẩn
-    const emp = employees.find(e => (e.id && e.id.toLowerCase() === trimmed.toLowerCase()) || (e.name && e.name.toLowerCase() === trimmed.toLowerCase()));
-    return emp ? emp.id : trimmed;
+    const emp = findMatchingEmployee(trimmed, employees);
+    if (emp && emp.id) return emp.id;
+
+    if (/^\d+$/.test(trimmed)) {
+        const num = parseInt(trimmed, 10);
+        if (employees[num - 1]) return employees[num - 1].id;
+        if (employees[num]) return employees[num].id;
+        return `NV${String(num).padStart(3, '0')}`;
+    }
+
+    return trimmed;
 }
 
 export const normalizeEmployeeId = resolveEmployeeId;
