@@ -133,6 +133,19 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
   return deadline < today;
 };
 
+export const getOverdueDays = (record: RecordFile): number => {
+  if (!isRecordOverdue(record)) return 0;
+  if (!record.deadline) return 0;
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  deadline.setHours(0, 0, 0, 0);
+  const diffTime = today.getTime() - deadline.getTime();
+  if (diffTime <= 0) return 0;
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+};
+
 export const isRecordApproaching = (record: RecordFile): boolean => {
   const completedStatuses = [
       RecordStatus.HANDOVER,

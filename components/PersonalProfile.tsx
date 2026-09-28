@@ -497,17 +497,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
     let text = "";
     if (diffDays === 0) {
-      text = "Quá hạn hôm nay";
-    } else if (diffDays < 30) {
-      text = `Quá hạn ${diffDays} ngày`;
+      text = "Trễ hạn hôm nay";
     } else {
-      const months = Math.floor(diffDays / 30);
-      const days = diffDays % 30;
-      if (days === 0) {
-        text = `Quá hạn ${months} tháng`;
-      } else {
-        text = `Quá hạn ${months} tháng ${days} ngày`;
-      }
+      text = `Trễ hạn ${diffDays} ngày`;
     }
 
     return {
@@ -1494,7 +1486,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       return {
         color: "text-red-600 font-bold",
         icon: <AlertCircle size={14} />,
-        text: "(Quá hạn)",
+        text: "",
       };
     if (diffDays <= 2)
       return {

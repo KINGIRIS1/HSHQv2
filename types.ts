@@ -175,6 +175,7 @@ export interface RecordFile {
   id: string;
   code: string;           
   customerName: string;   
+  certificateOwner?: string | null; // Người đứng tên GCN
   phoneNumber?: string | null;   
   cccd?: string | null;          
   customerAddress?: string | null;

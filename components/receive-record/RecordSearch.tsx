@@ -4,6 +4,7 @@ import { STATUS_LABELS, STATUS_COLORS, RECORD_TYPES, mapStatusToRecordStatus } f
 import StatusBadge from '../StatusBadge';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
 import { exportCustomRecordsToExcel } from '../../utils/excelExport';
+import { getOverdueDays } from '../../utils/appHelpers';
 import { 
     Search, 
     Filter, 
@@ -888,7 +889,11 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                         <td key="code" className="p-3 align-middle font-bold text-blue-600 cursor-pointer text-center" onClick={() => setSelectedDetailRecord(r)}>
                                                             <div className="flex flex-col items-center gap-0.5">
                                                                 <span className="text-sm font-bold">{r.code}</span>
-                                                                {isOverdue && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded border border-red-200 font-bold">Quá hạn</span>}
+                                                                {isOverdue && (() => {
+                                                                     const days = getOverdueDays(r);
+                                                                     const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
+                                                                     return <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded border border-red-200 font-bold">{text}</span>;
+                                                                 })()}
                                                             </div>
                                                         </td>
                                                     );

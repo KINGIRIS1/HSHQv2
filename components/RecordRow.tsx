@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType, isCertificateRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus, resolveEmployeeName } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus, resolveEmployeeName } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -110,7 +110,11 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 </div>
                 {hasActiveReminder && <div className="flex items-center gap-1 text-xs text-pink-600 font-bold bg-pink-100 px-1.5 py-0.5 rounded"><Bell size={12} className="fill-pink-600" /> Nhắc hẹn</div>}
             </div>
-            {isOverdue && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">Quá hạn</span>}
+            {isOverdue && (() => {
+              const days = getOverdueDays(record);
+              const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
+              return <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">{text}</span>;
+            })()}
           </td>
         );
       case 'customer':

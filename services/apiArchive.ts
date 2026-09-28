@@ -1793,10 +1793,12 @@ export const allocateNextVaoSoNumbers = async (
  */
 export const syncDangKyToVaoSo = async (records: RecordFile[]): Promise<boolean> => {
     if (!records || records.length === 0) return true;
+    const validRecords = records.filter(rec => rec.status === RecordStatus.PENDING_HANDOVER);
+    if (validRecords.length === 0) return true;
 
     try {
         const nowIso = new Date().toISOString();
-        const promises = records.map(async (rec) => {
+        const promises = validRecords.map(async (rec) => {
             // Xác định các trường bổ sung chi tiết theo thiết kế
             const extraData = {
                 ...(typeof rec.data === 'object' && rec.data !== null ? rec.data : {}),

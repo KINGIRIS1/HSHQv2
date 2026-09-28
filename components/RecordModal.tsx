@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RecordFile, RecordStatus, Employee, User, UserRole, AttachedDocItem, DossierComponentItem, AttachedFileMeta } from '../types';
+import { RecordFile, RecordStatus, Employee, User, UserRole, AttachedDocItem, DossierComponentItem, AttachedFileMeta, CertificateOwnerItem } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, CAP_GIAY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
 import { extractRecordSequence, checkRecordCodeExistsInDb } from '../services/apiRecords';
-import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
+import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus, Users, Trash2 } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile, isPreviewableFile } from '../services/attachmentStorage';
@@ -439,6 +439,58 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         }
     }
   }, [initialData, isOpen, currentView]);
+
+  const getCertificateOwners = (): CertificateOwnerItem[] => {
+    const list = formData.certificateOwners || [];
+    const firstOwner: CertificateOwnerItem = {
+      fullName: formData.customerName || '',
+      cccd: formData.cccd || '',
+      address: formData.customerAddress || ''
+    };
+    if (list.length === 0) {
+      return [firstOwner];
+    }
+    const updated = [...list];
+    updated[0] = {
+      ...updated[0],
+      fullName: firstOwner.fullName,
+      cccd: firstOwner.cccd,
+      address: firstOwner.address
+    };
+    return updated;
+  };
+
+  const handleAddOwner = () => {
+    const currentList = getCertificateOwners();
+    const newList = [...currentList, { fullName: '', cccd: '', address: '' }];
+    setFormData(prev => ({
+      ...prev,
+      certificateOwners: newList
+    }));
+  };
+
+  const handleOwnerChange = (index: number, field: keyof CertificateOwnerItem, value: string) => {
+    const currentList = getCertificateOwners();
+    const newList = currentList.map((owner, idx) => {
+      if (idx === index) {
+        return { ...owner, [field]: value };
+      }
+      return owner;
+    });
+    setFormData(prev => ({
+      ...prev,
+      certificateOwners: newList
+    }));
+  };
+
+  const handleRemoveOwner = (index: number) => {
+    const currentList = getCertificateOwners();
+    const newList = currentList.filter((_, idx) => idx !== index);
+    setFormData(prev => ({
+      ...prev,
+      certificateOwners: newList
+    }));
+  };
 
   const handleAddDoc = () => {
       const nextNum = attachedDocs.length + 1;
@@ -1185,24 +1237,133 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 </div>
 
                 {/* 2. CHỦ SỬ DỤNG HOẶC THÔNG TIN GỬI NHẬN */}
-                <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm">
-                    <h3 className="text-sm font-bold text-blue-800 uppercase mb-4 flex items-center gap-2 border-b pb-2">
+                <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm space-y-4">
+                    <h3 className="text-sm font-bold text-blue-800 uppercase flex items-center gap-2 border-b pb-2">
                         <UserIcon size={16} /> {isCongVan ? 'Thông tin gửi / nhận' : 'Chủ sử dụng'}
                     </h3>
                     {isCongVan ? (
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-700 mb-1">Số, ký hiệu Công văn <span className="text-red-500">*</span></label>
                                 <input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} placeholder="VD: 123/UBND-TH..." />
                             </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại liên hệ</label>
+                                <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} placeholder="VD: 09xxxxxxxx" />
+                            </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Tên chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
-                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chủ sử dụng</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
-                        </div>
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Chủ sử dụng / Đại diện <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" placeholder="Nguyễn Văn A..." value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="0123456789..." value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="09xxxxxxxx" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
+                                <div className="sm:col-span-2 lg:col-span-3"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chủ sử dụng</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Địa chỉ thường trú..." value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
+                            </div>
+
+                            {/* Bảng Người đứng tên GCN */}
+                            <div className="bg-slate-50/70 p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col mt-3">
+                                <div className="flex items-center justify-between border-b pb-2 border-slate-200 mb-3">
+                                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                                        <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
+                                            <Users size={14} />
+                                        </span> 
+                                        Người đứng tên GCN
+                                    </h3>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddOwner}
+                                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-indigo-200"
+                                    >
+                                        <Plus size={14} /> Thêm mới
+                                    </button>
+                                </div>
+
+                                <div className="overflow-x-auto border border-slate-200 rounded-lg bg-white">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-100 border-b border-slate-200">
+                                                <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider w-[5%] text-center">STT</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider w-[35%]">Họ tên chủ hồ sơ *</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider w-[25%]">Giấy CMND/ CCCD *</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider w-[30%]">Địa chỉ chủ sử dụng</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider w-[5%] text-center">Xóa</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {getCertificateOwners().map((owner, idx) => {
+                                                const isFirst = idx === 0;
+                                                return (
+                                                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-3 py-2 text-xs font-bold text-slate-600 text-center font-mono">
+                                                            {idx + 1}
+                                                        </td>
+                                                        <td className="px-3 py-1.5">
+                                                            <input
+                                                                type="text"
+                                                                required
+                                                                disabled={isFirst}
+                                                                placeholder="Họ và tên..."
+                                                                className={`w-full text-xs sm:text-sm font-semibold rounded-lg px-2.5 py-1.5 border transition-all ${
+                                                                    isFirst 
+                                                                        ? 'bg-slate-100/80 border-slate-200 text-slate-600 cursor-not-allowed font-bold' 
+                                                                        : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10'
+                                                                }`}
+                                                                value={owner.fullName}
+                                                                onChange={(e) => handleOwnerChange(idx, 'fullName', e.target.value)}
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-1.5">
+                                                            <input
+                                                                type="text"
+                                                                required
+                                                                disabled={isFirst}
+                                                                placeholder="Số CCCD..."
+                                                                className={`w-full text-xs sm:text-sm rounded-lg px-2.5 py-1.5 border transition-all ${
+                                                                    isFirst 
+                                                                        ? 'bg-slate-100/80 border-slate-200 text-slate-600 cursor-not-allowed font-medium' 
+                                                                        : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10'
+                                                                }`}
+                                                                value={owner.cccd}
+                                                                onChange={(e) => handleOwnerChange(idx, 'cccd', e.target.value)}
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-1.5">
+                                                            <input
+                                                                type="text"
+                                                                disabled={isFirst}
+                                                                placeholder="Địa chỉ..."
+                                                                className={`w-full text-xs sm:text-sm rounded-lg px-2.5 py-1.5 border transition-all ${
+                                                                    isFirst 
+                                                                        ? 'bg-slate-100/80 border-slate-200 text-slate-600 cursor-not-allowed font-medium' 
+                                                                        : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10'
+                                                                }`}
+                                                                value={owner.address || ''}
+                                                                onChange={(e) => handleOwnerChange(idx, 'address', e.target.value)}
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-1.5 text-center">
+                                                            {!isFirst ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveOwner(idx)}
+                                                                    className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                                                    title="Xóa dòng này"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-indigo-600 select-none uppercase font-mono">Đại diện</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
 
