@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, STATUS_LABELS } from "../constants";
-import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate } from "../utils/appHelpers";
+import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import { enqueueRecordForBackgroundDriveSync, hasPendingRecordAttachments } from "../services/attachmentStorage";
 import {
@@ -1546,7 +1546,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const isSorted = sortConfig.key === key;
     return (
       <div
-        className="flex items-center gap-1 cursor-pointer select-none"
+        className="flex items-center justify-center gap-1 cursor-pointer select-none text-center w-full"
         onClick={() => handleSort(key)}
       >
         {label}
@@ -1891,34 +1891,40 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           )}
                         </button>
                       </th>
-                      <th className="p-3 w-10 text-center">#</th>
-                      <th className="p-3 w-[120px]">
+                      <th className="p-3 w-[120px] text-center">
                         {renderSortHeader("Mã HS", "code")}
                       </th>
-                      <th className="p-3 w-[180px]">
+                      <th className="p-3 w-[180px] text-center">
                         {renderSortHeader("Chủ sử dụng", "customerName")}
                       </th>
-                      <th className="p-3 w-[115px]">
+                      <th className="p-3 w-[115px] text-center">
                         {renderSortHeader("Loại hồ sơ", "recordType")}
                       </th>
-                      <th className="p-3 w-[130px]">
-                        {renderSortHeader("Ngày giao việc", "assignedDate")}
+                      <th className="p-3 w-[160px] text-center">
+                        {renderSortHeader("Thời hạn xử lý", "deadline")}
                       </th>
-                      <th className="p-3 w-[110px]">
-                        {renderSortHeader("Ngày trình", "submissionDate")}
+                      <th className="p-3 w-[110px] text-center">
+                        {renderSortHeader("Ngày GV", "assignedDate")}
                       </th>
 
-                      <th className="p-3 w-[150px]">
-                        {renderSortHeader("Hẹn trả", "deadline")}
-                      </th>
+                      {activeTab !== "pending" && activeTab !== "pending_check" && (
+                        <th className="p-3 w-[110px] text-center">
+                          {renderSortHeader("Ngày trình", "submissionDate")}
+                        </th>
+                      )}
 
                       {activeTab === "pending_check" && (
-                        <th className="p-3 w-[150px]">Người kiểm tra</th>
+                        <>
+                          <th className="p-3 w-[110px] text-center">
+                            {renderSortHeader("Ngày KT", "submissionDate")}
+                          </th>
+                          <th className="p-3 w-[150px] text-center">Người kiểm tra</th>
+                        </>
                       )}
 
                       <th className="p-3 text-center w-[120px]">Trạng thái</th>
-                      <th className="p-3 text-center w-[100px]">Chỉnh lý</th>
-                      <th className="p-3 text-center w-[180px]">Thao tác chính</th>
+                      <th className="p-3 text-center w-[75px]">Chỉnh lý</th>
+                      <th className="p-3 text-center w-[170px]">Thao tác chính</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
@@ -1947,85 +1953,96 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                               )}
                             </button>
                           </td>
-                          <td className="p-3 text-center text-gray-400 text-xs align-middle">
-                            {(currentPage - 1) * itemsPerPage + index + 1}
-                          </td>
-                          <td className="p-3 font-medium text-blue-600 align-middle">
-                            <div className="truncate" title={r.code || ""}>
+                          <td className="p-3 text-center font-medium text-blue-600 align-middle">
+                            <div className="truncate font-bold text-sm text-center" title={r.code || ""}>
                               {r.code}
                             </div>
+                            {isRecordOverdue(r) && (() => {
+                              const days = getOverdueDays(r);
+                              const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
+                              return <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">{text}</span>;
+                            })()}
                           </td>
-                          <td className="p-3 font-medium text-gray-800 align-middle">
-                            <div className="truncate" title={r.customerName || ""}>
+                          <td className="p-3 font-medium text-gray-800 align-middle text-center">
+                            <div className="truncate text-center" title={r.customerName || ""}>
                               {r.customerName}
                             </div>
                           </td>
-                          <td className="p-3 text-gray-600 align-middle">
-                            <div className="truncate" title={r.recordType || ""}>
+                          <td className="p-3 text-gray-600 align-middle text-center">
+                            <div className="truncate text-center" title={r.recordType || ""}>
                               {getShortRecordType(r.recordType || undefined)}
                             </div>
+                          </td>
+                          <td className="p-3 align-middle text-center">
+                            {(() => {
+                              const isOverdue = isRecordOverdue(r);
+                              const isApproaching = isRecordApproaching(r);
+                              return (
+                                <div className="flex flex-col w-full bg-white/50 rounded border border-gray-100 overflow-hidden shadow-sm">
+                                   <div className="flex items-center justify-between px-2.5 py-1.5 bg-gray-50/80 border-b border-gray-100" title="Ngày tiếp nhận">
+                                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight mr-3">Nhận</span>
+                                      <span className="text-sm font-semibold text-slate-600 font-mono whitespace-nowrap">{formatDate(r.receivedDate || undefined)}</span>
+                                   </div>
+                                   
+                                   <div className={`flex items-center justify-between px-2.5 py-1.5 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
+                                      <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-3 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
+                                      <div className="flex items-center gap-1.5">
+                                          <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
+                                              {formatDate(r.deadline || undefined)}
+                                          </span>
+                                          {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
+                                          {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
+                                      </div>
+                                   </div>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="p-3 text-gray-600 align-middle text-center">
                             {formatDate(r.assignedDate || undefined)}
                           </td>
-                          <td className="p-3 text-gray-600 align-middle text-center">
-                            {formatDate(r.submissionDate || undefined)}
-                          </td>
 
-                          <td className="p-3 align-middle">
-                            <div>
-                              <div
-                                className={`flex items-center gap-1.5 ${deadlineStatus.color}`}
-                              >
-                                {deadlineStatus.icon}
-                                <span>{formatDate(r.deadline || undefined)}</span>
-                                <span className="text-[10px] uppercase ml-1">
-                                  {deadlineStatus.text}
-                                </span>
-                              </div>
-                              {(() => {
-                                const overdueInfo = getOverdueDetails(r);
-                                if (!overdueInfo) return null;
-                                return (
-                                  <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-600 text-white text-[11px] font-bold shadow-xs">
-                                    <span>🔴</span>
-                                    <span>{overdueInfo.text}</span>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </td>
+                          {activeTab !== "pending" && activeTab !== "pending_check" && (
+                            <td className="p-3 text-gray-600 align-middle text-center">
+                              {formatDate(r.submissionDate || undefined)}
+                            </td>
+                          )}
 
                           {activeTab === "pending_check" && (
-                            <td className="p-3 text-gray-600 align-middle">
-                              <div
-                                className="truncate"
-                                title={
-                                  r.checkedBy
+                            <>
+                              <td className="p-3 text-gray-600 align-middle text-center">
+                                {formatDate(r.checkedDate || r.pendingCheckDate || r.submissionDate || undefined)}
+                              </td>
+                              <td className="p-3 text-gray-600 align-middle text-center">
+                                <div
+                                  className="truncate text-center"
+                                  title={
+                                    r.checkedBy
+                                      ? employees.find((e) => e.id === r.checkedBy)
+                                          ?.name
+                                      : ""
+                                  }
+                                >
+                                  {r.checkedBy
                                     ? employees.find((e) => e.id === r.checkedBy)
                                         ?.name
-                                    : ""
-                                }
-                              >
-                                {r.checkedBy
-                                  ? employees.find((e) => e.id === r.checkedBy)
-                                      ?.name
-                                  : "---"}
-                              </div>
-                            </td>
+                                    : "---"}
+                                </div>
+                              </td>
+                            </>
                           )}
 
                           <td className="p-3 text-center align-middle">
                             <StatusBadge status={r.status} />
                           </td>
 
-                          <td className="p-3 text-center align-middle">
+                          <td className="p-3 text-center align-middle w-[75px]">
                             {onMapCorrection && !(isArchiveRecordType(r.recordType || '') || r.sourceTable === 'luutru_records') && (
                               <button
                                 onClick={() => onMapCorrection(r)}
-                                className={`flex items-center justify-center gap-1 px-2 py-1 rounded border transition-all text-[10px] font-bold shadow-sm mx-auto ${
+                                className={`flex items-center justify-center gap-0.5 px-1.5 py-1 rounded border transition-all text-[10px] font-bold shadow-sm mx-auto ${
                                   r.needsMapCorrection
-                                    ? "bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100 w-full"
+                                    ? "bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100"
                                     : "bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:bg-gray-50"
                                 }`}
                                 title={
@@ -2035,12 +2052,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 }
                               >
                                 <MapIcon
-                                  size={14}
+                                  size={13}
                                   className={
                                     r.needsMapCorrection ? "fill-orange-100" : ""
                                   }
                                 />
-                                {r.needsMapCorrection && <span>CHỈNH LÝ</span>}
+                                {r.needsMapCorrection && <span>CL</span>}
                               </button>
                             )}
                           </td>
