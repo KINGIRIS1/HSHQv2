@@ -146,7 +146,7 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                 <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
                 <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 flex items-center gap-2">
                     <span className="p-1.5 bg-orange-100 text-orange-600 rounded-lg"><FileText size={16}/></span> 
-                    Thông tin vụ việc & Hợp đồng
+                    Thông tin vụ việc & Hợp đồng biến động
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -158,12 +158,12 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                         </select>
                     </div>
                     <div>
-                        <label className={labelClass}>Thời gian xảy ra</label>
-                        <input className={inputClass} placeholder="ngày ... tháng ..." value={formData.TGXRVV} onChange={e => handleChange('TGXRVV', e.target.value)} />
+                        <label className={labelClass}>Ngày lập biên bản</label>
+                        <input className={inputClass} value={formData.NGAY_LAP || ''} onChange={e => handleChange('NGAY_LAP', e.target.value)} placeholder="04/9/2026" />
                     </div>
                     <div>
-                        <label className={labelClass}>Số công chứng</label>
-                        <input className={inputClass} value={formData.SOCC} onChange={e => handleChange('SOCC', e.target.value)} />
+                        <label className={labelClass}>Số công chứng hợp đồng</label>
+                        <input className={inputClass} value={formData.SOCC} onChange={e => handleChange('SOCC', e.target.value)} placeholder="002053/2026/CCGD" />
                     </div>
                     <div>
                         <label className={labelClass}>Ngày công chứng</label>
@@ -171,37 +171,57 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                     </div>
                     <div className="col-span-2">
                         <label className={labelClass}>Văn phòng công chứng</label>
-                        <input className={inputClass} value={formData.VPCC} onChange={e => handleChange('VPCC', e.target.value)} />
-                    </div>
-                    <div className="col-span-2">
-                        <label className={labelClass}>Số biên bản (Cho Mẫu 02)</label>
-                        <div className="relative">
-                            <Hash size={16} className={iconClass} />
-                            <input className={inputClass} value={formData.STT} onChange={e => handleChange('STT', e.target.value)} placeholder="01/BBLV" />
-                        </div>
+                        <input className={inputClass} value={formData.VPCC} onChange={e => handleChange('VPCC', e.target.value)} placeholder="VPCC Nguyễn Cảnh" />
                     </div>
                 </div>
             </div>
 
-            {/* 4. THÔNG TIN NGƯỜI LẬP BIÊN BẢN (MẪU 01) */}
+            {/* 3.1. THÔNG TIN ỦY QUYỀN (NẾU CÓ) */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 flex items-center gap-2">
+                    <span className="p-1.5 bg-purple-100 text-purple-600 rounded-lg"><User size={16}/></span> 
+                    Thông tin người nhận ủy quyền nộp hồ sơ (Nếu có)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                        <label className={labelClass}>Họ và tên người nhận ủy quyền</label>
+                        <input className={inputClass} value={formData.NGUOI_UY_QUYEN || ''} onChange={e => handleChange('NGUOI_UY_QUYEN', e.target.value)} placeholder="Ví dụ: Nguyễn Văn Mạnh (để trống nếu người vi phạm trực tiếp nộp)" />
+                    </div>
+                    <div>
+                        <label className={labelClass}>Số Hợp đồng ủy quyền</label>
+                        <input className={inputClass} value={formData.SO_HD_UQ || ''} onChange={e => handleChange('SO_HD_UQ', e.target.value)} placeholder="002054/2026/CCGD" />
+                    </div>
+                    <div>
+                        <label className={labelClass}>Ngày ủy quyền</label>
+                        <input type="date" className={inputClass} value={formData.NGAY_HD_UQ || ''} onChange={e => handleChange('NGAY_HD_UQ', e.target.value)} />
+                    </div>
+                    <div className="col-span-2">
+                        <label className={labelClass}>VPCC chứng nhận ủy quyền</label>
+                        <input className={inputClass} value={formData.VPCC_UQ || ''} onChange={e => handleChange('VPCC_UQ', e.target.value)} placeholder="VPCC Nguyễn Cảnh" />
+                    </div>
+                </div>
+            </div>
+
+            {/* 4. THÔNG TIN NGƯỜI LẬP BIÊN BẢN */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
                 <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 flex items-center gap-2">
                     <span className="p-1.5 bg-blue-100 text-blue-600 rounded-lg"><User size={16}/></span> 
-                    1. Người có thẩm quyền lập biên bản (Mẫu 01)
+                    Người có thẩm quyền lập biên bản
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className={labelClass}>Họ và tên người lập BB</label>
-                        <input className={inputClass} value={formData.NGUOI_LAP_BB || ''} onChange={e => handleChange('NGUOI_LAP_BB', e.target.value)} placeholder="Cao Thị Dung" />
+                        <input className={inputClass} value={formData.NGUOI_LAP_BB || ''} onChange={e => handleChange('NGUOI_LAP_BB', e.target.value)} placeholder="Trần Quốc Thuận" />
                     </div>
                     <div>
                         <label className={labelClass}>Chức vụ</label>
-                        <input className={inputClass} value={formData.CHUCVU_NGUOI_LAP || ''} onChange={e => handleChange('CHUCVU_NGUOI_LAP', e.target.value)} placeholder="Tổ trưởng Tổ Hành chính tổng hợp" />
+                        <input className={inputClass} value={formData.CHUCVU_NGUOI_LAP || ''} onChange={e => handleChange('CHUCVU_NGUOI_LAP', e.target.value)} placeholder="Viên chức Tổ Hành chính – Tổng hợp" />
                     </div>
                     <div className="md:col-span-2">
-                        <label className={labelClass}>Cơ quan</label>
-                        <input className={inputClass} value={formData.COQUAN_NGUOI_LAP || ''} onChange={e => handleChange('COQUAN_NGUOI_LAP', e.target.value)} placeholder="Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản" />
+                        <label className={labelClass}>Đơn vị</label>
+                        <input className={inputClass} value={formData.COQUAN_NGUOI_LAP || ''} onChange={e => handleChange('COQUAN_NGUOI_LAP', e.target.value)} placeholder="Văn phòng Đăng ký đất đai thành phố Đồng Nai – Chi nhánh Hớn Quản" />
                     </div>
                 </div>
             </div>

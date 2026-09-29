@@ -48,6 +48,7 @@
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
+    "@rollup/plugin-inject": "^5.0.5",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/file-saver": "^2.0.7",

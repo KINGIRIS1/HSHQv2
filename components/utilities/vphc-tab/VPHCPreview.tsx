@@ -1,45 +1,31 @@
 
 import React from 'react';
-import { ExternalLink, RefreshCw, FileOutput, Map as MapIcon, CheckCircle, AlertCircle, FileText, Gavel, Settings } from 'lucide-react';
+import { ExternalLink, RefreshCw, FileOutput, Map as MapIcon, CheckCircle, AlertCircle, FileText, Settings } from 'lucide-react';
 
 interface VPHCPreviewProps {
-    templateType: 'mau01' | 'mau02';
-    setTemplateType: (t: 'mau01' | 'mau02') => void;
     exportedFilePath: string | null;
     handleOpenFile: () => void;
-    handleExport: () => void;
+    handleSaveAndPrint: () => void;
+    handleExportWord: () => void;
     loading: boolean;
     renderPreviewHTML: () => string;
-    onConfig: () => void; // Prop mới để mở modal cấu hình
+    onConfig: () => void;
 }
 
 const VPHCPreview: React.FC<VPHCPreviewProps> = ({ 
-    templateType, setTemplateType,
-    exportedFilePath, handleOpenFile, handleExport, 
+    exportedFilePath, handleOpenFile, handleSaveAndPrint, handleExportWord,
     loading, renderPreviewHTML, onConfig
 }) => {
     return (
         <div className="hidden lg:flex flex-col flex-1 bg-slate-200 border-l border-slate-300 relative min-w-0 h-full">
             
-            {/* TOP BAR: TEMPLATE SWITCHER TABS & ACTIONS */}
+            {/* TOP BAR: TEMPLATE TITLE & ACTIONS */}
             <div className="bg-white border-b border-slate-200 p-2 flex items-center justify-between shrink-0 shadow-sm z-10">
-                <div className="flex bg-slate-100 p-1 rounded-lg">
-                    <button 
-                        onClick={() => setTemplateType('mau01')}
-                        className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-md transition-all ${templateType === 'mau01' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
-                    >
-                        <Gavel size={14} /> Mẫu 01 (VPHC)
-                    </button>
-                    <button 
-                        onClick={() => setTemplateType('mau02')}
-                        className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-md transition-all ${templateType === 'mau02' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
-                    >
-                        <FileText size={14} /> Mẫu 02 (Làm việc)
-                    </button>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold">
+                    <FileText size={14} className="text-blue-600" /> Biên bản ghi nhận sự việc (NĐ 123/2024/NĐ-CP)
                 </div>
 
                 <div className="flex gap-2 items-center">
-                    {/* Nút Cấu hình đã được chuyển vào đây */}
                     <button 
                         onClick={onConfig}
                         className="p-1.5 text-gray-500 hover:text-purple-600 bg-white border border-gray-200 rounded-lg hover:bg-purple-50 transition-colors shadow-sm"
@@ -47,26 +33,12 @@ const VPHCPreview: React.FC<VPHCPreviewProps> = ({
                     >
                         <Settings size={16} />
                     </button>
-
-                    <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-                    {exportedFilePath && (
-                        <button 
-                            onClick={handleOpenFile}
-                            className="flex items-center gap-1.5 bg-white border border-blue-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-50 transition-all shadow-sm animate-pulse"
-                            title="Mở file vừa xuất"
-                        >
-                            <ExternalLink size={14} /> Mở File
-                        </button>
-                    )}
                     <button 
-                        onClick={handleExport} 
-                        disabled={loading} 
-                        className="flex items-center gap-1.5 bg-green-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 transition-all shadow-sm disabled:opacity-50"
-                        title="Xuất ra file Word"
+                        onClick={handleExportWord}
+                        className="flex items-center gap-1.5 bg-white border border-blue-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-50 transition-all shadow-sm cursor-pointer"
+                        title="Tải bản Word"
                     >
-                        {loading ? <RefreshCw className="animate-spin" size={14}/> : <FileOutput size={14}/>}
-                        Xuất Word
+                        <FileOutput size={14} /> Tải Word
                     </button>
                 </div>
             </div>

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard, isArchiveRecordType, isCertificateRecordType, getSurveyRecordPrefix } from '../constants';
 import { extractRecordSequence } from '../services/apiRecords';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw, Search, CalendarClock } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw, Search, CalendarClock, FileText, X } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper, getReceiptReceiverName } from '../utils/appHelpers';
@@ -18,6 +18,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import VPHCTab from './utilities/VPHCTab';
 
 interface ReceiveRecordProps {
   onSave: (record: RecordFile) => Promise<RecordFile | null>;
@@ -79,7 +80,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
   const canVphc = false;
 
   useEffect(() => {
-    if (initialTab && initialTab !== 'vphc' && (initialTab as string) !== 'bulk') {
+    if (initialTab && (initialTab as string) !== 'bulk') {
       setViewMode(initialTab as any);
     } else {
       setViewMode('create');
@@ -87,7 +88,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
   }, [initialTab]);
 
   useEffect(() => {
-    if (viewMode === 'vphc' || (viewMode as string) === 'bulk') {
+    if ((viewMode as string) === 'bulk') {
       setViewMode('create');
     } else if (viewMode === 'create' && !canCreate) {
       if (canList) setViewMode('list');
@@ -405,6 +406,13 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
             >
                 <CalendarClock size={16} /> Hồ sơ gia hạn
             </button>
+            <button 
+                onClick={() => setViewMode('vphc')} 
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'vphc' ? 'bg-red-600 text-white shadow-sm' : 'text-red-600 bg-red-50 hover:bg-red-100 border border-red-200'}`}
+                title="Lập Biên bản VPHC"
+            >
+                <FileText size={16} /> Biên bản VPHC
+            </button>
         </div>
         
         {viewMode === 'create' && (
@@ -483,6 +491,12 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
                 isExtendView={true}
                 onReturnResult={onReturnResult}
             />
+        )}
+
+        {viewMode === 'vphc' && (
+            <div className="h-full overflow-hidden">
+                <VPHCTab currentUser={currentUser} notify={(msg, type) => {}} />
+            </div>
         )}
       </div>
 

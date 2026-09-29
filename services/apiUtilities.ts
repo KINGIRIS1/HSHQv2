@@ -12,7 +12,7 @@ export interface GenericRecord {
 }
 
 export interface VphcRecord extends GenericRecord {
-    record_type: 'mau01' | 'mau02';
+    record_type: string;
 }
 
 export interface BienBanRecord extends GenericRecord {

@@ -214,12 +214,12 @@ export const useAppData = (_currentUser?: any) => {
         }
     }, []);
 
-    // Khởi tạo ngầm từ IndexedDB khi mở app để đảm bảo đầy đủ bản ghi offline
+    // Khởi tạo ngay lập tức từ IndexedDB khi mở app để chống treo hệ thống / màn hình trắng
     useEffect(() => {
         getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS).then(idbRecords => {
             if (Array.isArray(idbRecords) && idbRecords.length > 0) {
                 setRecords(prev => {
-                    if (prev.length < idbRecords.length) {
+                    if (prev.length === 0 || prev.length < idbRecords.length) {
                         const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(idbRecords));
                         return migratedRecords;
                     }

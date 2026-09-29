@@ -72,8 +72,25 @@ function App() {
     }
   });
 
-
-
+  // --- DIAGNOSTIC: Log chi tiết thời điểm App Mount và trạng thái khởi tạo state / Supabase ---
+  useEffect(() => {
+    const mountTime = Date.now();
+    console.log(`🚀 [DIAGNOSTIC] App Component Mounted at ${new Date(mountTime).toISOString()}`);
+    console.log(`👤 [DIAGNOSTIC] Current User Session:`, currentUser ? currentUser.username : 'Chưa đăng nhập (Null)');
+    
+    const checkInitStatus = async () => {
+      try {
+        const startCheck = Date.now();
+        console.log(`🔍 [DIAGNOSTIC] Bắt đầu kiểm tra kết nối & đồng bộ dữ liệu ban đầu...`);
+        const res = await fetch('/api/ping').catch(() => null);
+        const latency = Date.now() - startCheck;
+        console.log(`⚡ [DIAGNOSTIC] Phản hồi kết nối server: ${res?.ok ? 'OK' : 'Offline/Local'} (${latency}ms)`);
+      } catch (err) {
+        console.warn(`⚠️ [DIAGNOSTIC] Lỗi kiểm tra kết nối khởi động:`, err);
+      }
+    };
+    checkInitStatus();
+  }, []);
   useEffect(() => {
     if (currentUser) {
       sessionStorage.setItem('current_user_session', JSON.stringify(currentUser));
@@ -516,7 +533,7 @@ function App() {
         } catch (err) {
           console.error('Lỗi khi tự động sao lưu định kỳ:', err);
         }
-      }, 2000);
+      }, 4000);
       return () => clearTimeout(timer);
     }
   }, [isAdmin, records, employees]);
