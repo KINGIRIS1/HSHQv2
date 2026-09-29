@@ -973,6 +973,16 @@ export function resolveEmployeeId(idOrName?: string | null, employees: Employee[
 
 export const normalizeEmployeeId = resolveEmployeeId;
 
+export function matchEmployeeId(idOrName1?: string | null, idOrName2?: string | null, employees: Employee[] = []): boolean {
+    if (!idOrName1 || !idOrName2) return false;
+    const s1 = String(idOrName1).trim();
+    const s2 = String(idOrName2).trim();
+    if (s1.toLowerCase() === s2.toLowerCase()) return true;
+    const norm1 = resolveEmployeeId(s1, employees).toLowerCase();
+    const norm2 = resolveEmployeeId(s2, employees).toLowerCase();
+    return norm1 === norm2;
+}
+
 export function getEmployeeName(idOrName?: string | null, employees: Employee[] = []): string {
     if (!idOrName) return 'Chưa giao';
     const trimmed = String(idOrName).trim();
@@ -1017,12 +1027,12 @@ export function findMatchingEmployee(idOrName?: string | null, employees: Employ
         (u.id && u.id.toLowerCase() === standardizedId.toLowerCase()) || 
         (u.username && u.username.toLowerCase() === trimmed) || 
         (u.name && u.name.toLowerCase() === trimmed) ||
-        (u.employeeId && u.employeeId.toLowerCase() === trimmed)
+        (u.employeeId && matchEmployeeId(u.employeeId, rawTrimmed, employees))
     );
     if (foundUser) {
         return employees.find(e => 
-            (foundUser.employeeId && e.id && e.id.toLowerCase() === foundUser.employeeId.toLowerCase()) ||
-            (foundUser.id && e.id && e.id.toLowerCase() === foundUser.id.toLowerCase()) || 
+            (foundUser.employeeId && matchEmployeeId(e.id, foundUser.employeeId, employees)) ||
+            (foundUser.id && matchEmployeeId(e.id, foundUser.id, employees)) || 
             (e.name && e.name.toLowerCase() === (foundUser.name || '').toLowerCase())
         );
     }

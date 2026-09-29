@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, STATUS_LABELS, formatDisplayCode } from "../constants";
-import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase } from "../utils/appHelpers";
+import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase, matchEmployeeId } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import { enqueueRecordForBackgroundDriveSync, hasPendingRecordAttachments } from "../services/attachmentStorage";
 import {
@@ -191,7 +191,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const [returnReason, setReturnReason] = useState("");
 
   const currentEmployee = useMemo(() => {
-    return employees.find((e) => e.id === user.employeeId);
+    return employees.find((e) => e.id === user.employeeId || matchEmployeeId(e.id, user.employeeId, employees));
   }, [employees, user.employeeId]);
 
   const isDirectorUser = useMemo(() => {
@@ -230,8 +230,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const mainRecords = records.filter((r) => {
       if (!user.employeeId) return false;
       if (isDirector) {
-        if (r.assignedTo === user.employeeId) return true;
-        if (r.submittedTo === user.employeeId) {
+        if (matchEmployeeId(r.assignedTo, user.employeeId, employees)) return true;
+        if (matchEmployeeId(r.submittedTo, user.employeeId, employees)) {
           const reachedSignStage =
             r.status === RecordStatus.PENDING_SIGN ||
             r.status === RecordStatus.SIGNED ||
@@ -242,23 +242,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return false;
       }
       // Nếu là người kiểm tra, họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
+      const currentUserEmp = employees.find((e) => e.id === user.employeeId || matchEmployeeId(e.id, user.employeeId, employees));
       const isCheckerUser =
-        employees
-          .find((e) => e.id === user.employeeId)
-          ?.position?.toLowerCase()
-          .includes("tổ") &&
-        (employees
-          .find((e) => e.id === user.employeeId)
-          ?.department?.toLowerCase()
-          .includes("đo đạc") ||
-          employees
-            .find((e) => e.id === user.employeeId)
-            ?.department?.toLowerCase()
-            .includes("kỹ thuật"));
+        currentUserEmp?.position?.toLowerCase().includes("tổ") &&
+        (currentUserEmp?.department?.toLowerCase().includes("đo đạc") ||
+         currentUserEmp?.department?.toLowerCase().includes("kỹ thuật"));
       if (isCheckerUser) {
         // Chỉ hiển thị hồ sơ giao xử lý (assignedTo) HOẶC hồ sơ đã tới khâu kiểm tra (status >= PENDING_CHECK) nếu họ là người kiểm tra (checkedBy)
-        if (r.assignedTo === user.employeeId) return true;
-        if (r.checkedBy === user.employeeId) {
+        if (matchEmployeeId(r.assignedTo, user.employeeId, employees)) return true;
+        if (matchEmployeeId(r.checkedBy, user.employeeId, employees)) {
           const reachedCheckStage =
             r.status !== RecordStatus.RECEIVED &&
             r.status !== RecordStatus.ASSIGNED &&
@@ -271,9 +263,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return false;
       }
       return (
-        r.assignedTo === user.employeeId ||
-        r.surveyorId === user.employeeId ||
-        r.drafterId === user.employeeId
+        matchEmployeeId(r.assignedTo, user.employeeId, employees) ||
+        matchEmployeeId(r.surveyorId, user.employeeId, employees) ||
+        matchEmployeeId(r.drafterId, user.employeeId, employees)
       );
     });
 
@@ -281,8 +273,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       .filter((r) => {
         if (!user.employeeId) return false;
         if (isDirector) {
-          if (r.data?.assigned_to === user.employeeId) return true;
-          if (r.data?.submitted_to === user.employeeId || r.data?.submittedTo === user.employeeId) {
+          if (matchEmployeeId(r.data?.assigned_to, user.employeeId, employees)) return true;
+          if (matchEmployeeId(r.data?.submitted_to || r.data?.submittedTo, user.employeeId, employees)) {
             let status: RecordStatus = RecordStatus.RECEIVED;
             const rawSt = String(r.status || '').toLowerCase();
             if (rawSt === 'assigned') status = RecordStatus.ASSIGNED;
@@ -303,22 +295,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           }
           return false;
         }
+        const currentUserEmp = employees.find((e) => e.id === user.employeeId || matchEmployeeId(e.id, user.employeeId, employees));
         const isCheckerUser =
-          employees
-            .find((e) => e.id === user.employeeId)
-            ?.position?.toLowerCase()
-            .includes("tổ") &&
-          (employees
-            .find((e) => e.id === user.employeeId)
-            ?.department?.toLowerCase()
-            .includes("đo đạc") ||
-            employees
-              .find((e) => e.id === user.employeeId)
-              ?.department?.toLowerCase()
-              .includes("kỹ thuật"));
+          currentUserEmp?.position?.toLowerCase().includes("tổ") &&
+          (currentUserEmp?.department?.toLowerCase().includes("đo đạc") ||
+           currentUserEmp?.department?.toLowerCase().includes("kỹ thuật"));
         if (isCheckerUser) {
-          if (r.data?.assigned_to === user.employeeId) return true;
-          if (r.data?.checked_by === user.employeeId) {
+          if (matchEmployeeId(r.data?.assigned_to, user.employeeId, employees)) return true;
+          if (matchEmployeeId(r.data?.checked_by, user.employeeId, employees)) {
             // Map status của archive để kiểm tra xem đã tới khâu kiểm tra chưa
             let status: RecordStatus = RecordStatus.RECEIVED;
             const rawSt = String(r.status || '').toLowerCase();
@@ -341,7 +325,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           }
           return false;
         }
-        return r.data?.assigned_to === user.employeeId;
+        return matchEmployeeId(r.data?.assigned_to, user.employeeId, employees);
       })
       .map((r) => {
         // Map status
@@ -437,7 +421,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const isChecker = useMemo(() => {
     if (!user.employeeId) return false;
-    const emp = employees.find((e) => e.id === user.employeeId);
+    const emp = employees.find((e) => e.id === user.employeeId || matchEmployeeId(e.id, user.employeeId, employees));
     if (!emp) return false;
     const isDoDac =
       emp.department?.toLowerCase().includes("đo đạc") ||
@@ -450,7 +434,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const isMeasurementTeam = useMemo(() => {
     if (!user.employeeId) return false;
-    const emp = employees.find((e) => e.id === user.employeeId);
+    const emp = employees.find((e) => e.id === user.employeeId || matchEmployeeId(e.id, user.employeeId, employees));
     if (!emp) return false;
     return (
       emp.department?.toLowerCase().includes("đo đạc") ||
@@ -555,8 +539,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         // Nếu là trạng thái Nội nghiệp và người dùng là Ngoại nghiệp (đã bàn giao đi cho người khác)
         if (
           r.status === RecordStatus.OFFICE_WORK &&
-          r.surveyorId === user.employeeId &&
-          r.assignedTo !== user.employeeId
+          matchEmployeeId(r.surveyorId, user.employeeId, employees) &&
+          !matchEmployeeId(r.assignedTo, user.employeeId, employees)
         ) {
           return false;
         }
@@ -577,7 +561,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           r.status === RecordStatus.RETURNED ||
           r.status === RecordStatus.REJECTED ||
           r.status === RecordStatus.WITHDRAWN ||
-          (r.surveyorId === user.employeeId && r.assignedTo !== user.employeeId && r.status === RecordStatus.OFFICE_WORK)
+          (matchEmployeeId(r.surveyorId, user.employeeId, employees) && !matchEmployeeId(r.assignedTo, user.employeeId, employees) && r.status === RecordStatus.OFFICE_WORK)
       );
     }
     return myRecords;
@@ -676,8 +660,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       // Nếu là trạng thái Nội nghiệp và người dùng là Ngoại nghiệp (đã bàn giao đi cho người khác)
       if (
         r.status === RecordStatus.OFFICE_WORK &&
-        r.surveyorId === user.employeeId &&
-        r.assignedTo !== user.employeeId
+        matchEmployeeId(r.surveyorId, user.employeeId, employees) &&
+        !matchEmployeeId(r.assignedTo, user.employeeId, employees)
       ) {
         return false;
       }
@@ -710,7 +694,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         r.status === RecordStatus.RETURNED ||
         r.status === RecordStatus.REJECTED ||
         r.status === RecordStatus.WITHDRAWN ||
-        (r.surveyorId === user.employeeId && r.assignedTo !== user.employeeId && r.status === RecordStatus.OFFICE_WORK),
+        (matchEmployeeId(r.surveyorId, user.employeeId, employees) && !matchEmployeeId(r.assignedTo, user.employeeId, employees) && r.status === RecordStatus.OFFICE_WORK),
     );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig, user.employeeId, warningFilter, filterFromDate, filterToDate, filterRecordType, filterStatus]);
