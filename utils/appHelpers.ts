@@ -995,26 +995,33 @@ export function getEmployeeName(idOrName?: string | null, employees: Employee[] 
 
 export function findMatchingEmployee(idOrName?: string | null, employees: Employee[] = [], users: User[] = []): Employee | undefined {
     if (!idOrName) return undefined;
-    const trimmed = String(idOrName).trim().toLowerCase();
+    const rawTrimmed = String(idOrName).trim();
+    const trimmed = rawTrimmed.toLowerCase();
     if (!trimmed) return undefined;
     
-    // Sử dụng ID chuẩn hóa để tìm kiếm
-    const standardizedId = resolveEmployeeId(trimmed, employees);
+    // 1. Kiểm tra khớp chính xác với ID gốc (Vd: "35", "NV035")
+    let foundEmp = employees.find(e => e.id && e.id.toLowerCase() === trimmed);
+    if (foundEmp) return foundEmp;
 
-    const foundEmp = employees.find(e => 
-        (e.id && e.id.toLowerCase() === standardizedId.toLowerCase()) || 
-        (e.name && e.name.toLowerCase() === trimmed)
-    );
+    // 2. Kiểm tra khớp với Tên
+    foundEmp = employees.find(e => e.name && e.name.toLowerCase() === trimmed);
+    if (foundEmp) return foundEmp;
+
+    // 3. Sử dụng ID chuẩn hóa để tìm kiếm
+    const standardizedId = resolveEmployeeId(rawTrimmed, employees);
+    foundEmp = employees.find(e => e.id && e.id.toLowerCase() === standardizedId.toLowerCase());
     if (foundEmp) return foundEmp;
 
     // Tìm theo User id, username hoặc name rồi map qua Employee
     const foundUser = users.find(u => 
         (u.id && u.id.toLowerCase() === standardizedId.toLowerCase()) || 
         (u.username && u.username.toLowerCase() === trimmed) || 
-        (u.name && u.name.toLowerCase() === trimmed)
+        (u.name && u.name.toLowerCase() === trimmed) ||
+        (u.employeeId && u.employeeId.toLowerCase() === trimmed)
     );
     if (foundUser) {
         return employees.find(e => 
+            (foundUser.employeeId && e.id && e.id.toLowerCase() === foundUser.employeeId.toLowerCase()) ||
             (foundUser.id && e.id && e.id.toLowerCase() === foundUser.id.toLowerCase()) || 
             (e.name && e.name.toLowerCase() === (foundUser.name || '').toLowerCase())
         );
