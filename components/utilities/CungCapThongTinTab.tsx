@@ -511,7 +511,7 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
                     Ông (bà): <b>${toTitleCase(formData.Ten_Nguoi_Yeu_Cau)}</b> ${uqText} nộp phiếu yêu cầu cung cấp thông tin tại Trung tâm phục vụ hành chính công ${formData.Phuong} ${previewData.Ngay_Nop_Fmt}.
                 </p>
                 <p style="text-indent: 30px; margin-bottom: 5px;">
-                    Nội dung yêu cầu cung cấp thông tin quy hoạch thửa đất số <b>${formData.Thua_Cu}</b>, tờ bản đồ số <b>${formData.To_Cu}</b>, diện tích <b>${formData.DT_Cu}m²</b> ${previewData.Loai_Dat_Fmt} tọa lạc tại ${formData.Dia_Chi_Thua_Dat}, ${formData.Phuong}, tỉnh Bình Phước của ông (bà) <b>${formData.Ten_CSD}</b>.
+                    Nội dung yêu cầu cung cấp thông tin quy hoạch thửa đất số <b>${formData.Thua_Cu}</b>, tờ bản đồ số <b>${formData.To_Cu}</b>, diện tích <b>${formData.DT_Cu}m²</b> ${previewData.Loai_Dat_Fmt} tọa lạc tại ${formData.Dia_Chi_Thua_Dat}, ${formData.Phuong}, thành phố Đồng Nai của ông (bà) <b>${formData.Ten_CSD}</b>.
                 </p>
                 <p style="text-indent: 30px; margin-bottom: 5px;">
                     Căn cứ chức năng, nhiệm vụ Văn phòng Đăng ký Đất đai thành phố Đồng Nai – Chi nhánh Hớn Quản cung cấp thông tin cho ông (bà) ${formData.Ten_Nguoi_Yeu_Cau} với các nội dung như sau:
