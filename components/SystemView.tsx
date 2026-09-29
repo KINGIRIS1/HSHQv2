@@ -61,9 +61,9 @@ const SystemView: React.FC<SystemViewProps> = ({
     }, []);
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col flex-1 min-h-full animate-fade-in-up">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col flex-1 min-h-full animate-fade-in-up overflow-hidden">
             {/* TABS */}
-            <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
+            <div className="flex border-b border-gray-200 bg-gray-50/95 backdrop-blur px-4 overflow-x-auto sticky top-0 z-30 shadow-xs shrink-0">
                 {isAdmin && (
                     <button 
                         onClick={() => setActiveTab('users')}
@@ -97,7 +97,7 @@ const SystemView: React.FC<SystemViewProps> = ({
             </div>
 
             {/* CONTENT */}
-            <div className="flex-1 flex flex-col p-4">
+            <div className="flex-1 flex flex-col p-4 overflow-y-auto min-h-0 scrollbar-thin">
                 {activeTab === 'users' && isAdmin && (
                     <UserManagement 
                         users={users} 

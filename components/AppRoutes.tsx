@@ -642,7 +642,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           <>
             {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
             {isMeasurementView && (
-          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto shrink-0">
+          <div className="flex border-b border-gray-200 bg-gray-50/95 backdrop-blur px-4 overflow-x-auto shrink-0 sticky top-0 z-30 shadow-sm">
             {!isDirector && (
               <>
                 {isViewAllowedForUser(currentUser, employees, "all_records", rolePermissions, departmentPermissions) && (
@@ -730,7 +730,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
         {/* SUB-HEADER TABS FOR ARCHIVE RECORDS */}
         {isArchiveMeasurementView && (
-          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto shrink-0">
+          <div className="flex border-b border-gray-200 bg-gray-50/95 backdrop-blur px-4 overflow-x-auto shrink-0 sticky top-0 z-30 shadow-sm">
             {!isDirector && (
               <>
                 {isViewAllowedForUser(currentUser, employees, "archive_records", rolePermissions, departmentPermissions) && (
@@ -811,7 +811,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
         {/* SUB-HEADER TABS FOR TEST MEASUREMENT RECORDS */}
         {isTestMeasurementView && (
-          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto shrink-0">
+          <div className="flex border-b border-gray-200 bg-gray-50/95 backdrop-blur px-4 overflow-x-auto shrink-0 sticky top-0 z-30 shadow-sm">
             {!isDirector && (
               <>
                 {isViewAllowedForUser(currentUser, employees, "test_records", rolePermissions, departmentPermissions) && (
@@ -914,7 +914,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           </div>
         )}
 
-        <div className="p-4 border-b border-gray-100 flex flex-col gap-4 shrink-0">
+        <div className="p-4 border-b border-gray-100 flex flex-col gap-4 shrink-0 sticky top-[46px] z-20 bg-white/95 backdrop-blur shadow-xs">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 shrink-0">
               {title}
@@ -1954,7 +1954,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         </div>
 
         {props.paginatedRecords.length > 0 && (
-          <div className="border-t border-gray-200 p-3 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 text-xs text-gray-600">
+          <div className="border-t border-gray-200 p-3 bg-gray-50/95 backdrop-blur flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 text-xs text-gray-600 sticky bottom-0 z-20 shadow-[0_-2px_10px_rgba(0,0,0,0.02)]">
             <div className="flex items-center gap-4">
               <span>
                 Tổng số: <strong>{props.filteredRecords.length}</strong> bản ghi
