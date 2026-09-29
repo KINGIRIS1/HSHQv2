@@ -35,10 +35,11 @@ import {
   SlidersHorizontal,
   RefreshCw,
   Layers,
+  Phone,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
-import { getShortRecordType, isArchiveRecordType, STATUS_LABELS } from "../constants";
-import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays } from "../utils/appHelpers";
+import { getShortRecordType, isArchiveRecordType, STATUS_LABELS, formatDisplayCode } from "../constants";
+import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import { enqueueRecordForBackgroundDriveSync, hasPendingRecordAttachments } from "../services/attachmentStorage";
 import {
@@ -1955,7 +1956,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           </td>
                           <td className="p-3 text-center font-medium text-blue-600 align-middle">
                             <div className="truncate font-bold text-sm text-center" title={r.code || ""}>
-                              {r.code}
+                              {formatDisplayCode(r.code)}
                             </div>
                             {isRecordOverdue(r) && (() => {
                               const days = getOverdueDays(r);
@@ -1964,8 +1965,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             })()}
                           </td>
                           <td className="p-3 font-medium text-gray-800 align-middle text-center">
-                            <div className="truncate text-center" title={r.customerName || ""}>
-                              {r.customerName}
+                            <div className="flex flex-col gap-1 items-center text-center">
+                                <div className="truncate text-center font-medium text-gray-900 w-full" title={r.customerName || ""}>
+                                    {toTitleCase(r.customerName || "")}
+                                </div>
+                                {r.phoneNumber && (
+                                    <div className="flex items-center gap-1 text-xs text-gray-600 justify-center">
+                                        <Phone size={13} className="shrink-0" />
+                                        <span className="font-mono">{r.phoneNumber}</span>
+                                    </div>
+                                )}
                             </div>
                           </td>
                           <td className="p-3 text-gray-600 align-middle text-center">

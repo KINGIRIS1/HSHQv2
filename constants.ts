@@ -693,3 +693,15 @@ export const MOCK_CONTRACTS: Contract[] = [
     status: 'PENDING'
   }
 ];
+
+export const formatDisplayCode = (code?: string) => {
+  if (!code) return "";
+  const match = code.match(/(\d{6}-\d+)/);
+  if (match) {
+    return match[1];
+  }
+  if (code.length > 14) {
+    return "..." + code.slice(-12);
+  }
+  return code;
+};

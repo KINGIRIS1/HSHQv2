@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType, isCertificateRecordType } from '../constants';
+import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType, isCertificateRecordType, formatDisplayCode } from '../constants';
 import { isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus, resolveEmployeeName } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
@@ -103,10 +103,10 @@ const RecordRow: React.FC<RecordRowProps> = ({
     switch (key) {
       case 'code':
         return (
-          <td key="code" className={`${cellClass} font-medium text-blue-600 cursor-pointer`} onClick={() => onView(record)}>
+          <td key="code" className={`${cellClass} font-medium text-blue-600 cursor-pointer text-center`} onClick={() => onView(record)}>
             <div className="flex flex-col items-center gap-1">
-                <div className="break-words font-bold leading-normal text-sm" title={record.code}>
-                    {record.code}
+                <div className="truncate font-bold leading-normal text-sm text-center w-full" title={record.code}>
+                    {formatDisplayCode(record.code)}
                 </div>
                 {hasActiveReminder && <div className="flex items-center gap-1 text-xs text-pink-600 font-bold bg-pink-100 px-1.5 py-0.5 rounded"><Bell size={12} className="fill-pink-600" /> Nhắc hẹn</div>}
             </div>
@@ -271,7 +271,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'type':
         return (
           <td key="type" className={`${cellClass} text-center text-gray-700`}>
-              <div className="break-words leading-normal text-sm" title={record.recordType || ''}> 
+              <div className="truncate text-center w-full leading-normal text-sm" title={record.recordType || ''}> 
                   {getShortRecordType(record.recordType)}
               </div>
           </td>
