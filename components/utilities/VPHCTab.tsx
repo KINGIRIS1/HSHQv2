@@ -236,7 +236,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
         const currentYear = new Date().getFullYear();
 
         const lineLeftHtml = `
-            <table style="width: 100px; margin: 0 auto; border-collapse: collapse; border: none;">
+            <table style="width: 140px; margin: 0 auto; border-collapse: collapse; border: none;">
                 <tr><td style="border-bottom: 1px solid black; height: 1px;"></td></tr>
             </table>
         `;
@@ -252,14 +252,14 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
             
             <table style="width: 100%; text-align: center; font-weight: bold; border-collapse: collapse; margin-bottom: 0px; border: none;">
                 <tr style="vertical-align: top;">
-                    <td style="width: 45%; padding: 0;">
-                        <p style="margin: 0; font-size: 10pt; white-space: nowrap;">VĂN PHÒNG ĐKĐĐ THÀNH PHỐ ĐỒNG NAI</p>
-                        <p style="margin: 0; font-size: 12pt;">CHI NHÁNH HỚN QUẢN</p>
+                    <td style="width: 48%; padding: 0;">
+                        <p style="margin: 0; font-size: 11pt; white-space: nowrap;">VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI</p>
+                        <p style="margin: 0; font-size: 10.5pt; white-space: nowrap;">THÀNH PHỐ ĐỒNG NAI - CHI NHÁNH HỚN QUẢN</p>
                         ${lineLeftHtml}
                     </td>
-                    <td style="width: 55%; padding: 0;">
-                        <p style="margin: 0; font-size: 12pt;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                        <p style="margin: 0; font-size: 13pt;">Độc lập - Tự do - Hạnh phúc</p>
+                    <td style="width: 52%; padding: 0;">
+                        <p style="margin: 0; font-size: 11pt; white-space: nowrap;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                        <p style="margin: 0; font-size: 12.5pt; white-space: nowrap;">Độc lập - Tự do - Hạnh phúc</p>
                         ${lineRightHtml}
                     </td>
                 </tr>

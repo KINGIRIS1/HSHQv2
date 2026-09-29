@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PhieuInfoData, generatePreviewData, PLANNING_PRESETS, PlanningConfig, parseNumber } from '../../services/phieuInfoService';
-import { Settings, X, Plus, Trash2, RotateCcw, RefreshCw, Download, List, PlusCircle, Save, Search, Loader2 } from 'lucide-react';
+import { Settings, X, Plus, Trash2, RotateCcw, RefreshCw, Download, List, PlusCircle, Save, Search, Loader2, Printer } from 'lucide-react';
 import saveAs from 'file-saver';
 import { User as UserType, NotifyFunction } from '../../types';
 import InfoForm from './info-tab/InfoForm';
@@ -180,6 +180,54 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
             if (!silent) notify("Lỗi khi lưu dữ liệu.", 'error');
         }
         return success;
+    };
+
+    const handleSaveAndPrint = async () => {
+        if (!formData.Ten_Nguoi_Yeu_Cau) {
+            notify("Vui lòng nhập tên người yêu cầu trước khi in.", 'error');
+            return;
+        }
+
+        // Open print window synchronously to prevent popup blockers
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write('<html><head><title>Đang tải...</title></head><body style="font-family:sans-serif; text-align:center; padding-top:50px;"><h3>Đang chuẩn bị trang in...</h3></body></html>');
+        }
+
+        setLoading(true);
+        await handleSaveRecord(true);
+        setLoading(false);
+
+        const content = renderPreviewHTML();
+        if (printWindow) {
+            printWindow.document.open();
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Phiếu cung cấp thông tin</title>
+                        <style>
+                            @page { size: A4; margin: 20mm 15mm 15mm 25mm; }
+                            body { font-family: 'Times New Roman', serif; font-size: 13pt; color: black; line-height: 1.3; margin: 0; padding: 20px; background: white; -webkit-print-color-adjust: exact; }
+                            @media print {
+                                body { padding: 0; }
+                                button { display: none !important; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${content}
+                        <script>
+                            window.onload = () => {
+                                window.print();
+                            };
+                        </script>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+        }
+        notify("Đã lưu dữ liệu và mở hộp thoại in trực tiếp!", "success");
     };
 
     const handleEditFromList = (item: ThongTinRecord) => {
@@ -405,7 +453,7 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
         };
 
         const lineLeftHtml = `
-            <table style="width: 85px; margin: 0 auto; border-collapse: collapse; border: none;">
+            <table style="width: 140px; margin: 0 auto; border-collapse: collapse; border: none;">
                 <tr><td style="border-bottom: 1px solid black; height: 1px;"></td></tr>
             </table>
         `;
@@ -421,14 +469,14 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
                 
                 <table style="width: 100%; text-align: center; font-weight: bold; border-collapse: collapse; margin-bottom: 0px; font-size: 11pt; border: none;">
                     <tr style="vertical-align: top;">
-                        <td style="width: 45%; padding: 0;">
-                            <p style="margin: 0;">VĂN PHÒNG ĐKĐĐ THÀNH PHỐ ĐỒNG NAI</p>
-                            <p style="margin: 0;">CHI NHÁNH HỚN QUẢN</p>
+                        <td style="width: 48%; padding: 0;">
+                            <p style="margin: 0; font-size: 11pt; white-space: nowrap;">VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI</p>
+                            <p style="margin: 0; font-size: 10.5pt; white-space: nowrap;">THÀNH PHỐ ĐỒNG NAI - CHI NHÁNH HỚN QUẢN</p>
                             ${lineLeftHtml}
                         </td>
-                        <td style="width: 55%; padding: 0;">
-                            <p style="margin: 0;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                            <p style="margin: 0;">Độc lập - Tự do - Hạnh phúc</p>
+                        <td style="width: 52%; padding: 0;">
+                            <p style="margin: 0; font-size: 11pt; white-space: nowrap;">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                            <p style="margin: 0; font-size: 12.5pt; white-space: nowrap;">Độc lập - Tự do - Hạnh phúc</p>
                             ${lineRightHtml}
                         </td>
                     </tr>
@@ -563,8 +611,12 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
                             
                             {/* ACTION BUTTON */}
                             <div className="mt-4 flex justify-end gap-3 pt-4 border-t border-gray-200 bg-white p-4 rounded-xl shadow-sm">
-                                <button onClick={() => handleSaveRecord(false)} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm">
-                                    <Save size={18} /> Lưu Dữ Liệu
+                                <button 
+                                    onClick={handleSaveAndPrint} 
+                                    disabled={loading}
+                                    className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm disabled:opacity-50"
+                                >
+                                    <Printer size={18} /> {loading ? 'Đang xử lý...' : 'Lưu & In'}
                                 </button>
                             </div>
                         </div>

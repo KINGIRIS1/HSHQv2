@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User as UserType, NotifyFunction } from '../../types';
 import saveAs from 'file-saver';
-import { Loader2, Download, ExternalLink, List, PlusCircle, Save, Settings, Trash2, X, Plus, Search } from 'lucide-react';
+import { Loader2, Download, ExternalLink, List, PlusCircle, Save, Settings, Trash2, X, Plus, Search, Printer } from 'lucide-react';
 import BienBanForm from './bien-ban-tab/BienBanForm';
 import BienBanPreview from './bien-ban-tab/BienBanPreview';
 import BienBanList from './bien-ban-tab/BienBanList';
@@ -222,6 +222,54 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
           if (!silent) notify("Lỗi khi lưu dữ liệu.", 'error');
       }
       return success;
+  };
+
+  const handleSaveAndPrint = async () => {
+      if (!formData.TEN_CHU) {
+          notify("Vui lòng nhập tên chủ sử dụng trước khi in.", 'error');
+          return;
+      }
+
+      // Open print window synchronously to prevent popup blockers
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+          printWindow.document.write('<html><head><title>Đang tải...</title></head><body style="font-family:sans-serif; text-align:center; padding-top:50px;"><h3>Đang chuẩn bị trang in...</h3></body></html>');
+      }
+
+      setIsProcessing(true);
+      await handleSaveRecord(true);
+      setIsProcessing(false);
+
+      const content = generateContent(false);
+      if (printWindow) {
+          printWindow.document.open();
+          printWindow.document.write(`
+              <html>
+                  <head>
+                      <title>Biên bản kiểm tra thực địa</title>
+                      <style>
+                          @page { size: A4; margin: 20mm 15mm 15mm 25mm; }
+                          body { font-family: 'Times New Roman', serif; font-size: 13pt; color: black; line-height: 1.4; margin: 0; padding: 20px; background: white; -webkit-print-color-adjust: exact; text-align: justify; }
+                          @media print {
+                              body { padding: 0; }
+                              button { display: none !important; }
+                          }
+                      </style>
+                  </head>
+                  <body>
+                      ${content}
+                      <script>
+                          window.onload = () => {
+                              window.print();
+                          };
+                      </script>
+                  </body>
+              </html>
+          `);
+          printWindow.document.close();
+          printWindow.focus();
+      }
+      notify("Đã lưu dữ liệu và mở hộp thoại in trực tiếp!", "success");
   };
 
   const handleEditFromList = (item: BienBanRecord) => {
@@ -846,8 +894,12 @@ const SoanBienBanTab: React.FC<SoanBienBanTabProps> = ({ currentUser, isActive, 
                             onOpenConfig={openAuthorityConfig}
                         />
                         <div className="p-4 bg-white border-t border-gray-200 flex justify-end">
-                            <button onClick={() => handleSaveRecord(false)} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm">
-                                <Save size={18} /> Lưu Dữ Liệu
+                            <button 
+                                onClick={handleSaveAndPrint} 
+                                disabled={isProcessing}
+                                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm disabled:opacity-50"
+                            >
+                                <Printer size={18} /> {isProcessing ? 'Đang xử lý...' : 'Lưu & In'}
                             </button>
                         </div>
                     </div>
