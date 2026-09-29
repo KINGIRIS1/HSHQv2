@@ -673,6 +673,38 @@ export const sanitizePayloadFor22P02 = (payload: any): any => {
 };
 
 // --- MAPPERS ---
+export function sanitizeRecordType(rawType: string | undefined, content: string | undefined): string {
+    const typeStr = String(rawType || '').trim();
+    const contentStr = String(content || '').trim();
+
+    const isDescriptive = !typeStr || typeStr === contentStr || typeStr.length > 50 || typeStr.toLowerCase().includes('đo đạc lập') || typeStr.toLowerCase().includes('cấp giấy chứng nhận quyền sử dụng đất cho') || typeStr.toLowerCase().includes('thửa đất số');
+
+    if (isDescriptive) {
+        const target = (typeStr + ' ' + contentStr).toLowerCase();
+        if (target.includes('tách') || target.includes('hợp thửa')) return '2.5 TÁCH-HỢP THỬA';
+        if (target.includes('trích lục')) return '2.1 Trích lục bản đồ';
+        if (target.includes('trích đo')) return '2.2 Trích đo';
+        if (target.includes('cắm mốc')) return '2.4 Cắm mốc';
+        if (target.includes('cấp lại')) return '3.3.1 Cấp lại';
+        if (target.includes('cấp lần đầu') || target.includes('lần đầu')) return '3.1 Cấp lần đầu';
+        if (target.includes('chuyển mục đích')) return '3.2 Chuyển mục đích';
+        if (target.includes('thừa kế') || target.includes('tặng cho')) return '3.3 Biến động (Thừa kế, Tặng cho)';
+        if (target.includes('đính chính')) return '3.4 Đính chính GCN';
+        if (target.includes('sao lục')) return '1.1 Sao lục';
+        if (target.includes('công văn')) return '1.2 Công văn';
+        return typeStr && typeStr.length <= 50 ? typeStr : '2.5 TÁCH-HỢP THỬA';
+    }
+
+    if (typeStr === '2.3 Trích đo' || typeStr === 'Trích đo bản đồ địa chính') {
+        return '2.2 Trích đo';
+    }
+    if (typeStr.startsWith('2.6') || typeStr.includes('CN số thửa') || typeStr.includes('Cập số thửa') || typeStr.includes('Cập nhập số thửa') || typeStr.includes('Cập nhật số thửa') || typeStr.includes('Duyệt đơn') || typeStr.includes('duyệt đơn') || typeStr.includes('Duyệt Đơn') || typeStr.includes('Duyệt đơn-số thửa') || typeStr.includes('Duyệt Đơn & Cung cấp số thửa')) {
+        return '2.3 Duyệt đơn';
+    }
+
+    return typeStr;
+}
+
 export const mapRecordFromDb = (item: any): any => {
     if (!item) return item;
     const r = { ...item };
@@ -702,12 +734,8 @@ export const mapRecordFromDb = (item: any): any => {
     r.needsMapCorrection = val(r.needsMapCorrection, r.needsmapcorrection, r.needs_map_correction);
     r.explanationPlan = val(r.explanationPlan, r.explanationplan, r.explanation_plan);
     r.receiptNumber = val(r.receiptNumber, r.receiptnumber, r.receipt_number);
-    r.recordType = val(r.recordType, r.recordtype, r.record_type);
-    if (r.recordType === '2.3 Trích đo' || r.recordType === 'Trích đo bản đồ địa chính') {
-        r.recordType = '2.2 Trích đo';
-    } else if (r.recordType && (r.recordType.startsWith('2.6') || r.recordType.includes('CN số thửa') || r.recordType.includes('Cập số thửa') || r.recordType.includes('Cập nhập số thửa') || r.recordType.includes('Cập nhật số thửa') || r.recordType.includes('Duyệt đơn') || r.recordType.includes('duyệt đơn') || r.recordType.includes('Duyệt Đơn') || r.recordType.includes('Duyệt đơn-số thửa') || r.recordType.includes('Duyệt Đơn & Cung cấp số thửa'))) {
-        r.recordType = '2.3 Duyệt đơn';
-    }
+    r.content = val(r.content, r.trich_yeu, r.description);
+    r.recordType = sanitizeRecordType(val(r.recordType, r.recordtype, r.record_type, r.loai_bien_dong), r.content);
     
     r.receivedBy = val(r.receivedBy, r.receivedby, r.received_by);
     r.assignedDate = keepOnlyDate(val(r.assignedDate, r.assigneddate, r.assigned_date));

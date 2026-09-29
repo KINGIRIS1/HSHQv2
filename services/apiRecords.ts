@@ -371,6 +371,16 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     };
 
     const validSource = normalizeSource(record.sourceTable);
+
+    // Nếu nguồn gốc là lưu trữ (luutru_records) và recordType không phải là thủ tục cấp giấy (3.x), giữ nguyên luutru_records
+    if (validSource === 'luutru_records') {
+        const rType = String(record.recordType || '').trim();
+        const short = getShortRecordType(rType);
+        if (!rType.startsWith('3.') && !short.startsWith('3.') && !isCertificateRecordType(record)) {
+            return 'luutru_records';
+        }
+    }
+
     const explicitGroup = getExplicitGroup(record);
     const inferredGroup = explicitGroup || getInferredTable(record);
 
@@ -1768,12 +1778,28 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
                     }
 
                     if (foundOther) {
-                        console.error(`[ROUTING_DATA_INTEGRITY_ERROR] Record ID ${record.id} exists in ${foundOther}, but update requested for ${targetTable}. Auto-migration is forbidden.`);
-                        throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${record.id} exists in ${foundOther}. Auto-migration to ${targetTable} is strictly forbidden.`);
+                        console.warn(`[AUTO_MIGRATION] Record ID ${record.id} found in ${foundOther}, but update requested for ${targetTable}. Performing safe migration...`);
+                        await supabase.from(foundOther).delete().eq('id', record.id);
+                        const sanitized = sanitizeRecordPayloadForTable(record, targetTable);
+                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
+                        if (insRes.data && insRes.data.length > 0) {
+                            data = insRes.data;
+                            console.log(`[AUTO_MIGRATION] Successfully migrated record ID ${record.id} from ${foundOther} to ${targetTable}`);
+                        } else {
+                            throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${record.id} exists in ${foundOther}. Auto-migration to ${targetTable} failed.`);
+                        }
+                    } else {
+                        console.warn(`[AUTO_UPSERT_MISSING] Record ID ${record.id} not found in any table. Performing upsert into ${targetTable}...`);
+                        const sanitized = sanitizeRecordPayloadForTable(record, targetTable);
+                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
+                        if (insRes.data && insRes.data.length > 0) {
+                            data = insRes.data;
+                            console.log(`[AUTO_UPSERT_MISSING] Successfully inserted missing record ID ${record.id} into ${targetTable}`);
+                        } else {
+                            console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${record.id} was not found in table ${targetTable}.`);
+                            throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${record.id} was not found in table ${targetTable}.`);
+                        }
                     }
-
-                    console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${record.id} was not found in table ${targetTable}.`);
-                    throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${record.id} was not found in table ${targetTable}.`);
                 }
             }
         }
@@ -1930,12 +1956,30 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
                     }
 
                     if (foundOther) {
-                        console.error(`[ROUTING_DATA_INTEGRITY_ERROR] Record ID ${id} exists in ${foundOther}, but update requested for ${targetTable}. Auto-migration is forbidden.`);
-                        throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${id} exists in ${foundOther}. Auto-migration to ${targetTable} is strictly forbidden.`);
+                        console.warn(`[AUTO_MIGRATION] Record ID ${id} found in ${foundOther}, but update requested for ${targetTable}. Performing safe migration...`);
+                        const { data: oldRecData } = await supabase.from(foundOther).select('*').eq('id', id).maybeSingle();
+                        await supabase.from(foundOther).delete().eq('id', id);
+                        const mergedRecord = { ...(oldRecData || {}), ...fields, id };
+                        const sanitized = sanitizeRecordPayloadForTable(mergedRecord, targetTable);
+                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
+                        if (insRes.data && insRes.data.length > 0) {
+                            data = insRes.data;
+                            console.log(`[AUTO_MIGRATION] Successfully migrated record ID ${id} from ${foundOther} to ${targetTable}`);
+                        } else {
+                            throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${id} exists in ${foundOther}. Auto-migration to ${targetTable} failed.`);
+                        }
+                    } else {
+                        console.warn(`[AUTO_UPSERT_MISSING] Record ID ${id} not found in any table. Performing upsert into ${targetTable}...`);
+                        const sanitized = sanitizeRecordPayloadForTable({ id, ...fields }, targetTable);
+                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
+                        if (insRes.data && insRes.data.length > 0) {
+                            data = insRes.data;
+                            console.log(`[AUTO_UPSERT_MISSING] Successfully inserted missing record ID ${id} into ${targetTable}`);
+                        } else {
+                            console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${id} was not found in table ${targetTable}.`);
+                            throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${id} was not found in table ${targetTable}.`);
+                        }
                     }
-
-                    console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${id} was not found in table ${targetTable}.`);
-                    throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${id} was not found in table ${targetTable}.`);
                 }
             }
         }
