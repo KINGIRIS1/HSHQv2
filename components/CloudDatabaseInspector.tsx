@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Database, CheckCircle2, AlertTriangle, RefreshCw, Layers, FileText, FolderArchive, Server, ShieldCheck, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Database, CheckCircle2, AlertTriangle, RefreshCw, Layers, FileText, FolderArchive, Server, ShieldCheck, X, Download, Upload, Clock, FileJson } from 'lucide-react';
 import { supabase, isConfigured } from '../services/supabaseClient';
 import { getShortRecordType } from '../constants';
+import { downloadSystemJsonBackup, restoreSystemJsonBackupAsync, FullBackupData } from '../services/backupService';
+import { RecordFile } from '../types';
 
 interface CloudDatabaseInspectorProps {
   isOpen: boolean;
   onClose: () => void;
+  records?: RecordFile[];
+  onRefreshData?: () => void;
 }
 
-export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ isOpen, onClose }) => {
+export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ isOpen, onClose, records = [], onRefreshData }) => {
   const [loading, setLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [restoreProgress, setRestoreProgress] = useState<{ processed: number; total: number; status: string } | null>(null);
+  const [backupFeedback, setBackupFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [restoreFeedback, setRestoreFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [tableStats, setTableStats] = useState<{
     dangky: { count: number; error?: string; samples: any[] };
     land: { count: number; error?: string; samples: any[] };
@@ -78,6 +89,78 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
 
     setTableStats(stats);
     setLoading(false);
+  };
+
+  const handleDownloadBackup = async () => {
+    setBackupLoading(true);
+    setBackupFeedback(null);
+    try {
+      const res = await downloadSystemJsonBackup();
+      if (res.success) {
+        setBackupFeedback({
+          type: 'success',
+          message: `Đã tạo và tải về tệp sao lưu "${res.fileName}" (${res.count} hồ sơ) thành công!`
+        });
+      }
+    } catch (err: any) {
+      setBackupFeedback({
+        type: 'error',
+        message: err?.message || 'Lỗi khi tạo tệp sao lưu .json'
+      });
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleFileRestoreChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setRestoreLoading(true);
+    setRestoreFeedback(null);
+    setRestoreProgress({ processed: 0, total: 100, status: 'Đang đọc tệp sao lưu .json...' });
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const jsonContent = event.target?.result as string;
+        const backupObj = JSON.parse(jsonContent) as FullBackupData;
+        
+        if (!backupObj || !backupObj.data || !backupObj.data.records) {
+          throw new Error("Tệp .json không đúng định dạng sao lưu hệ thống.");
+        }
+
+        const result = await restoreSystemJsonBackupAsync(backupObj, records, (processed, total, status) => {
+          setRestoreProgress({ processed, total, status });
+        });
+
+        setRestoreFeedback({
+          type: 'success',
+          message: result.message
+        });
+
+        if (onRefreshData) {
+          onRefreshData();
+        }
+        checkDatabase();
+      } catch (err: any) {
+        console.error("Restore error:", err);
+        setRestoreFeedback({
+          type: 'error',
+          message: err?.message || 'Lỗi khi phân tích hoặc khôi phục tệp .json'
+        });
+      } finally {
+        setRestoreLoading(false);
+        setRestoreProgress(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setRestoreFeedback({ type: 'error', message: 'Không thể đọc tệp đã chọn.' });
+      setRestoreLoading(false);
+      setRestoreProgress(null);
+    };
+    reader.readAsText(file);
   };
 
   useEffect(() => {
@@ -240,6 +323,98 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                       )}
                     </>
                   )}
+                </div>
+              </div>
+
+              {/* --- SAO LƯU & KHÔI PHỤC DỮ LIỆU .JSON THÔNG MINH --- */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-5 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between pb-3 border-b border-blue-200/60">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-blue-600 text-white rounded-xl shadow-xs">
+                      <FileJson className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-800 text-sm tracking-tight">Sao lưu & Khôi phục Dữ liệu Hệ thống (.json)</h3>
+                      <p className="text-xs text-slate-500 font-medium">Bảo toàn 100% tất cả trường thông tin hồ sơ. Tự động sao lưu lúc 7:30 sáng hàng ngày.</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-mono px-3 py-1 bg-blue-100 text-blue-800 font-bold rounded-full">
+                    Định dạng .json chuẩn
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Export Box */}
+                  <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-2xs flex flex-col justify-between gap-3">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-700 mb-1 flex items-center gap-1.5">
+                        <Download size={15} className="text-blue-600" /> Xuất tệp sao lưu (.json)
+                      </h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Đóng gói toàn bộ dữ liệu hồ sơ, nhân sự, lịch sử và cấu hình hệ thống thành tệp .json và tự động tải về máy.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleDownloadBackup}
+                      disabled={backupLoading}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {backupLoading ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+                      <span>{backupLoading ? 'Đang tạo tệp sao lưu...' : 'Tạo & Tải về tệp .json ngay'}</span>
+                    </button>
+                    {backupFeedback && (
+                      <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${backupFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                        {backupFeedback.type === 'success' ? <CheckCircle2 size={14} className="text-emerald-600 shrink-0" /> : <AlertTriangle size={14} className="text-red-600 shrink-0" />}
+                        <span className="text-[11px]">{backupFeedback.message}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Restore Box */}
+                  <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-2xs flex flex-col justify-between gap-3">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-700 mb-1 flex items-center gap-1.5">
+                        <Upload size={15} className="text-indigo-600" /> Khôi phục thông minh (.json)
+                      </h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Tải lên tệp .json. Hệ thống áp dụng <strong>phân trang chống quá tải</strong> và <strong>chỉ bù đắp hồ sơ thiếu</strong>, bỏ qua hồ sơ đã có sẵn.
+                      </p>
+                    </div>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept=".json" 
+                      onChange={handleFileRestoreChange} 
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={restoreLoading}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {restoreLoading ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
+                      <span>{restoreLoading ? 'Đang khôi phục phân trang...' : 'Chọn tệp .json để khôi phục'}</span>
+                    </button>
+
+                    {restoreProgress && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-indigo-700">
+                          <span>{restoreProgress.status}</span>
+                          <span>{Math.round((restoreProgress.processed / restoreProgress.total) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                          <div className="bg-indigo-600 h-2 transition-all duration-300 rounded-full" style={{ width: `${Math.max(5, (restoreProgress.processed / restoreProgress.total) * 100)}%` }}></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {restoreFeedback && (
+                      <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${restoreFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                        {restoreFeedback.type === 'success' ? <CheckCircle2 size={14} className="text-emerald-600 shrink-0" /> : <AlertTriangle size={14} className="text-red-600 shrink-0" />}
+                        <span className="text-[11px]">{restoreFeedback.message}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

@@ -11,6 +11,7 @@ import {
     fetchExcerptHistory,
     fetchExcerptCounters
 } from './api';
+import { createRecordsBatchApi } from './apiRecords';
 import { RecordFile, Contract, Employee, User, Holiday } from '../types';
 import { 
     fetchVphcRecords, 
@@ -544,4 +545,75 @@ export const exportFullBackupToExcelAsync = async (
 
     onProgress?.(100, 'Xuất file thành công!');
     await new Promise(r => setTimeout(r, 200));
+};
+
+export const downloadSystemJsonBackup = async (): Promise<{ success: boolean; fileName: string; count: number }> => {
+    const backup = await createFullBackupData();
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    const fileName = `Backup_He_Thong_Ho_So_${dateStr}.json`;
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", fileName);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    localStorage.setItem('last_json_backup_timestamp', Date.now().toString());
+    const totalRecords = backup.data?.records?.length || 0;
+    return { success: true, fileName, count: totalRecords };
+};
+
+export const restoreSystemJsonBackupAsync = async (
+    backupData: FullBackupData,
+    existingRecords: RecordFile[],
+    onProgress?: (processed: number, total: number, status: string) => void
+): Promise<{ restoredCount: number; skippedCount: number; message: string }> => {
+    const payload = backupData.data || (backupData as any);
+    const incomingRecords: RecordFile[] = payload.records || [];
+    
+    if (incomingRecords.length === 0) {
+        return { restoredCount: 0, skippedCount: 0, message: "Tệp sao lưu không chứa hồ sơ nào." };
+    }
+
+    const existingIds = new Set(existingRecords.map(r => r.id));
+    const existingCodes = new Set(existingRecords.map(r => String(r.code || '').trim().toLowerCase()).filter(Boolean));
+
+    // Chỉ lấy các hồ sơ bị mất thiếu trên hệ thống
+    const missingRecords = incomingRecords.filter(r => {
+        const idMatch = r.id && existingIds.has(r.id);
+        const codeMatch = r.code && existingCodes.has(String(r.code).trim().toLowerCase());
+        return !idMatch && !codeMatch;
+    });
+
+    const skippedCount = incomingRecords.length - missingRecords.length;
+
+    if (missingRecords.length === 0) {
+        return { 
+            restoredCount: 0, 
+            skippedCount, 
+            message: `Tất cả ${incomingRecords.length} hồ sơ trong tệp backup đều đã có đầy đủ trên hệ thống. Không có hồ sơ nào bị thiếu (Bỏ qua hoàn toàn).` 
+        };
+    }
+
+    onProgress?.(0, missingRecords.length, `Phát hiện ${missingRecords.length} hồ sơ thiếu cần khôi phục (${skippedCount} hồ sơ đã có sẵn được bỏ qua)...`);
+    await new Promise(r => setTimeout(r, 100));
+
+    const CHUNK_SIZE = 50; // Phân trang tránh quá tải hệ thống
+    let processed = 0;
+
+    for (let i = 0; i < missingRecords.length; i += CHUNK_SIZE) {
+        const chunk = missingRecords.slice(i, i + CHUNK_SIZE);
+        onProgress?.(processed, missingRecords.length, `Đang khôi phục phân trang lô từ ${i + 1} đến ${Math.min(i + CHUNK_SIZE, missingRecords.length)}...`);
+        
+        await createRecordsBatchApi(chunk);
+        processed += chunk.length;
+        await new Promise(r => setTimeout(r, 60)); // Yield thread
+    }
+
+    onProgress?.(missingRecords.length, missingRecords.length, 'Khôi phục hoàn tất!');
+    return {
+        restoredCount: missingRecords.length,
+        skippedCount,
+        message: `Đã khôi phục thành công ${missingRecords.length} hồ sơ bị thiếu. Đã bỏ qua ${skippedCount} hồ sơ đã có sẵn trên hệ thống.`
+    };
 };

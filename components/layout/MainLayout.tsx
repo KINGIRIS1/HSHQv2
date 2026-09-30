@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
-import { Menu, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2 } from 'lucide-react';
+import { Menu, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2, Database } from 'lucide-react';
 import { User, UserRole, RolePermissions, DepartmentPermissions, Employee, RecordFile } from '../../types';
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
@@ -45,6 +45,7 @@ interface MainLayoutProps {
     onUpdateNow?: () => void;
     onUpdateLater?: () => void;
     onReopenUpdateModal?: () => void;
+    onOpenCloudInspector?: () => void;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({
@@ -78,7 +79,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     updateSpeed = 0, // Default
     onUpdateNow = () => {},
     onUpdateLater = () => {},
-    onReopenUpdateModal
+    onReopenUpdateModal,
+    onOpenCloudInspector
 }) => {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);

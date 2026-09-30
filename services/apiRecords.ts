@@ -2378,6 +2378,12 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
         const dangkyPayload: any[] = [];
         const luutruPayload: any[] = [];
         const seenCodesInBatch = new Set<string>();
+
+        const cachedRecords: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const cachedMapByCode = new Map<string, RecordFile>();
+        cachedRecords.forEach(cr => {
+            if (cr.code) cachedMapByCode.set(cr.code.trim().toLowerCase(), cr);
+        });
         
         for (const r of records) {
             let finalCode = (r.code || '').trim();
@@ -2385,19 +2391,17 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                 finalCode = await getNextGlobalRecordCode(r.receivedDate || new Date().toISOString());
             }
 
-            // Giải quyết xung đột trên Cloud DB
-            finalCode = await resolveGuaranteedUniqueCode(finalCode, r.id);
-
-            // Đảm bảo không trùng với các hồ sơ khác trong cùng file tải lên / batch
-            while (seenCodesInBatch.has(finalCode.toLowerCase())) {
-                finalCode = await resolveGuaranteedUniqueCode(finalCode, r.id);
-            }
-            seenCodesInBatch.add(finalCode.toLowerCase());
-            
             const recordPayload = { ...r, code: finalCode };
-            if (!recordPayload.id || !isValidUUID(recordPayload.id)) {
+
+            // Nếu hồ sơ đã có sẵn mã trên hệ thống, giữ lại ID cũ để Force Upsert ghi đè mượt mà
+            const matchExisting = cachedMapByCode.get(finalCode.toLowerCase());
+            if (matchExisting && matchExisting.id) {
+                recordPayload.id = matchExisting.id;
+            } else if (!recordPayload.id || !isValidUUID(recordPayload.id)) {
                 recordPayload.id = generateStandardUUID();
             }
+
+            seenCodesInBatch.add(finalCode.toLowerCase());
             
             const targetTable = getTargetTable(recordPayload);
             if (targetTable === 'luutru_records') {
@@ -2413,7 +2417,15 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
             const CHUNK_SIZE = 500;
             for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
                 const chunk = payload.slice(i, i + CHUNK_SIZE);
-                let { error } = await supabase.from(table).insert(chunk);
+                let { error } = await supabase.from(table).upsert(chunk, { onConflict: 'code' });
+                if (error) {
+                    const resId = await supabase.from(table).upsert(chunk, { onConflict: 'id' });
+                    if (!resId.error) error = null;
+                }
+                if (error) {
+                    const resInsert = await supabase.from(table).insert(chunk);
+                    error = resInsert.error;
+                }
                 
                 if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
                     console.warn(`⚠️ [22P02 Fallback] Retrying batch insert into ${table} chunk ${i} with 22P02 sanitized payload...`);

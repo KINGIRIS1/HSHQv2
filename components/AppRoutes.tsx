@@ -882,16 +882,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               </button>
             )}
 
-            {isDirector && isViewAllowedForUser(currentUser, employees, "test_director_completed", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-test-records-director-completed"
-                onClick={() => props.setCurrentView("test_director_completed")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Hoàn thành
-              </button>
-            )}
-
             {!isDirector && (
               <button
                 id="tab-test-records-vaoso"
@@ -899,6 +889,16 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "vao_so" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
                 <BookOpen size={16} /> Vô số GCN
+              </button>
+            )}
+
+            {isDirector && isViewAllowedForUser(currentUser, employees, "test_director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-director-completed"
+                onClick={() => props.setCurrentView("test_director_completed")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <CheckSquare size={16} /> Hoàn thành
               </button>
             )}
 
@@ -2206,16 +2206,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               </button>
             )}
 
-            {isDirector && isViewAllowedForUser(currentUser, employees, "test_director_completed", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-test-records-director-completed"
-                onClick={() => props.setCurrentView("test_director_completed")}
-                className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
-              >
-                <CheckSquare size={16} /> Hoàn thành
-              </button>
-            )}
-
             {!isDirector && (
               <button
                 id="tab-test-records-vaoso"
@@ -2223,6 +2213,16 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-purple-600 text-purple-700 bg-white"
               >
                 <BookOpen size={16} /> Vô số GCN
+              </button>
+            )}
+
+            {isDirector && isViewAllowedForUser(currentUser, employees, "test_director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-director-completed"
+                onClick={() => props.setCurrentView("test_director_completed")}
+                className="px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap border-transparent text-gray-500 hover:text-gray-700"
+              >
+                <CheckSquare size={16} /> Hoàn thành
               </button>
             )}
 

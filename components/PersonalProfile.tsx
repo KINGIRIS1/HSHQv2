@@ -38,8 +38,9 @@ import {
   Phone,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
-import { getShortRecordType, isArchiveRecordType, STATUS_LABELS, formatDisplayCode } from "../constants";
+import { getShortRecordType, isArchiveRecordType, STATUS_LABELS, formatDisplayCode, isCertificateRecordType } from "../constants";
 import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase, matchEmployeeId } from "../utils/appHelpers";
+import { calculateExactSla } from "../utils/registrationWorkflows";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import { enqueueRecordForBackgroundDriveSync, hasPendingRecordAttachments } from "../services/attachmentStorage";
 import {
@@ -1942,7 +1943,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             <div className="truncate font-bold text-sm text-center" title={r.code || ""}>
                               {formatDisplayCode(r.code)}
                             </div>
-                            {isRecordOverdue(r) && (() => {
+                            {isCertificateRecordType(r) ? (() => {
+                              const exactSla = calculateExactSla(r);
+                              return (
+                                <span className={`inline-block px-1.5 py-0.5 text-xs rounded border font-bold mt-1 block text-center w-full ${exactSla.isOverdue ? 'bg-red-50 text-red-600 border-red-200' : exactSla.isApproaching ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
+                                  ⏱️ {exactSla.text}
+                                </span>
+                              );
+                            })() : isRecordOverdue(r) && (() => {
                               const days = getOverdueDays(r);
                               const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
                               return <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">{text}</span>;

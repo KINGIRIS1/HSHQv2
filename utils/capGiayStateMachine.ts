@@ -119,11 +119,31 @@ export interface CapGiayTransitionValidation {
  * Bộ kiểm soát chuyển trạng thái (State Machine Guard) cho Module Cấp giấy
  */
 export function validateCapGiayTransition(
-  _currentStatus: RecordStatus | string,
+  currentStatus: RecordStatus | string,
   targetStatus: RecordStatus | string,
-  _previousStatus?: RecordStatus | string | null,
+  previousStatus?: RecordStatus | string | null,
   _recordType?: string | null
 ): CapGiayTransitionValidation {
+  // 1. Chặn các trạng thái cấm thuộc Đo đạc/Lưu trữ
+  if ((CAP_GIAY_FORBIDDEN_STATUSES as string[]).includes(targetStatus) || targetStatus.includes('SURVEY')) {
+    return { valid: false, reason: 'Trạng thái thuộc phân hệ Đo đạc/Lưu trữ không được áp dụng cho Module Cấp giấy.' };
+  }
+
+  // 2. Kiểm tra xem trạng thái đích có hợp lệ thuộc Cấp giấy hay không
+  if (!isCapGiayStatus(targetStatus)) {
+    return { valid: false, reason: `Trạng thái "${targetStatus}" không thuộc danh mục hợp lệ của Module Cấp giấy.` };
+  }
+
+  // 3. Nếu đang ở Chờ bổ sung (PENDING_SUPPLEMENT) -> Bắt buộc quay lại đúng bước trước đó (previousStatus)
+  if (currentStatus === RecordStatus.PENDING_SUPPLEMENT) {
+    if (previousStatus && targetStatus !== previousStatus) {
+      return {
+        valid: false,
+        reason: `Hồ sơ sau khi hoàn tất bổ sung bắt buộc quay lại đúng bước cũ (${previousStatus}), không thể nhảy cóc sang "${targetStatus}".`
+      };
+    }
+  }
+
   return { valid: true, targetStatus: targetStatus as CapGiayStatus };
 }
 

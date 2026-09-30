@@ -562,10 +562,6 @@ function cleanString(str) {
     }
   };
 
-  // Excel Periodic Auto-Backup
-  const [isExecutingExcelBackup, setIsExecutingExcelBackup] = useState(false);
-  const [lastExcelBackupTimestamp, setLastExcelBackupTimestamp] = useState<number | null>(null);
-  const [excelBackupFeedback, setExcelBackupFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Holiday States
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -691,7 +687,6 @@ function cleanString(str) {
       loadPermissions();
       loadContractSettings();
       loadBackupSettings();
-      loadExcelBackupSettings();
 
       const handleOpenTab = (e: any) => {
           if (e.detail?.tab) {
@@ -699,61 +694,13 @@ function cleanString(str) {
           }
       };
 
-      const handleExcelSuccess = (e: any) => {
-          if (e.detail?.time) {
-              setLastExcelBackupTimestamp(e.detail.time);
-          }
-      };
-
       window.addEventListener('open_system_settings_tab', handleOpenTab);
-      window.addEventListener('excel_backup_success', handleExcelSuccess);
 
       return () => {
           window.removeEventListener('open_system_settings_tab', handleOpenTab);
-          window.removeEventListener('excel_backup_success', handleExcelSuccess);
       };
   }, []);
 
-  const loadExcelBackupSettings = async () => {
-      const lastTime = await getLastExcelBackupTime();
-      setLastExcelBackupTimestamp(lastTime);
-  };
-
-  const handleTriggerExcelBackupNow = async () => {
-      setIsExecutingExcelBackup(true);
-      setExcelBackupFeedback(null);
-      try {
-          let currentRecords = records;
-          if (!currentRecords || currentRecords.length === 0) {
-              currentRecords = await fetchRecords();
-          }
-          if (!currentRecords || currentRecords.length === 0) {
-              setExcelBackupFeedback({ type: 'error', message: 'Không có dữ liệu hồ sơ để sao lưu.' });
-              return;
-          }
-          const result = await performExcelBackup(currentRecords, employees);
-          if (result.success) {
-              const now = Date.now();
-              setLastExcelBackupTimestamp(now);
-              setExcelBackupFeedback({
-                  type: 'success',
-                  message: `Đã sao lưu thành công file ${result.fileName || EXCEL_BACKUP_FILENAME} (${currentRecords.length} hồ sơ)! Tệp Excel đã được tải trực tiếp về thư mục Downloads.`
-              });
-          } else {
-              setExcelBackupFeedback({
-                  type: 'error',
-                  message: result.error || 'Lỗi khi sao lưu file Excel.'
-              });
-          }
-      } catch (err: any) {
-          setExcelBackupFeedback({
-              type: 'error',
-              message: err.message || 'Lỗi không xác định khi thực hiện sao lưu.'
-          });
-      } finally {
-          setIsExecutingExcelBackup(false);
-      }
-  };
 
   const loadBackupSettings = async () => {
       const savedDir = await getSystemSetting('backup_directory');
@@ -1328,79 +1275,6 @@ function cleanString(str) {
                         </div>
                     </div>
 
-                    {/* Excel Periodic Auto-Backup Config */}
-                    <div className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm space-y-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                            <div>
-                                <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
-                                    <FileSpreadsheet size={20} className="text-emerald-600" />
-                                    Sao lưu hồ sơ dự phòng ra Excel
-                                </h3>
-                                <p className="text-xs text-slate-500 font-medium mt-1">
-                                    Hệ thống tự động sao lưu dữ liệu ra file Excel theo chu kỳ 5 ngày và tải về máy. Bạn cũng có thể chủ động bấm nút bên dưới bất kỳ lúc nào để xuất và tải ngay toàn bộ hồ sơ về thư mục <strong>Downloads (Tải về)</strong>.
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    Tự động theo chu kỳ 5 ngày
-                                </span>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-mono font-bold rounded-full border border-slate-200">
-                                    Tên tệp: {EXCEL_BACKUP_FILENAME}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Status & Manual Action */}
-                        <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                    <Clock size={14} className="text-slate-400" />
-                                    <span>Lần sao lưu gần nhất:</span>
-                                    <strong className="text-slate-800 font-bold">
-                                        {lastExcelBackupTimestamp ? new Date(lastExcelBackupTimestamp).toLocaleString('vi-VN') : 'Chưa có lịch sử sao lưu'}
-                                    </strong>
-                                </div>
-                                {lastExcelBackupTimestamp && (
-                                    <div className="text-[11px] text-slate-500">
-                                        Dự kiến sao lưu tiếp theo: <strong>{new Date(lastExcelBackupTimestamp + EXCEL_BACKUP_PERIOD_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN')}</strong>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                                <button
-                                    type="button"
-                                    onClick={handleTriggerExcelBackupNow}
-                                    disabled={isExecutingExcelBackup}
-                                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer disabled:opacity-60"
-                                >
-                                    {isExecutingExcelBackup ? (
-                                        <>
-                                            <Loader2 size={14} className="animate-spin" />
-                                            <span>Đang tạo & tải file...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download size={14} className="text-emerald-400" />
-                                            <span>Sao lưu & Tải file Excel về máy</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        {excelBackupFeedback && (
-                            <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                                excelBackupFeedback.type === 'success' 
-                                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' 
-                                    : 'bg-red-50 border border-red-200 text-red-800'
-                            }`}>
-                                {excelBackupFeedback.type === 'success' ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" /> : <AlertTriangle size={16} className="text-red-600 shrink-0" />}
-                                <span>{excelBackupFeedback.message}</span>
-                            </div>
-                        )}
-                    </div>
 
                     {/* Google Drive Incoming URL Config */}
                     <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-sm space-y-4">

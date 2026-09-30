@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 import { RecordFile, Employee, User as AppUser, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
-import { getRegistrationWorkflowCategory, getStepSlaInfo, getAppointmentInfo } from '../../utils/registrationWorkflows';
+import { getRegistrationWorkflowCategory, getStepSlaInfo, getAppointmentInfo, calculateExactSla } from '../../utils/registrationWorkflows';
 import { resolveEmployeeName } from '../../utils/appHelpers';
+import { isCertificateRecordType } from '../../constants';
 
 interface RegistrationRecordRowProps {
   record: RecordFile;
@@ -80,20 +81,30 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
 
       {/* Mã hồ sơ */}
       <td className="py-2.5 px-3">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onViewDetail(record)}
-            className="font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer text-left flex items-center gap-1"
-          >
-            <FileText size={13} className="text-blue-600 shrink-0" />
-            <span>{record.code}</span>
-          </button>
-          {hasAttachments && (
-            <span title="Có tệp đính kèm" className="text-emerald-600">
-              <Paperclip size={12} />
-            </span>
-          )}
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onViewDetail(record)}
+              className="font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer text-left flex items-center gap-1"
+            >
+              <FileText size={13} className="text-blue-600 shrink-0" />
+              <span>{record.code}</span>
+            </button>
+            {hasAttachments && (
+              <span title="Có tệp đính kèm" className="text-emerald-600">
+                <Paperclip size={12} />
+              </span>
+            )}
+          </div>
+          {isCertificateRecordType(record) && (() => {
+            const exactSla = calculateExactSla(record);
+            return (
+              <span className={`text-[11px] font-bold ${exactSla.colorClass}`}>
+                ⏱️ {exactSla.text}
+              </span>
+            );
+          })()}
         </div>
       </td>
 

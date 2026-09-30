@@ -123,6 +123,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   return idx !== -1 ? row[idx] : undefined;
               };
 
+              const existingCode = String(getVal(['MÃ HỒ SƠ', 'MÃ SỐ', 'MÃ', 'SỐ HỒ SƠ', 'SỐ HIỆU', 'CODE', 'MA HO SO']) || '').trim();
               const customerName = getVal(['CHỦ SỬ DỤNG', 'TÊN', 'HỌ TÊN']);
               if (!customerName) continue;
 
@@ -168,7 +169,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   content: String(getVal(['NỘI DUNG', 'GHI CHÚ']) || ''),
                   authorizedBy: authorizedBy,
                   authDocType: authDocType,
-                  code: ''
+                  code: existingCode || ''
               });
           }
           setBulkRecords(newBulkRecords);
@@ -214,6 +215,40 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       }
   };
 
+  const handleSaveAllRecords = async () => {
+      const unsaved = bulkRecords.filter(r => !r.isSaved && r.code);
+      if (unsaved.length === 0) {
+          alert("Không có hồ sơ nào có mã hoặc tất cả đã được lưu.");
+          return;
+      }
+
+      let successCount = 0;
+      for (let i = 0; i < bulkRecords.length; i++) {
+          const record = bulkRecords[i];
+          if (record.isSaved || !record.code) continue;
+
+          const newRecord: RecordFile = { 
+              ...record, 
+              id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
+              receivedDate: record.receivedDate || new Date().toISOString(),
+              deadline: record.deadline || '',
+              status: RecordStatus.RECEIVED,
+              receivedBy: record.receivedBy || currentUser?.employeeId || currentUser?.name || currentUser?.username || ''
+          } as RecordFile;
+
+          const savedRecord = await onSave(newRecord);
+          if (savedRecord) {
+              successCount++;
+              setBulkRecords(prev => {
+                  const newList = [...prev];
+                  newList[i] = { ...newList[i], isSaved: true, code: savedRecord.code || record.code };
+                  return newList;
+              });
+          }
+      }
+      alert(`Đã lưu thành công ${successCount} hồ sơ vào phần mềm!`);
+  };
+
   const updateBulkRecord = (index: number, field: keyof RecordFile, value: any) => {
       setBulkRecords(prev => {
           const newList = [...prev];
@@ -243,6 +278,11 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                     {bulkRecords.length > 0 && <span className="text-xs text-orange-600 italic hidden md:inline">Lưu ý: Bấm "Tạo mã" &rarr; "Lưu" cho từng dòng.</span>}
                 </div>
                 <div className="flex items-center gap-2">
+                    {bulkRecords.length > 0 && (
+                        <button onClick={handleSaveAllRecords} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
+                            <Save size={15} /> Lưu tất cả ({bulkRecords.filter(r => !r.isSaved).length})
+                        </button>
+                    )}
                     <button onClick={handleDownloadTemplate} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
                         <Download size={15} /> Tải mẫu
                     </button>

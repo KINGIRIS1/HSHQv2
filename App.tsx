@@ -43,7 +43,7 @@ import BulkSignConfirmModal from './components/BulkSignConfirmModal';
 import { DossierComponentItem } from './types';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
-import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
+import { checkAndTriggerWeeklyBackup, downloadBackupAsFile, downloadSystemJsonBackup } from './services/backupService';
 import { checkAndTriggerPeriodicExcelBackup, performExcelBackup } from './services/excelBackupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
@@ -285,6 +285,26 @@ function App() {
 
   // Save visible columns
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
+
+  // Daily 7:30 AM automatic JSON backup check
+  useEffect(() => {
+      const checkDailyBackup = () => {
+          const now = new Date();
+          const hours = now.getHours();
+          const minutes = now.getMinutes();
+          if (hours === 7 && minutes >= 30) {
+              const todayStr = now.toISOString().split('T')[0];
+              const lastAutoDate = localStorage.getItem('last_auto_json_backup_date');
+              if (lastAutoDate !== todayStr) {
+                  localStorage.setItem('last_auto_json_backup_date', todayStr);
+                  downloadSystemJsonBackup().catch(err => console.error("Auto backup error:", err));
+              }
+          }
+      };
+      checkDailyBackup();
+      const interval = setInterval(checkDailyBackup, 60000);
+      return () => clearInterval(interval);
+  }, []);
 
   // --- CUSTOM HOOKS ---
   const { 
@@ -2280,6 +2300,7 @@ function App() {
         onUpdateNow={handleUpdateNow}
         onUpdateLater={handleUpdateLater}
         onReopenUpdateModal={() => setUpdateDeferred(false)}
+        onOpenCloudInspector={() => setIsCloudDatabaseInspectorOpen(true)}
     >
         <AppRoutes 
             currentView={currentView}
@@ -2629,7 +2650,7 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
-        <CloudDatabaseInspector isOpen={isCloudDatabaseInspectorOpen} onClose={() => setIsCloudDatabaseInspectorOpen(false)} />
+        <CloudDatabaseInspector isOpen={isCloudDatabaseInspectorOpen} onClose={() => setIsCloudDatabaseInspectorOpen(false)} records={rawRecords} onRefreshData={loadData} />
         <ConnectionGuardOverlay 
           onRestored={() => {
             setToast({ type: 'success', message: 'Đã khôi phục kết nối mạng & máy chủ thành công!' });

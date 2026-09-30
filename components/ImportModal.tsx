@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
 import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType, isCertificateRecordType } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { keepOnlyDate } from '../services/apiCore';
-import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { calculateDeadlineHelper, migrateUnbatchedRecords, isOfficeOnlySurveyProcedure, isFieldWorkProcedure } from '../utils/appHelpers';
 
 interface ImportModalProps {
@@ -432,7 +432,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           const cUpper = String(record.code).trim().toUpperCase();
           if (existingCodeSet.has(cUpper)) {
             isDupInSoftware = true;
-            errors.push(`Trùng mã hồ sơ "${record.code}" với hồ sơ đã có trong phần mềm.`);
+            // Cơ chế Force Upsert tự động Ghi đè/Cập nhật thông minh hồ sơ đã có mã
           }
           if ((fileCodeCounts.get(cUpper) || 0) > 1) {
             isDupInFile = true;
@@ -682,13 +682,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             <div>
               <h2 className="text-lg font-bold text-white tracking-wide">
                 {mode === 'create' 
-                  ? 'Tiếp nhận hàng loạt từ Excel (Đo đạc / Lưu trữ)' 
+                  ? 'Tiếp nhận hàng loạt' 
                   : 'Cập nhật hàng loạt'
                 }
               </h2>
               <p className="text-xs text-blue-100/90 font-medium mt-0.5">
                 {mode === 'create'
-                  ? 'Thêm mới hàng loạt hồ sơ Đo đạc & Lưu trữ từ file Excel'
+                  ? 'Thêm mới hàng loạt hồ sơ từ file Excel'
                   : 'Cập nhật tự động trạng thái quy trình, cán bộ thụ lý, hạn trả... dựa theo Mã hồ sơ'
                 }
               </p>
@@ -793,19 +793,19 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
               </div>
 
               {/* Alert Banner for Duplicate Codes */}
-              {mode === 'create' && previewData.some(r => r._isDuplicateCode) && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-fade-in">
-                  <div className="flex items-center gap-2.5 text-amber-900 text-xs font-bold">
-                    <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+              {mode === 'create' && previewData.some(r => r._isDupInSoftware) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-fade-in">
+                  <div className="flex items-center gap-2.5 text-blue-900 text-xs font-bold">
+                    <CheckCircle2 size={18} className="text-blue-600 shrink-0" />
                     <span>
-                      Phát hiện <strong className="text-red-600 font-extrabold text-sm">{previewData.filter(r => r._isDuplicateCode).length}</strong> hồ sơ có <strong>Mã hồ sơ đã tồn tại</strong> trong phần mềm hoặc lặp lại trong file.
+                      Phát hiện <strong className="text-blue-700 font-extrabold text-sm">{previewData.filter(r => r._isDupInSoftware).length}</strong> hồ sơ đã có sẵn mã trong phần mềm — Hệ thống sẽ tự động <strong>CẬP NHẬT / GHI ĐÈ THÔNG MINH (Force Upsert)</strong> dữ liệu mới nhất từ file Excel vào các hồ sơ này.
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={handleAutoFixDuplicateCodes} 
                       className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                      title="Tự động thêm hậu tố (-1, -2...) để cấp mã mới duy nhất"
+                      title="Tự động thêm hậu tố (-1, -2...) nếu muốn tạo bản sao mới riêng biệt"
                     >
                       🪄 Tự đổi mã mới
                     </button>
@@ -815,13 +815,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                       title="Loại bỏ các dòng bị trùng mã ra khỏi danh sách nhập"
                     >
                       🚫 Bỏ qua dòng trùng
-                    </button>
-                    <button 
-                      onClick={handleSwitchToUpdateMode} 
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                      title="Chuyển sang chế độ Cập nhật dữ liệu theo mã hồ sơ"
-                    >
-                      🔄 Chuyển Cập nhật
                     </button>
                   </div>
                 </div>
