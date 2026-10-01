@@ -1,5 +1,5 @@
 
-import { supabase, isConfigured } from './supabaseClient';
+import { supabase, isConfigured, hasAuthenticatedSession } from './supabaseClient';
 import { Holiday } from '../types';
 import { DEFAULT_HOLIDAYS } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
@@ -31,7 +31,7 @@ export const testDatabaseConnection = async (): Promise<{ status: string, messag
 };
 
 export const fetchUpdateInfo = async (): Promise<{ version: string | null, url: string | null }> => {
-    if (!isConfigured) return { version: null, url: null };
+    if (!(await hasAuthenticatedSession())) return { version: null, url: null };
     try {
         const { data, error } = await supabase
             .from('system_settings')
@@ -79,8 +79,9 @@ export const saveUpdateInfo = async (version: string, url: string): Promise<bool
 };
 
 export const getSystemSetting = async (key: string): Promise<string | null> => {
+    if (key === 'users_config') return null;
     const localVal = typeof window !== 'undefined' ? localStorage.getItem(`sys_setting_${key}`) : null;
-    if (!isConfigured) return localVal;
+    if (!(await hasAuthenticatedSession())) return null;
     try {
         const { data, error } = await supabase
             .from('system_settings')
