@@ -50,8 +50,12 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.username || !formData.name || !formData.password) {
+    if (!formData.username || !formData.name || (!editingUser && !formData.password)) {
         alert("Vui lòng điền đầy đủ thông tin bắt buộc.");
+        return;
+    }
+    if (formData.password && formData.password.trim().length < 6) {
+        alert('Mật khẩu mới cần ít nhất 6 ký tự.');
         return;
     }
 
@@ -372,11 +376,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
                             <label className="block text-sm font-medium text-gray-600 mb-2">Mật khẩu <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <input
-                                    type="text"
+                                    type="password"
                                     className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-10 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                    value={formData.password}
+                                    value={formData.password || ''}
                                     onChange={e => setFormData({...formData, password: e.target.value})}
-                                    placeholder="password"
+                                    placeholder={editingUser ? 'Để trống để giữ mật khẩu hiện tại' : 'Ít nhất 6 ký tự'}
                                 />
                                 <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             </div>

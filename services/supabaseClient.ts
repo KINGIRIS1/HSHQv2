@@ -1,46 +1,40 @@
-
 import { createClient } from '@supabase/supabase-js';
 
-// =========================================================================
-// HƯỚNG DẪN CẤU HÌNH GÓI PRO (QUAN TRỌNG):
-// 1. Vào trang https://supabase.com/dashboard/project/_/settings/api
-// 2. Copy "Project URL" và dán vào biến SUPABASE_URL bên dưới.
-// 3. Copy "anon public" Key và dán vào biến SUPABASE_ANON_KEY bên dưới.
-// LƯU Ý: Nếu bạn vừa tạo Project mới cho gói Pro, BẮT BUỘC phải thay đổi 2 dòng này.
-// =========================================================================
-
-// --- CẤU HÌNH KẾT NỐI CLOUD ---
-const SUPABASE_URL: string = 'https://lrnfdksqepztnihrkgrr.supabase.co'; 
-const SUPABASE_ANON_KEY: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxybmZka3NxZXB6dG5paHJrZ3JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4Njk1NzQsImV4cCI6MjA5MjQ0NTU3NH0.eIif2yiYZ8RwdoVLjHXBc73ookcWWEIqF_om7O-Eso8';
-
-// Kiểm tra kỹ điều kiện cấu hình
-const isEmpty = !SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.trim() === '' || SUPABASE_ANON_KEY.trim() === '';
-// Kiểm tra nếu là placeholder (chỉ cảnh báo nếu thực sự chưa thay đổi)
-const isUrlPlaceholder = SUPABASE_URL.includes('YOUR_PROJECT_ID');
-const isKeyPlaceholder = SUPABASE_ANON_KEY.includes('YOUR_ANON_KEY');
-
-export const isConfigured = !isEmpty && !isUrlPlaceholder && !isKeyPlaceholder;
-
-if (!isConfigured) {
-    console.warn("⚠️ CHƯA CẤU HÌNH SUPABASE: Ứng dụng sẽ chạy ở chế độ Demo (Offline) với dữ liệu mẫu.");
-} else {
-    console.log(`✅ Đã phát hiện cấu hình Cloud. Đang kết nối tới: ${SUPABASE_URL}`);
+const buildEnv = (import.meta as any).env || {};
+const defaultUrl = buildEnv.VITE_SUPABASE_URL || 'https://api.qlhshq.info.vn';
+const defaultKey = buildEnv.VITE_SUPABASE_ANON_KEY || '';
+// Build configuration takes precedence over settings left by the Cloud app.
+const customUrl = !buildEnv.VITE_SUPABASE_URL && typeof localStorage !== 'undefined'
+    ? localStorage.getItem('CUSTOM_SUPABASE_URL') : null;
+const customKey = customUrl && typeof localStorage !== 'undefined'
+    ? localStorage.getItem('CUSTOM_SUPABASE_KEY') : null;
+export const SUPABASE_URL: string = customUrl || defaultUrl;
+export const SUPABASE_ANON_KEY: string = customKey || defaultKey;
+export const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+if (typeof localStorage !== 'undefined') {
+    for (const key of ['offline_users', 'sys_setting_users_config', 'users_config']) localStorage.removeItem(key);
 }
+export const supabase = createClient(
+    isConfigured ? SUPABASE_URL : 'https://placeholder.supabase.co',
+    isConfigured ? SUPABASE_ANON_KEY : 'placeholder',
+    { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'hshq-auth-v1' }, db: { schema: 'public' } }
+);
 
-// Sử dụng thông tin placeholder hợp lệ để tránh lỗi crash khi khởi tạo createClient nếu người dùng lỡ xóa trắng biến
-const urlToUse = isConfigured ? SUPABASE_URL : 'https://placeholder.supabase.co';
-const keyToUse = isConfigured ? SUPABASE_ANON_KEY : 'placeholder';
-
-export const supabase = createClient(urlToUse, keyToUse, {
-    auth: {
-        persistSession: true, // Giữ đăng nhập khi F5
-        autoRefreshToken: true,
-        // Hủy bỏ việc sử dụng LockManager của trình duyệt (tránh lỗi Timeout 10s trong iframe sandboxed)
-        lock: async <R>(name: string, acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
-            return await fn();
-        }
-    },
-    db: {
-        schema: 'public',
-    }
-});
+// Staff still enter their username; Auth uses an internal deterministic alias.
+export const usernameToAuthEmail = async (username: string): Promise<string> => {
+    const normalized = username.normalize('NFC').trim().toLowerCase();
+    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+    const hash = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+    return `${hash}@users.qlhshq.info.vn`;
+};
+export const setCustomEndpoint = (url: string, key?: string) => {
+    if (buildEnv.VITE_SUPABASE_URL) throw new Error('Máy chủ được cấu hình trong bản cài đặt ứng dụng.');
+    if (!key?.trim()) throw new Error('Cần URL và khóa anon của cùng một máy chủ.');
+    localStorage.setItem('CUSTOM_SUPABASE_URL', url.trim());
+    localStorage.setItem('CUSTOM_SUPABASE_KEY', key.trim());
+    window.location.reload();
+};
+export const resetToDefaultEndpoint = () => {
+    for (const key of ['CUSTOM_SUPABASE_URL', 'CUSTOM_SUPABASE_KEY', 'custom_supabase_url', 'custom_supabase_key']) localStorage.removeItem(key);
+    window.location.reload();
+};

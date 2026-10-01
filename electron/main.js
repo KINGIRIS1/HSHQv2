@@ -1,7 +1,7 @@
 
-const { app, BrowserWindow, ipcMain, desktopCapturer, shell, dialog, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, shell, dialog, Notification, protocol, net } = require('electron');
+const { pathToFileURL } = require('url');
 const path = require('path');
-const { fork } = require('child_process');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
@@ -14,34 +14,11 @@ autoUpdater.logger = log;
 autoUpdater.autoDownload = false;
 autoUpdater.allowDowngrade = false;
 
-let serverProcess;
 let mainWindow;
-
-function startServer() {
-  const serverPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'server', 'index.js')
-    : path.join(__dirname, '../server/index.js');
-
-  const userDataPath = app.getPath('userData');
-  const dbPath = path.join(userDataPath, 'db.json');
-
-  serverProcess = fork(serverPath, [], {
-    env: { ...process.env, DB_PATH: dbPath },
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
-  });
-
-  serverProcess.on('message', (msg) => {
-    if (msg === 'ready') console.log('Internal Server is ready!');
-  });
-  
-  // Log lỗi từ server ra file log của electron
-  serverProcess.stderr?.on('data', (data) => {
-      log.error(`Server Error: ${data}`);
-  });
-}
+protocol.registerSchemesAsPrivileged([{ scheme: 'hshq', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 function getAppIconPath() {
-  const distIcon = path.join(__dirname, '../dist/icon.ico');
+  const distIcon = path.join(__dirname, '../dist-desktop/icon.ico');
   const publicIcon = path.join(__dirname, '../public/icon.ico');
   if (fs.existsSync(distIcon)) return distIcon;
   if (fs.existsSync(publicIcon)) return publicIcon;
@@ -54,23 +31,23 @@ function createWindow() {
     height: 800,
     icon: getAppIconPath(), 
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
       preload: path.join(__dirname, 'preload.js')
     },
     autoHideMenuBar: true,
   });
 
   // Đặt App User Model ID để thông báo hiển thị đúng trên Windows
-  app.setAppUserModelId("com.quanlyhoso.app");
+  app.setAppUserModelId("vn.info.qlhshq.desktop");
 
   const isDev = !app.isPackaged;
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadURL('hshq://app/index.html');
   }
   
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -274,16 +251,23 @@ ipcMain.handle('show-confirm-dialog', async (event, { message, title }) => {
 });
 
 app.whenReady().then(() => {
-  startServer();
+  // Serve bundled assets from a stable secure origin. All data uses Supabase.
+  protocol.handle('hshq', request => {
+    const base = path.resolve(__dirname, '../dist-desktop');
+    let relative;
+    try { relative = decodeURIComponent(new URL(request.url).pathname); }
+    catch { return new Response('Bad request', { status: 400 }); }
+    const file = path.resolve(base, '.' + relative);
+    if (!file.startsWith(base + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return new Response('Not found', { status: 404 });
+    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
+    return net.fetch(pathToFileURL(file).toString());
+  });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-app.on('before-quit', () => {
-  if (serverProcess) serverProcess.kill();
-});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

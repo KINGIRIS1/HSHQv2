@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, Employee } from '../types';
 import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Loader2, ShieldCheck, Bell } from 'lucide-react';
 import { DEPARTMENTS, POSITIONS } from '../constants';
+import { authenticateUserCloud } from '../services/authAccounts';
 
 interface AccountSettingsViewProps {
   currentUser: User;
@@ -84,13 +85,13 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
         if (activeTab === 'security') {
             if (!currentPassword) throw new Error("Vui lòng nhập mật khẩu hiện tại để xác thực.");
             
-            // Check old password (Verify against currentUser prop locally first)
-            if (currentPassword !== currentUser.password) {
+            const verification = await authenticateUserCloud(currentUser.username, currentPassword);
+            if (verification.status !== 'SUCCESS') {
                 throw new Error("Mật khẩu hiện tại không chính xác.");
             }
 
             if (newPassword) {
-                if (newPassword.length < 3) throw new Error("Mật khẩu mới quá ngắn (tối thiểu 3 ký tự).");
+                if (newPassword.length < 6) throw new Error("Mật khẩu mới cần ít nhất 6 ký tự.");
                 if (newPassword !== confirmPassword) throw new Error("Xác nhận mật khẩu không khớp.");
                 updateData.password = newPassword;
             } else {

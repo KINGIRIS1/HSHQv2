@@ -1,0 +1,43 @@
+[
+  {
+    "id": "wbn4y24yh",
+    "created_at": "2026-05-20T06:54:10.288596+00:00",
+    "created_by": "Nguyễn Tài Tình",
+    "customer_name": "Phạm Minh Thuyên",
+    "data": {
+      "formData": {
+        "UQ": "",
+        "CV_1": "Tổ phó tổ đo đạc",
+        "QDTH": "",
+        "TBTH": "",
+        "DT_Cu": "1810",
+        "To_Cu": "52",
+        "UQ_So": "",
+        "DT_CLN": "1710.0",
+        "DT_Moi": "",
+        "DT_ODT": "100",
+        "Phuong": "Tân Quan",
+        "To_106": "",
+        "Dia_Chi": "khu phố Sóc Giếng, phường An Lộc, tỉnh Đồng Nai",
+        "Nguoi_1": "Vũ Văn Đản",
+        "Nguoi_2": "Nguyễn Tài Tình",
+        "Ten_CSD": "Phạm Minh Thuyên",
+        "Thua_Cu": "351",
+        "To_2024": "52",
+        "UQ_Loai": "",
+        "UQ_Ngay": "",
+        "UQ_VPCC": "",
+        "KH_Value": "",
+        "Ngay_Nop": "2026-05-20T06:54:08.379Z",
+        "QH_Value": "",
+        "QHC_Value": "",
+        "Thua_2024": "351",
+        "QHPK_Value": "",
+        "QHC_DC_Value": "",
+        "Dia_Chi_Thua_Dat": "",
+        "QHC_DC_Moi_Value": "",
+        "Ten_Nguoi_Yeu_Cau": "Phạm Minh Thuyên"
+      }
+    }
+  }
+]
