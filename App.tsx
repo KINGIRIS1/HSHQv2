@@ -29,6 +29,7 @@ import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
 import { useAppData } from './hooks/useAppData';
+import { useAuthenticatedUser } from './hooks/useAuthenticatedUser';
 import { useRecordFilter } from './hooks/useRecordFilter';
 import { useReminderSystem } from './hooks/useReminderSystem';
 
@@ -51,26 +52,7 @@ import { DriveSyncToastContainer } from './components/common/DriveSyncToastConta
 
 function App() {
   const isMobile = useIsMobile(768);
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = sessionStorage.getItem('current_user_session');
-      if (!saved) return null;
-
-      const lastActivity = sessionStorage.getItem('last_activity_timestamp');
-      const SIXTY_MINUTES_MS = 60 * 60 * 1000;
-      if (lastActivity) {
-        const elapsed = Date.now() - parseInt(lastActivity, 10);
-        if (elapsed >= SIXTY_MINUTES_MS) {
-          sessionStorage.removeItem('current_user_session');
-          sessionStorage.removeItem('last_activity_timestamp');
-          return null;
-        }
-      }
-      return JSON.parse(saved);
-    } catch {
-      return null;
-    }
-  });
+  const { currentUser, setCurrentUser } = useAuthenticatedUser();
 
   // --- DIAGNOSTIC: Log chi tiết thời điểm App Mount và trạng thái khởi tạo state / Supabase ---
   useEffect(() => {
@@ -282,13 +264,16 @@ function App() {
   }, [currentUser, handleSetCurrentView]);
 
   // Sync Templates
-  useEffect(() => { syncTemplatesFromCloud(); }, []);
+  useEffect(() => {
+    if (currentUser) void syncTemplatesFromCloud();
+  }, [currentUser?.username]);
 
   // Save visible columns
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
 
   // Daily 7:30 AM automatic JSON backup check
   useEffect(() => {
+      if (!currentUser) return;
       const checkDailyBackup = () => {
           const now = new Date();
           const hours = now.getHours();
@@ -305,7 +290,7 @@ function App() {
       checkDailyBackup();
       const interval = setInterval(checkDailyBackup, 60000);
       return () => clearInterval(interval);
-  }, []);
+  }, [currentUser?.username]);
 
   // --- CUSTOM HOOKS ---
   const { 
