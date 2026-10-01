@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Database } from 'lucide-react';
+import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Database, Copy } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User, UserRole } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
@@ -9,6 +9,7 @@ import SaiSoTab from './utilities/SaiSoTab';
 import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
+import { DuplicateRemovalTab } from './utilities/DuplicateRemovalTab';
 import ExcerptManagement from './ExcerptManagement';
 
 interface UtilitiesViewProps {
@@ -47,7 +48,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
 }) => {
   const isSotltdAllowed = isViewAllowedForUser(currentUser, employees || [], 'excerpt_management');
 
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd'>(
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'loctrung'>(
       isSotltdAllowed ? 'sotltd' : 'bienban'
   );
   const [defaultExportPath, setDefaultExportPath] = useState('');
@@ -174,6 +175,12 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               >
                   <FileSpreadsheet size={16} /> Chuyển đổi tờ bản đồ
               </button>
+              <button 
+                  onClick={() => setActiveTab('loctrung')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'loctrung' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <Copy size={16} /> Lọc Trùng Hồ Sơ
+              </button>
           </div>
           
           {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && (
@@ -245,6 +252,17 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                       <p className="text-slate-600 font-medium">Đang tải cấu hình Số TL/TĐ...</p>
                   </div>
               )}
+          </div>
+
+          {/* TAB 9: LỌC TRÙNG HỒ SƠ */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'loctrung' ? 'block' : 'hidden'}`}>
+              <DuplicateRemovalTab 
+                  records={records}
+                  currentUser={currentUser}
+                  notify={notify}
+                  onDeleteBatchRecords={onDeleteBatchRecords}
+                  onRefreshData={onRefreshData}
+              />
           </div>
       </div>
     </div>

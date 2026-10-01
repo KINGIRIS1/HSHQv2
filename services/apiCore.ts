@@ -282,6 +282,21 @@ export const keepOnlyDate = (val: any): string | null => {
         let cleanStr = val.trim();
         if (cleanStr === '' || cleanStr === 'null' || cleanStr === 'undefined' || cleanStr === '-' || cleanStr === 'N/A') return null;
 
+        // Xử lý số serial Excel dạng chuỗi (vd: "45500" hoặc "45500.5")
+        if (/^\d{5}(\.\d+)?$/.test(cleanStr)) {
+            const numVal = parseFloat(cleanStr);
+            if (numVal > 20000 && numVal < 70000) {
+                const utcMs = Math.round((numVal - 25569) * 86400 * 1000);
+                const date = new Date(utcMs);
+                if (!isNaN(date.getTime())) {
+                    const y = date.getUTCFullYear();
+                    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                    const d = String(date.getUTCDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+            }
+        }
+
         // Trích xuất YYYY-MM-DD từ chuỗi ISO hoặc có giờ (vd: 2026-07-24T12:34:56.000Z hoặc 2026-07-24 10:30:00)
         const matchYmd = cleanStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
         if (matchYmd) {
@@ -297,11 +312,12 @@ export const keepOnlyDate = (val: any): string | null => {
         }
         
         // Xử lý định dạng DD/MM/YYYY hoặc DD-MM-YYYY hoặc DD.MM.YYYY
-        const matchDmy = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+        const matchDmy = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
         if (matchDmy) {
             const day = parseInt(matchDmy[1], 10);
             const month = parseInt(matchDmy[2], 10);
-            const year = parseInt(matchDmy[3], 10);
+            let year = parseInt(matchDmy[3], 10);
+            if (year < 100) year += 2000; // Hỗ trợ năm 2 chữ số (vd: 24/07/26 -> 2026)
             if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
             const d = new Date(year, month - 1, day);
             if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {

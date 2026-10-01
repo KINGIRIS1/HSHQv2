@@ -171,7 +171,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
 
     const handleExportWord = async () => {
         if (!formData.NGUOI) {
-            notify("Vui lòng nhập tên người vi phạm trước khi tải file Word.", 'error');
+            notify("Vui lòng nhập tên người vi phạm/liên quan trước khi tải file Word.", 'error');
             return;
         }
         try {
@@ -181,20 +181,61 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 ...formData,
                 NGUOI: formData.NGUOI.toUpperCase()
             };
+
             if (hasTemplate(templateKey)) {
                 const blob = await generateDocxBlobAsync(templateKey, dataToExport);
                 if (blob) {
                     saveAs(blob, `Bien_Ban_VPHC_${formData.NGUOI.replace(/\s+/g, '_')}.docx`);
-                    notify("Tải file Word thành công!", "success");
+                    notify("Tải file Word từ mẫu thành công!", "success");
+                    return;
+                }
+            }
+
+            // Fallback xuất file Word trực tiếp từ nội dung mẫu biên bản
+            const content = renderPreviewHTML();
+            const cleanName = formData.NGUOI.replace(/\s+/g, '_') || 'Nguoi_Vi_Pham';
+            const fileName = `Bien_Ban_VPHC_${cleanName}.doc`;
+
+            const header = `
+              <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+              <head>
+                <meta charset='utf-8'>
+                <style>
+                  @page Section1 {
+                    size: 595.3pt 841.9pt; 
+                    margin: 56.7pt 42.5pt 56.7pt 70.9pt; 
+                  }
+                  div.Section1 { page: Section1; }
+                  body { font-family: "Times New Roman", serif; font-size: 13pt; text-align: justify; line-height: 1.3; }
+                  p { margin: 0; margin-bottom: 2px; line-height: 1.3; }
+                  table { border-collapse: collapse; width: 100%; }
+                  td, th { padding: 4px; vertical-align: top; }
+                </style>
+              </head>
+              <body><div class="Section1">${content}</div></body></html>
+            `;
+
+            if (window.electronAPI && window.electronAPI.saveAndOpenFile) {
+                const base64Data = btoa(unescape(encodeURIComponent('\ufeff' + header)));
+                const outputFolder = localStorage.getItem('DEFAULT_EXPORT_PATH_BIENBAN');
+                const result = await window.electronAPI.saveAndOpenFile({ fileName, base64Data, outputFolder });
+                if (result.success) {
+                    setExportedFilePath(result.path || null);
+                    if (window.electronAPI.openFilePath && result.path) {
+                        await window.electronAPI.openFilePath(result.path);
+                    }
+                    notify("Xuất và mở file Word thành công!", "success");
                 } else {
-                    notify("Lỗi tạo file Word từ mẫu.", "error");
+                    notify(`Lỗi khi lưu file: ${result.message}`, 'error');
                 }
             } else {
-                notify("Chưa cấu hình mẫu Word VPHC. Vui lòng bấm vào nút Cấu hình mẫu để upload file Word.", "info");
+                const blob = new Blob(['\ufeff', header], { type: 'application/msword' });
+                saveAs(blob, fileName);
+                notify("Tải file Word thành công!", "success");
             }
-        } catch (e) {
-            console.error(e);
-            notify("Lỗi khi xuất file Word.", "error");
+        } catch (e: any) {
+            console.error("Export VPHC Word error:", e);
+            notify("Lỗi khi xuất file Word: " + (e?.message || ''), "error");
         } finally {
             setLoading(false);
         }

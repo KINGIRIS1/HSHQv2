@@ -7,7 +7,6 @@ import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
-import { FixContractDatesModal } from './receive-contract/FixContractDatesModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
 import saveAs from 'file-saver'; // Import saveAs
 
@@ -71,7 +70,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
   // Modal States
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [isFixDatesOpen, setIsFixDatesOpen] = useState(false);
   
   // Không dùng Modal Preview nữa, nhưng vẫn giữ state để tránh lỗi biên dịch nếu cần
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -662,13 +660,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
         {/* UTILITY BUTTONS */}
         <div className="flex gap-2 shrink-0">
-            <button 
-                onClick={() => setIsFixDatesOpen(true)} 
-                className="p-2 bg-white border border-purple-200 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" 
-                title="Công cụ Quét & Chuẩn hóa Ngày lập Hợp đồng (Sửa lỗi Ngày/Tháng bị ngược)"
-            >
-                <CalendarCheck2 size={18} />
-            </button>
             <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-xs" title="Cấu hình Bảng giá Dịch vụ">
                 <Settings2 size={18} />
             </button>
@@ -753,15 +744,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           onClose={() => setIsPreviewOpen(false)} 
           docxBlob={previewBlob} 
           fileName={previewFileName} 
-      />
-      <FixContractDatesModal
-          isOpen={isFixDatesOpen}
-          onClose={() => setIsFixDatesOpen(false)}
-          contracts={contracts}
-          records={records}
-          onUpdateSuccess={() => {
-              loadContracts();
-          }}
       />
     </div>
   );

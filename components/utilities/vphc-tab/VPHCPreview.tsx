@@ -22,7 +22,7 @@ const VPHCPreview: React.FC<VPHCPreviewProps> = ({
             {/* TOP BAR: TEMPLATE TITLE & ACTIONS */}
             <div className="bg-white border-b border-slate-200 p-2 flex items-center justify-between shrink-0 shadow-sm z-10">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold">
-                    <FileText size={14} className="text-blue-600" /> Biên bản ghi nhận sự việc (NĐ 123/2024/NĐ-CP)
+                    <FileText size={14} className="text-blue-600" /> Mau01
                 </div>
 
                 <div className="flex gap-2 items-center">

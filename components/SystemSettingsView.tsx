@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink, Copy, Code, HelpCircle, Check, Lock, Unlock, Edit3, X } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink, Copy, Code, HelpCircle, Check, Lock, Unlock, Edit3, X, HardDrive } from 'lucide-react';
+import { BackupRestoreTab } from './settings/BackupRestoreTab';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords } from '../services/apiRecords';
@@ -185,7 +186,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   fixedTab,
   onRecordsUpdated
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>(fixedTab || 'general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data' | 'backup'>(fixedTab || 'general');
 
   useEffect(() => {
     if (fixedTab) {
@@ -1242,6 +1243,12 @@ function cleanString(str) {
                     <Calendar size={16} /> Ngày nghỉ lễ
                 </button>
                 <button 
+                    onClick={() => setActiveTab('backup')}
+                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'backup' ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                >
+                    <HardDrive size={16} /> Sao lưu & Khôi phục
+                </button>
+                <button 
                     onClick={() => setActiveTab('data')}
                     className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-red-50/50' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                 >
@@ -1255,25 +1262,6 @@ function cleanString(str) {
         }`}>
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
-                    {/* Cloud Database Info */}
-                    <div className="bg-white border border-blue-100 rounded-2xl p-5 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-                        <div className="text-center md:text-left">
-                            <h3 className="font-black text-blue-800 flex items-center justify-center md:justify-start gap-2 mb-1 tracking-tight"> <Database size={18} /> Cloud Database </h3>
-                            <p className="text-xs text-blue-600 font-medium">Kiểm tra kết nối đến cơ sở dữ liệu Supabase.</p>
-                        </div>
-                        <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                            {onOpenCloudInspector && (
-                                <button onClick={onOpenCloudInspector} className="w-full md:w-auto px-5 py-2.5 bg-purple-600 text-white font-bold text-xs rounded-xl hover:bg-purple-700 transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer">
-                                    <Database size={16} /> Kiểm tra 3 Bảng Cloud DB
-                                </button>
-                            )}
-                            {dbTestStatus === 'success' && <div className="text-xs font-black text-green-600 flex items-center gap-1 uppercase tracking-wider"><CheckCircle size={16} /> Kết nối OK!</div>}
-                            {dbTestStatus === 'error' && <div className="text-xs font-black text-red-600 uppercase tracking-wider">{dbTestMsg || 'Lỗi!'}</div>}
-                            <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="w-full md:w-auto px-6 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 font-medium text-sm rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center justify-center gap-2"> 
-                                {dbTestStatus === 'testing' ? <Loader2 className="animate-spin" size={16} /> : 'Kiểm tra kết nối'} 
-                            </button>
-                        </div>
-                    </div>
 
 
                     {/* Google Drive Incoming URL Config */}
@@ -1910,6 +1898,12 @@ function cleanString(str) {
                             );
                         })}
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'backup' && (
+                <div className="max-w-6xl mx-auto">
+                    <BackupRestoreTab onRecordsUpdated={onRecordsUpdated} records={records} />
                 </div>
             )}
 

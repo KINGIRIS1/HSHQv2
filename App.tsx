@@ -234,6 +234,7 @@ function App() {
   const [bulkSignPendingRecords, setBulkSignPendingRecords] = useState<RecordFile[]>([]);
   const [isSignApprovalModalOpen, setIsSignApprovalModalOpen] = useState(false);
   const [signApprovalTargetRecords, setSignApprovalTargetRecords] = useState<RecordFile[]>([]);
+  const [isBackupRestoreModalOpen, setIsBackupRestoreModalOpen] = useState(false);
 
   // Modals Quy trình Cấp giấy
   const [isPreAssignPrintModalOpen, setIsPreAssignPrintModalOpen] = useState(false);
@@ -475,7 +476,8 @@ function App() {
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if (e.key === 'Escape') {
-              if (isBulkSignModalOpen) setIsBulkSignModalOpen(false);
+              if (isBackupRestoreModalOpen) setIsBackupRestoreModalOpen(false);
+              else if (isBulkSignModalOpen) setIsBulkSignModalOpen(false);
               else if (isSignApprovalModalOpen) setIsSignApprovalModalOpen(false);
               else if (isSubmitModalOpen) setIsSubmitModalOpen(false);
               else if (isSubmitCheckModalOpen) setIsSubmitCheckModalOpen(false);
@@ -484,7 +486,7 @@ function App() {
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isBulkSignModalOpen, isSignApprovalModalOpen, isSubmitModalOpen, isSubmitCheckModalOpen, isHandoverOfficeModalOpen]);
+  }, [isBackupRestoreModalOpen, isBulkSignModalOpen, isSignApprovalModalOpen, isSubmitModalOpen, isSubmitCheckModalOpen, isHandoverOfficeModalOpen]);
 
   const records = useMemo(() => {
       return deferredRecords;
@@ -2301,6 +2303,7 @@ function App() {
         onUpdateLater={handleUpdateLater}
         onReopenUpdateModal={() => setUpdateDeferred(false)}
         onOpenCloudInspector={() => setIsCloudDatabaseInspectorOpen(true)}
+        onOpenBackupRestore={() => setIsBackupRestoreModalOpen(true)}
     >
         <AppRoutes 
             currentView={currentView}
@@ -2418,6 +2421,8 @@ function App() {
             isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
             isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
+            isBackupRestoreModalOpen={isBackupRestoreModalOpen} setIsBackupRestoreModalOpen={setIsBackupRestoreModalOpen}
+            onRecordsUpdated={loadData}
             
             isPreAssignPrintModalOpen={isPreAssignPrintModalOpen} setIsPreAssignPrintModalOpen={setIsPreAssignPrintModalOpen}
             preAssignTargetRecords={preAssignTargetRecords}

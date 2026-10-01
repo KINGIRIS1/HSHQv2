@@ -21,6 +21,7 @@ import { ConfirmPaymentReceiptModal } from './registration/ConfirmPaymentReceipt
 import { HandoverTaxModal } from './registration/HandoverTaxModal';
 import { HandoverPostingModal } from './registration/HandoverPostingModal';
 import { HandoverPrintModal } from './registration/HandoverPrintModal';
+import BackupRestoreModal from './BackupRestoreModal';
 import * as XLSX from 'xlsx-js-style';
 import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
 
@@ -41,6 +42,9 @@ interface AppModalsProps {
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
     isExtendModalOpen?: boolean;
+    isBackupRestoreModalOpen?: boolean;
+    setIsBackupRestoreModalOpen?: (v: boolean) => void;
+    onRecordsUpdated?: () => void;
 
     // Modals Cấp giấy
     isPreAssignPrintModalOpen?: boolean;
@@ -421,6 +425,13 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 selectedRecords={props.handoverPrintTargetRecords || []}
                 employees={props.employees}
                 onConfirmHandoverPrint={props.onConfirmHandoverPrint || (async () => {})}
+            />
+
+            <BackupRestoreModal
+                isOpen={!!props.isBackupRestoreModalOpen}
+                onClose={() => props.setIsBackupRestoreModalOpen && props.setIsBackupRestoreModalOpen(false)}
+                onRecordsUpdated={props.onRecordsUpdated}
+                records={props.records || []}
             />
         </>
     );

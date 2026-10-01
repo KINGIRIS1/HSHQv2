@@ -2321,6 +2321,36 @@ export const deleteRecordsBatchApi = async (
     }
 };
 
+/**
+ * Lọc loại bỏ dữ liệu trùng lặp theo ID và Mã hồ sơ trong cùng một mảng yêu cầu
+ * Phòng chống triệt để lỗi PostgreSQL 21000 (cardinality_violation: ON CONFLICT DO UPDATE)
+ */
+export const deduplicatePayloadByKeys = (items: any[]): any[] => {
+    if (!items || items.length === 0) return [];
+    const seenIds = new Set<string>();
+    const seenCodes = new Set<string>();
+    const result: any[] = [];
+
+    for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        if (!item) continue;
+
+        const idKey = item.id ? String(item.id).trim().toLowerCase() : null;
+        const codeKey = item.code ? String(item.code).trim().toLowerCase() : null;
+
+        let isDuplicate = false;
+        if (idKey && seenIds.has(idKey)) isDuplicate = true;
+        if (codeKey && seenCodes.has(codeKey)) isDuplicate = true;
+
+        if (!isDuplicate) {
+            if (idKey) seenIds.add(idKey);
+            if (codeKey) seenCodes.add(codeKey);
+            result.unshift(item);
+        }
+    }
+    return result;
+};
+
 export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: (processed: number, total: number) => void): Promise<boolean> => {
     if (!records || records.length === 0) return true;
 
@@ -2413,11 +2443,23 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
             }
         }
 
-        const insertIntoTableInChunks = async (table: 'land_records' | 'dangky_records' | 'luutru_records', payload: any[]) => {
+        const insertIntoTableInChunks = async (table: 'land_records' | 'dangky_records' | 'luutru_records', rawPayload: any[]) => {
+            const payload = deduplicatePayloadByKeys(rawPayload);
             const CHUNK_SIZE = 500;
             for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
-                const chunk = payload.slice(i, i + CHUNK_SIZE);
+                const chunk = deduplicatePayloadByKeys(payload.slice(i, i + CHUNK_SIZE));
                 let { error } = await supabase.from(table).upsert(chunk, { onConflict: 'code' });
+
+                if (error && (error.code === '21000' || String(error.message || '').includes('21000') || String(error.message || '').includes('second time') || String(error.message || '').includes('cardinality'))) {
+                    console.warn(`⚠️ [21000 Fallback] Cardinality duplicate detected in batch insert into ${table}. Executing single-row upsert...`);
+                    let singleErr = null;
+                    for (const item of chunk) {
+                        const { error: sErr } = await supabase.from(table).upsert([item], { onConflict: 'code' });
+                        if (sErr) singleErr = sErr;
+                    }
+                    error = singleErr;
+                }
+
                 if (error) {
                     const resId = await supabase.from(table).upsert(chunk, { onConflict: 'id' });
                     if (!resId.error) error = null;
@@ -2722,12 +2764,23 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                 }
             });
 
-            const upsertIntoTable = async (table: 'land_records' | 'luutru_records' | 'dangky_records', updates: any[]) => {
+            const upsertIntoTable = async (table: 'land_records' | 'luutru_records' | 'dangky_records', rawUpdates: any[]) => {
+                const updates = deduplicatePayloadByKeys(rawUpdates);
                 if (updates.length === 0) return;
                 const UPSERT_CHUNK = 50;
                 for (let u = 0; u < updates.length; u += UPSERT_CHUNK) {
-                    const upChunk = updates.slice(u, u + UPSERT_CHUNK);
+                    const upChunk = deduplicatePayloadByKeys(updates.slice(u, u + UPSERT_CHUNK));
                     let { error: upsertError } = await supabase.from(table).upsert(upChunk);
+
+                    if (upsertError && (upsertError.code === '21000' || String(upsertError.message || '').includes('21000') || String(upsertError.message || '').includes('second time') || String(upsertError.message || '').includes('cardinality'))) {
+                        console.warn(`⚠️ [21000 Fallback] Cardinality duplicate detected in ${table} chunk. Falling back to single-row upsert...`);
+                        let singleErr = null;
+                        for (const item of upChunk) {
+                            const { error: sErr } = await supabase.from(table).upsert([item]);
+                            if (sErr) singleErr = sErr;
+                        }
+                        upsertError = singleErr;
+                    }
                     
                     if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02') || String(upsertError.message || '').includes('invalid input syntax'))) {
                         console.warn(`⚠️ [22P02 Fallback] Retrying chunk target upsert into ${table} with 22P02 sanitized payload...`);

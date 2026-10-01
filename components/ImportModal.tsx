@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
-import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType, isCertificateRecordType } from '../constants';
+import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType, isCertificateRecordType, getNormalizedWard, getWardLabel } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { keepOnlyDate } from '../services/apiCore';
 import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { calculateDeadlineHelper, migrateUnbatchedRecords, isOfficeOnlySurveyProcedure, isFieldWorkProcedure } from '../utils/appHelpers';
+import { calculateDeadlineHelper, isOfficeOnlySurveyProcedure, isFieldWorkProcedure } from '../utils/appHelpers';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -92,7 +92,16 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
         }
 
-        const headers = (data[headerRowIndex] as string[]).map(h => String(h || '').toUpperCase().trim());
+        const rawHeaders = (data[headerRowIndex] as any[]).map(h => String(h || '').trim());
+        const normalizeHdr = (str: string) => {
+            return str
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '');
+        };
+        const normalizedHeaders = rawHeaders.map(h => normalizeHdr(h));
         const mappedRecords: any[] = [];
 
         const typeMapping: Record<string, string> = {
@@ -110,20 +119,28 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (!row || row.length === 0) continue;
 
             const getVal = (possibleHeaders: string[]) => {
-                let idx = headers.findIndex(h => {
-                    const hUpper = h.trim().toUpperCase();
-                    return possibleHeaders.some(ph => hUpper === ph.toUpperCase());
-                });
-                if (idx === -1) {
-                    idx = headers.findIndex(h => {
-                        const hUpper = h.trim().toUpperCase();
-                        return possibleHeaders.some(ph => hUpper.includes(ph.toUpperCase()));
-                    });
+                // 1. Khớp chính xác 100% dạng chuẩn hóa
+                for (const ph of possibleHeaders) {
+                    const normPh = normalizeHdr(ph);
+                    const idx = normalizedHeaders.findIndex(nh => nh === normPh);
+                    if (idx !== -1 && row[idx] !== undefined && row[idx] !== null && String(row[idx]).trim() !== '') {
+                        return row[idx];
+                    }
                 }
-                return idx !== -1 ? row[idx] : undefined;
+                // 2. Khớp chuỗi con nếu độ dài >= 3
+                for (const ph of possibleHeaders) {
+                    const normPh = normalizeHdr(ph);
+                    if (normPh.length >= 3) {
+                        const idx = normalizedHeaders.findIndex(nh => nh.includes(normPh));
+                        if (idx !== -1 && row[idx] !== undefined && row[idx] !== null && String(row[idx]).trim() !== '') {
+                            return row[idx];
+                        }
+                    }
+                }
+                return undefined;
             };
 
-            const codeRaw = getVal(['MÃ HỒ SƠ', 'MÃ HS', 'CODE', 'code']);
+            const codeRaw = getVal(['MÃ HỒ SƠ', 'MÃ HS', 'SỐ BIÊN NHẬN', 'SỐ HỒ SƠ', 'MÃ SỐ', 'CODE', 'MA HO SO', 'MA HS', 'SO BIEN NHAN']);
             const code = codeRaw ? String(codeRaw).trim() : undefined;
             
             if (mode === 'update' && !code) continue;
@@ -133,37 +150,50 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (code) record.code = code;
             else if (mode === 'create') record.code = `AUTO-${Math.floor(Math.random()*10000)}`;
 
-            const nameRaw = getVal(['CHỦ SỬ DỤNG', 'TÊN', 'HỌ TÊN', 'CUSTOMER', 'customername', 'customer_name', 'customerName', 'BÊN CHUYỂN NHƯỢNG']);
+            const nameRaw = getVal(['CHỦ SỬ DỤNG', 'TÊN CHỦ SỬ DỤNG', 'HỌ VÀ TÊN', 'HỌ TÊN', 'TÊN', 'CUSTOMER NAME', 'CUSTOMERNAME', 'CUSTOMER', 'BÊN CHUYỂN NHƯỢNG', 'CHU SU DUNG', 'HO TEN']);
             if (nameRaw !== undefined) record.customerName = String(nameRaw).trim();
             else if (mode === 'create') record.customerName = 'Chưa cập nhật';
 
-            const phoneRaw = getVal(['SĐT', 'ĐIỆN THOẠI', 'phonenumber', 'phone_number', 'phoneNumber']);
+            const phoneRaw = getVal(['SỐ ĐIỆN THOẠI', 'SĐT', 'ĐIỆN THOẠI', 'PHONE NUMBER', 'PHONENUMBER', 'PHONE', 'SO DIEN THOAI', 'SDT', 'DIEN THOAI']);
             if (phoneRaw !== undefined) record.phoneNumber = String(phoneRaw).trim();
 
-            const addressRaw = getVal(['ĐỊA CHỈ', 'ADDRESS', 'customeraddress', 'customer_address', 'customerAddress', 'address']);
+            const addressRaw = getVal(['ĐỊA CHỈ', 'ĐỊA CHỈ THỬA ĐẤT', 'ADDRESS', 'DIA CHI']);
             if (addressRaw !== undefined) record.customerAddress = String(addressRaw).trim();
 
-            const cccdRaw = getVal(['CCCD', 'CMND', 'cccd']);
+            const cccdRaw = getVal(['CCCD', 'CMND', 'SỐ CCCD', 'SO CCCD']);
             if (cccdRaw !== undefined) record.cccd = String(cccdRaw).trim();
 
-            const authByRaw = getVal(['NGƯỜI ỦY QUYỀN', 'ỦY QUYỀN', 'authorizedby', 'authorized_by', 'authorizedBy']);
-            const authTypeRaw = getVal(['LOẠI ỦY QUYỀN', 'GIẤY ỦY QUYỀN', 'authdoctype', 'auth_doc_type', 'authDocType']);
+            const authByRaw = getVal(['NGƯỜI ỦY QUYỀN', 'ỦY QUYỀN', 'AUTHORIZED BY', 'NGUOI UY QUYEN', 'UY QUYEN']);
+            const authTypeRaw = getVal(['LOẠI ỦY QUYỀN', 'GIẤY ỦY QUYỀN', 'AUTH DOC', 'LOAI UY QUYEN']);
             if (authByRaw !== undefined || authTypeRaw !== undefined) {
                 record.authDocType = `${authByRaw || ''}|${authTypeRaw || ''}`;
             }
 
-            const wardRaw = getVal(['XÃ', 'PHƯỜNG', 'WARD', 'ward', 'ĐỊA BÀN', 'XÃ / PHƯỜNG']);
-            if (wardRaw !== undefined) record.ward = String(wardRaw).trim();
+            const wardRaw = getVal(['XÃ', 'PHƯỜNG', 'XÃ / PHƯỜNG', 'XÃ/PHƯỜNG', 'ĐỊA BÀN', 'WARD', 'XA', 'PHUONG']);
+            if (wardRaw !== undefined) record.ward = getNormalizedWard(String(wardRaw).trim());
 
-            const mapSheetRaw = getVal(['TỜ', 'BẢN ĐỒ SỐ', 'TỜ BẢN ĐỒ', 'mapsheet', 'map_sheet', 'mapSheet']);
+            const handoverWardRaw = getVal([
+                'PHI ĐỊA GIỚI', 'NƠI TRẢ KẾT QUẢ', 'NƠI GIAO TRẢ', 'XÃ TRẢ KẾT QUẢ', 'PHƯỜNG TRẢ KẾT QUẢ',
+                'HANDOVER WARD', 'HANDOVERWARD', 'PHI DIA GIOI', 'NOI TRA KET QUA', 'XÃ PHI ĐỊA GIỚI', 'PHUONG PHI DIA GIOI', 'ĐỊA BÀN TRẢ'
+            ]);
+            if (handoverWardRaw !== undefined && handoverWardRaw !== null && String(handoverWardRaw).trim() !== '') {
+                const rawVal = String(handoverWardRaw).trim();
+                if (rawVal.toLowerCase() === 'không' || rawVal.toLowerCase() === 'khong' || rawVal === '--' || rawVal === '-') {
+                    record.handoverWard = null;
+                } else {
+                    record.handoverWard = getNormalizedWard(rawVal);
+                }
+            }
+
+            const mapSheetRaw = getVal(['TỜ BẢN ĐỒ', 'TỜ BẢN ĐỒ SỐ', 'SỐ TỜ', 'TỜ SỐ', 'BẢN ĐỒ SỐ', 'TỜ', 'MAP SHEET', 'MAPSHEET', 'TO BAN DO', 'SO TO', 'TO']);
             if (mapSheetRaw !== undefined) record.mapSheet = String(mapSheetRaw).trim();
 
-            const landPlotRaw = getVal(['THỬA', 'THỬA ĐẤT SỐ', 'THỬA ĐẤT', 'landplot', 'land_plot', 'landPlot']);
+            const landPlotRaw = getVal(['THỬA ĐẤT', 'THỬA ĐẤT SỐ', 'SỐ THỬA', 'THỬA SỐ', 'THỬA', 'LAND PLOT', 'LANDPLOT', 'THUA DAT', 'SO THUA', 'THUA']);
             if (landPlotRaw !== undefined) record.landPlot = String(landPlotRaw).trim();
 
             const errors: string[] = [];
 
-            const rawArea = getVal(['DIỆN TÍCH', 'AREA', 'area']);
+            const rawArea = getVal(['DIỆN TÍCH', 'DIỆN TÍCH THỬA', 'AREA', 'DIEN TICH']);
             if (rawArea !== undefined && rawArea !== null && rawArea !== '') {
                 const parsedArea = parseFloat(String(rawArea));
                 record.area = isNaN(parsedArea) ? 0 : parsedArea;
@@ -174,7 +204,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.area = null;
             }
 
-            const rawResArea = getVal(['ĐẤT Ở', 'THỔ CƯ', 'residentialarea', 'residential_area', 'residentialArea']);
+            const rawResArea = getVal(['ĐẤT Ở', 'THỔ CƯ', 'RESIDENTIAL AREA', 'RESIDENTIALAREA', 'DAT O', 'THO CU']);
             if (rawResArea !== undefined && rawResArea !== null && rawResArea !== '') {
                  const parsedResArea = parseFloat(String(rawResArea));
                  record.residentialArea = isNaN(parsedResArea) ? 0 : parsedResArea;
@@ -185,53 +215,78 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                  record.residentialArea = null;
             }
 
-            const issueNumRaw = getVal(['SỐ PHÁT HÀNH', 'issuenumber', 'issue_number', 'issueNumber']);
+            const issueNumRaw = getVal(['SỐ PHÁT HÀNH', 'SỐ GCN', 'ISSUE NUMBER', 'ISSUENUMBER', 'SO PHAT HANH', 'SO GCN']);
             if (issueNumRaw !== undefined) record.issueNumber = String(issueNumRaw).trim();
 
-            const entryNumRaw = getVal(['SỐ VÀO SỔ', 'entrynumber', 'entry_number', 'entryNumber']);
+            const entryNumRaw = getVal(['SỐ VÀO SỔ', 'VÀO SỔ SỐ', 'ENTRY NUMBER', 'ENTRYNUMBER', 'SO VAO SO']);
             if (entryNumRaw !== undefined) record.entryNumber = String(entryNumRaw).trim();
 
-            const issueDateRaw = getVal(['NGÀY CẤP', 'issuedate', 'issue_date', 'issueDate']);
+            const issueDateRaw = getVal(['NGÀY CẤP', 'CẤP NGÀY', 'ISSUE DATE', 'ISSUEDATE', 'NGAY CAP', 'CAP NGAY']);
             if (issueDateRaw !== undefined) record.issueDate = parseExcelDate(issueDateRaw, 'Ngày cấp', errors);
 
-            const contentRaw = getVal(['NỘI DUNG', 'GHI CHÚ', 'content', 'notes']);
-            if (contentRaw !== undefined) record.content = String(contentRaw).trim();
-
-            const otherDocsRaw = getVal(['GIẤY TỜ KÈM THEO', 'GIẤY TỜ', 'otherdocs', 'other_docs', 'otherDocs']);
+            const otherDocsRaw = getVal(['GIẤY TỜ KÈM THEO', 'GIẤY TỜ', 'OTHER DOCS', 'OTHERDOCS', 'GIAY TO']);
             if (otherDocsRaw !== undefined) record.otherDocs = String(otherDocsRaw).trim();
 
-            const receivedRaw = getVal(['NGÀY NHẬN', 'NGÀY NỘP', 'receiveddate', 'received_date', 'receivedDate']);
+            const receivedRaw = getVal([
+                'NGÀY TIẾP NHẬN', 'TIẾP NHẬN', 'NGÀY NHẬN', 'NGÀY NỘP', 'NGÀY THỤ LÝ', 'NGÀY VÀO SỔ', 'THỤ LÝ',
+                'RECEIVED DATE', 'RECEIVEDDATE', 'RECEIVED_DATE', 'NGAY TIEP NHAN', 'TIEP NHAN', 'NGAY NHAN', 'NGAY NOP', 'NGAY THU LY'
+            ]);
             if (receivedRaw !== undefined) {
                 record.receivedDate = parseExcelDate(receivedRaw, 'Ngày nhận', errors);
             } else if (mode === 'create') {
                 record.receivedDate = new Date().toISOString();
             }
 
-            const deadlineRaw = getVal(['HẸN TRẢ', 'DEADLINE', 'deadline']);
-            if (deadlineRaw !== undefined) record.deadline = parseExcelDate(deadlineRaw, 'Ngày hẹn trả', errors);
+            const deadlineRaw = getVal([
+                'NGÀY HẸN TRẢ', 'HẸN TRẢ', 'HẠN TRẢ', 'HẠN GIẢI QUYẾT', 'HẠN TRẢ KẾT QUẢ', 'HẸN TRẢ DÂN', 'NGÀY HẠN TRẢ', 'HẠN XỬ LÝ',
+                'DEADLINE', 'DEAD_LINE', 'HEN TRA', 'HAN TRA', 'NGAY HEN TRA', 'HAN GIAI QUYET', 'HAN TRA KET QUA'
+            ]);
+            if (deadlineRaw !== undefined) {
+                record.deadline = parseExcelDate(deadlineRaw, 'Ngày hẹn trả', errors);
+            }
 
-            const completedWorkDateRaw = getVal(['NGÀY THỰC HIỆN', 'NGÀY ĐÃ THỰC HIỆN', 'completedworkdate', 'completed_work_date', 'completedWorkDate']);
-            if (completedWorkDateRaw !== undefined) record.completedWorkDate = parseExcelDate(completedWorkDateRaw, 'Ngày thực hiện', errors);
+            const completedWorkDateRaw = getVal([
+                'NGÀY THỰC HIỆN', 'NGÀY ĐÃ THỰC HIỆN', 'NGÀY ĐO', 'NGÀY ĐI ĐO', 'ĐÃ ĐO', 'NGÀY ĐO ĐẠC', 'HOÀN THÀNH ĐO', 'ĐO XONG', 'NGÀY ĐO XONG',
+                'COMPLETED WORK DATE', 'COMPLETEDWORKDATE', 'completed_work_date', 'completedWorkDate', 'NGAY THUC HIEN', 'NGAY DO', 'NGAY DI DO', 'DA DO', 'NGAY DO DAC'
+            ]);
+            if (completedWorkDateRaw !== undefined) record.completedWorkDate = parseExcelDate(completedWorkDateRaw, 'Ngày thực hiện / đo đạc', errors);
 
-            const pendingCheckDateRaw = getVal(['NGÀY TRÌNH KIỂM TRA', 'NGÀY CHỜ KIỂM TRA', 'pendingcheckdate', 'pending_check_date', 'pendingCheckDate']);
+            const pendingCheckDateRaw = getVal([
+                'NGÀY TRÌNH KIỂM TRA', 'NGÀY CHỜ KIỂM TRA', 'TRÌNH KIỂM TRA', 'TRÌNH KT', 'CHỜ KT',
+                'PENDING CHECK DATE', 'PENDINGCHECKDATE', 'pending_check_date', 'pendingCheckDate', 'NGAY TRINH KIEM TRA', 'TRINH KIEM TRA', 'TRINH KT'
+            ]);
             if (pendingCheckDateRaw !== undefined) record.pendingCheckDate = parseExcelDate(pendingCheckDateRaw, 'Ngày trình KT', errors);
 
-            const checkedDateRaw = getVal(['NGÀY ĐÃ KIỂM TRA', 'checkeddate', 'checked_date', 'checkedDate']);
+            const checkedDateRaw = getVal([
+                'NGÀY ĐÃ KIỂM TRA', 'NGÀY KIỂM TRA', 'ĐÃ KIỂM TRA', 'ĐÃ KT', 'KIỂM TRA XONG',
+                'CHECKED DATE', 'CHECKEDDATE', 'checked_date', 'checkedDate', 'NGAY DA KIEM TRA', 'NGAY KIEM TRA', 'DA KIEM TRA', 'DA KT'
+            ]);
             if (checkedDateRaw !== undefined) record.checkedDate = parseExcelDate(checkedDateRaw, 'Ngày đã KT', errors);
 
-            const submissionDateRaw = getVal(['NGÀY TRÌNH KÝ', 'submissiondate', 'submission_date', 'submissionDate']);
+            const submissionDateRaw = getVal([
+                'NGÀY TRÌNH KÝ', 'TRÌNH KÝ', 'CHỜ KÝ', 'SUBMISSION DATE', 'SUBMISSIONDATE', 'submission_date', 'submissionDate', 'NGAY TRINH KY', 'TRINH KY'
+            ]);
             if (submissionDateRaw !== undefined) record.submissionDate = parseExcelDate(submissionDateRaw, 'Ngày trình ký', errors);
 
-            const approvalDateRaw = getVal(['NGÀY KÝ DUYỆT', 'NGÀY KÝ', 'approvaldate', 'approval_date', 'approvalDate']);
+            const approvalDateRaw = getVal([
+                'NGÀY KÝ DUYỆT', 'NGÀY KÝ', 'KÝ DUYỆT', 'ĐÃ KÝ', 'LÃNH ĐẠO KÝ', 'NGÀY DUYỆT',
+                'APPROVAL DATE', 'APPROVALDATE', 'approval_date', 'approvalDate', 'NGAY KY DUYET', 'NGAY KY', 'KY DUYET', 'DA KY', 'LANH DAO KY'
+            ]);
             if (approvalDateRaw !== undefined) record.approvalDate = parseExcelDate(approvalDateRaw, 'Ngày ký', errors);
 
-            const completedDateRaw = getVal(['NGÀY HOÀN THÀNH', 'completeddate', 'completed_date', 'completedDate', 'NGÀY GIAO 1 CỬA']);
-            if (completedDateRaw !== undefined) record.completedDate = parseExcelDate(completedDateRaw, 'Ngày hoàn thành', errors);
+            const completedDateRaw = getVal([
+                'NGÀY HOÀN THÀNH', 'HOÀN THÀNH', 'NGÀY GIAO 1 CỬA', 'NGÀY GIAO MỘT CỬA', 'GIAO 1 CỬA', 'BÀN GIAO 1 CỬA', 'GIAO MỘT CỬA',
+                'COMPLETED DATE', 'COMPLETEDDATE', 'completed_date', 'completedDate', 'NGAY HOAN THANH', 'NGAY GIAO 1 CUA'
+            ]);
+            if (completedDateRaw !== undefined) record.completedDate = parseExcelDate(completedDateRaw, 'Ngày hoàn thành / Giao 1 cửa', errors);
 
-            const resultReturnedDateRaw = getVal(['NGÀY TRẢ DÂN', 'resultreturneddate', 'result_returned_date', 'resultReturnedDate']);
+            const resultReturnedDateRaw = getVal([
+                'NGÀY TRẢ DÂN', 'TRẢ DÂN', 'ĐÃ TRẢ DÂN', 'TRẢ KẾT QUẢ', 'NGÀY TRẢ KẾT QUẢ', 'ĐÃ TRẢ KẾT QUẢ',
+                'RESULT RETURNED DATE', 'RESULTRETURNEDDATE', 'result_returned_date', 'resultReturnedDate', 'NGAY TRA DAN', 'TRA DAN', 'DA TRA DAN', 'TRA KET QUA'
+            ]);
             if (resultReturnedDateRaw !== undefined) record.resultReturnedDate = parseExcelDate(resultReturnedDateRaw, 'Ngày trả dân', errors);
 
-            const typeRaw = getVal(['LOẠI HỒ SƠ', 'LOAI HO SO', 'LOẠI', 'THỦ TỤC', 'recordtype', 'record_type']);
+            const typeRaw = getVal(['LOẠI HỒ SƠ', 'LOAI HO SO', 'MÃ THỦ TỤC', 'LOẠI TTHC', 'RECORD TYPE', 'RECORDTYPE']);
             if (typeRaw !== undefined) {
                 const str = String(typeRaw).trim();
                 record.recordType = typeMapping[str.toUpperCase()] || getShortRecordType(str);
@@ -239,11 +294,19 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.recordType = RECORD_TYPES[0];
             }
 
+            const contentRaw = getVal(['TRÍCH YẾU', 'TRICH YEU', 'NỘI DUNG', 'TRÍCH YẾU NỘI DUNG', 'CONTENT', 'DESCRIPTION']);
+            if (contentRaw !== undefined && contentRaw !== null) {
+                record.content = String(contentRaw).trim();
+            } else if (mode === 'create') {
+                record.content = '';
+            }
+
+            // Tôn trọng ngày hẹn trả trong file. Chỉ tự động tính deadline khi file không có cột hẹn trả ở chế độ Tiếp nhận mới
             if (mode === 'create' && !record.deadline && record.recordType && record.receivedDate) {
                 record.deadline = calculateDeadline(record.recordType, record.receivedDate);
             }
 
-            const exportBatchRaw = getVal(['ĐỢT', 'BATCH', 'exportbatch', 'export_batch', 'exportBatch', 'ĐỢT XUẤT', 'DOT XUAT', 'DOT', 'ĐỢT BÀN GIAO', 'ĐỢT GIAO 1 CỬA', 'ĐỢT GIAO', 'ĐỢT XUẤT HỒ SƠ', 'ĐỢT GIAO MỘT CỬA']);
+            const exportBatchRaw = getVal(['ĐỢT', 'BATCH', 'ĐỢT XUẤT', 'DOT XUAT', 'DOT', 'ĐỢT BÀN GIAO', 'ĐỢT GIAO 1 CỬA', 'ĐỢT GIAO', 'ĐỢT XUẤT HỒ SƠ', 'ĐỢT GIAO MỘT CỬA']);
             if (exportBatchRaw !== undefined) {
                 const numStr = String(exportBatchRaw).replace(/[^0-9]/g, '');
                 if (numStr) {
@@ -253,36 +316,27 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 }
             }
 
-            const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE', 'exportdate', 'export_date', 'exportDate', 'NGÀY XUẤT HỒ SƠ', 'NGÀY XUẤT GIAO 1 CỬA', 'NGÀY BÀN GIAO', 'NGÀY GIAO 1 CỬA', 'NGÀY BÀN GIAO 1 CỬA', 'NGÀY GIAO MỘT CỬA', 'NGÀY BÀN GIAO MỘT CỬA', 'NGÀY TRẢ KẾT QUẢ', 'NGÀY XUẤT ĐỢT']);
+            const exportDateRaw = getVal(['NGÀY XUẤT', 'NGÀY XUẤT ĐỢT', 'NGÀY XUẤT HỒ SƠ', 'NGÀY XUẤT GIAO 1 CỬA', 'NGÀY BÀN GIAO', 'NGÀY BÀN GIAO 1 CỬA', 'EXPORT DATE', 'EXPORTDATE', 'NGAY XUAT', 'NGAY XUAT DOT']);
             if (exportDateRaw !== undefined) {
                 record.exportDate = parseExcelDate(exportDateRaw, 'Ngày xuất', errors);
             }
 
-            // Đồng bộ và tự động bù ngày xuất / ngày hoàn thành nếu có đợt xuất
-            if (record.exportBatch && !record.exportDate) {
-                record.exportDate = record.completedDate || record.approvalDate || record.resultReturnedDate || record.receivedDate;
-            }
-            if (record.exportDate && !record.completedDate) {
-                record.completedDate = record.exportDate;
-            }
-
-            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo', 'NV XỬ LÝ']);
+            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'NV XỬ LÝ', 'CÁN BỘ XỬ LÝ', 'CÁN BỘ', 'NGUOI XU LY', 'NHAN VIEN', 'CAN BO']);
             if (assigneeRaw !== undefined && String(assigneeRaw).trim() !== '') {
                 const emp = employees.find(e => e.name.toLowerCase().includes(String(assigneeRaw).toLowerCase().trim()));
                 if (emp) {
                     record.assignedTo = emp.id;
-                    if (mode === 'create') record.assignedDate = record.receivedDate;
                 }
             }
 
-            const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'assigneddate', 'assigned_date', 'assignedDate']);
+            const assignedDateRaw = getVal(['NGÀY GIAO VIỆC', 'NGÀY GIAO', 'GIAO VIỆC', 'PHÂN CÔNG', 'NGÀY PHÂN CÔNG', 'ASSIGNED DATE', 'ASSIGNEDDATE', 'NGAY GIAO VIEC', 'NGAY GIAO']);
             if (assignedDateRaw !== undefined) {
-                record.assignedDate = parseExcelDate(assignedDateRaw, 'Ngày giao', errors);
+                record.assignedDate = parseExcelDate(assignedDateRaw, 'Ngày giao việc', errors);
             }
 
             let explicitStatus: RecordStatus | undefined = undefined;
 
-            const statusRaw = getVal(['TRẠNG THÁI', 'STATUS', 'status']);
+            const statusRaw = getVal(['TRẠNG THÁI', 'TÌNH TRẠNG', 'TIẾN ĐỘ', 'STATUS', 'TRANG THAI', 'TINH TRANG', 'TIEN DO']);
             if (statusRaw !== undefined && String(statusRaw).trim() !== '') {
                 let sStr = String(statusRaw).toUpperCase().trim();
                 if (sStr.includes('1 CỬA') || sStr.includes('1 CUA') || sStr.includes('MỘT CỬA') || sStr.includes('MOT CUA') || sStr.includes('HANDOVER') || sStr.includes('GIAO 1 CỬA') || sStr.includes('ĐÃ GIAO 1 CỬA') || sStr.includes('BÀN GIAO 1 CỬA') || sStr.includes('XUẤT 1 CỬA') || sStr.includes('ĐÃ XUẤT 1 CỬA')) {
@@ -316,25 +370,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
             if (explicitStatus !== undefined && explicitStatus !== RecordStatus.IN_PROGRESS) {
                 record.status = explicitStatus;
-                
-                const nowStr = new Date().toISOString();
-                if (explicitStatus === RecordStatus.HANDOVER) {
-                    if (!record.completedDate) record.completedDate = nowStr;
-                } else if (explicitStatus === RecordStatus.RETURNED) {
-                    if (!record.resultReturnedDate) record.resultReturnedDate = nowStr;
-                } else if (explicitStatus === RecordStatus.SIGNED) {
-                    if (!record.approvalDate) record.approvalDate = nowStr;
-                } else if (explicitStatus === RecordStatus.PENDING_SIGN) {
-                    if (!record.submissionDate) record.submissionDate = nowStr;
-                } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
-                    if (!record.pendingCheckDate) record.pendingCheckDate = nowStr;
-                } else if (explicitStatus === RecordStatus.COMPLETED_WORK) {
-                    if (!record.completedWorkDate) record.completedWorkDate = nowStr;
-                } else if (explicitStatus === RecordStatus.ASSIGNED) {
-                    if (!record.assignedDate) record.assignedDate = nowStr;
-                }
+                // TUYỆT ĐỐI KHÔNG TỰ ĐỘNG GÁN NGÀY HÔM NAY (nowStr) VÀO CÁC MỐC NGÀY!
             } else {
-                // Tự động suy luận trạng thái dựa trên các mốc tiến trình (khi file không có cột Trạng thái hoặc là "Đang thực hiện")
+                // Tự động suy luận trạng thái dựa trên các mốc tiến trình THỰC TẾ CÓ TRONG FILE (khi file không có cột Trạng thái)
                 if (record.resultReturnedDate) {
                     record.status = RecordStatus.RETURNED;
                 } else if (record.exportBatch || record.exportDate || record.completedDate) {
@@ -387,8 +425,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             mappedRecords.push(record);
         }
 
-        const { migratedRecords } = migrateUnbatchedRecords(mappedRecords as RecordFile[]);
-        const validated = validateRecords(migratedRecords as PreviewRecord[], mode, records);
+        // Bỏ migrateUnbatchedRecords vì hàm này tự sinh ngày xuất/ngày hoàn thành hôm nay làm sai lệch dữ liệu file
+        const validated = validateRecords(mappedRecords as PreviewRecord[], mode, records);
         setPreviewData(validated);
         setLoading(false);
 
@@ -569,28 +607,28 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       if (mode === 'update') {
           headers = [
               'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 
-              'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
+              'XÃ', 'PHI ĐỊA GIỚI', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
               'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
               'TRẠNG THÁI', 'NGÀY THỰC HIỆN', 'NGÀY TRÌNH KIỂM TRA', 'NGÀY ĐÃ KIỂM TRA', 'NGÀY TRÌNH KÝ', 
               'NGÀY KÝ DUYỆT', 'NGÀY HOÀN THÀNH', 'NGÀY TRẢ DÂN', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
           ];
           sampleData = [
               ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
-               'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+               'Tân Khai', 'Tân Quan', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
                '2.1 Trích Lục', 'cấp đổi', 'Sổ đỏ | Bản chính', '2024-01-01', '2024-01-15', 
                'Đã kiểm tra', '', '', '2024-01-10', '', '', '', '', '2024-01-20', '1', '', '']
           ];
       } else {
           headers = [
               'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 'LOẠI ỦY QUYỀN', 
-              'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
+              'XÃ', 'PHI ĐỊA GIỚI', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
               'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
               'TRẠNG THÁI', 'NGÀY THỰC HIỆN', 'NGÀY TRÌNH KIỂM TRA', 'NGÀY ĐÃ KIỂM TRA', 'NGÀY TRÌNH KÝ', 
               'NGÀY KÝ DUYỆT', 'NGÀY HOÀN THÀNH', 'NGÀY TRẢ DÂN', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
           ];
           sampleData = [
               ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 'Giấy ủy quyền', 
-               'Tân Khai', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+               'Tân Khai', 'Tân Quan', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
                'Đo đạc', 'Đo đạc cắm mốc', 'Sổ đỏ|Bản chính', '2024-01-01', '2024-01-15', 
                'Đã nhận', '', '', '', '', '', '', '', '', '', '', '']
           ];
@@ -612,6 +650,20 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         key: 'customerName', 
         label: 'Chủ Sử Dụng', 
         render: (r) => r.customerName || <span className="text-slate-300 italic">(Giữ nguyên)</span> 
+      },
+      { 
+        key: 'ward', 
+        label: 'Xã (Thửa)', 
+        render: (r) => r.ward ? getWardLabel(r.ward) : <span className="text-slate-300 italic">-</span> 
+      },
+      { 
+        key: 'handoverWard', 
+        label: 'Phi Địa Giới', 
+        render: (r) => r.handoverWard ? (
+          <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-semibold border border-purple-200">
+            {getWardLabel(r.handoverWard)}
+          </span>
+        ) : <span className="text-slate-300 italic">-</span> 
       },
       { 
         key: 'status', 
@@ -643,11 +695,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     ];
 
     if (mode === 'create') {
+      const hasHandover = previewData.some(r => !!r.handoverWard);
       return [
         possibleCols[0], // customerName
-        possibleCols[1], // status
-        possibleCols[11], // exportDate
-        possibleCols[12]  // exportBatch
+        possibleCols[1], // ward
+        ...(hasHandover ? [possibleCols[2]] : []), // handoverWard if present
+        possibleCols[3], // status
+        possibleCols[13], // exportDate
+        possibleCols[14]  // exportBatch
       ];
     }
 
@@ -659,9 +714,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     if (active.length === 0) {
       return [
         possibleCols[0], // customerName
-        possibleCols[1], // status
-        possibleCols[11], // exportDate
-        possibleCols[12]  // exportBatch
+        possibleCols[1], // ward
+        possibleCols[3], // status
+        possibleCols[13], // exportDate
+        possibleCols[14]  // exportBatch
       ];
     }
     return active;

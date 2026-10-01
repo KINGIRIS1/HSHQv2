@@ -5,6 +5,7 @@ import { RecordFile, RecordStatus } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType } from '../../constants';
 import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
+import { keepOnlyDate } from '../../services/apiCore';
 
 interface BulkImportProps {
   onSave: (record: RecordFile) => Promise<RecordFile | null>;
@@ -32,14 +33,14 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       
       const headers = [
           'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 
-          'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
+          'XÃ', 'PHI ĐỊA GIỚI', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
           'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
           'TRẠNG THÁI', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
       ];
       
       const sampleData = [
           ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
-           'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+           'Tân Khai', 'Tân Quan', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
            '2.1 Trích Lục', 'cấp đổi', 'Sổ đỏ | Bản chính', '2024-01-01', '2024-01-15', 
            'Đã nhận', '', '']
       ];
@@ -128,6 +129,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               if (!customerName) continue;
 
               const ward = getVal(['XÃ', 'PHƯỜNG', 'ĐỊA BÀN']) || '';
+              const handoverWardRaw = getVal(['PHI ĐỊA GIỚI', 'NƠI TRẢ', 'NƠI GIAO TRẢ', 'XÃ PHI ĐỊA GIỚI', 'HANDOVER WARD', 'PHI DIA GIOI']);
+              const handoverWard = handoverWardRaw ? String(handoverWardRaw).trim() : null;
               
               let rawType = String(getVal(['LOẠI', 'LĨNH VỰC', 'LOAI HO SO', 'LOẠI HỒ SƠ']) || '').trim();
               let recordType = typeMapping[rawType.toUpperCase()];
@@ -148,8 +151,13 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               const authorizedBy = String(getVal(['NGƯỜI ỦY QUYỀN', 'ỦY QUYỀN', 'AUTHORIZED BY']) || '');
               const authDocType = String(getVal(['LOẠI ỦY QUYỀN', 'GIẤY ỦY QUYỀN', 'AUTH DOC']) || '');
 
-              const receivedDate = new Date().toISOString();
-              const deadline = calculateDeadline(String(recordType), receivedDate.split('T')[0]);
+              const rawReceived = getVal(['NGÀY TIẾP NHẬN', 'TIẾP NHẬN', 'NGÀY NHẬN', 'NGÀY NỘP', 'NGAY TIEP NHAN', 'NGAY NHAN', 'RECEIVED DATE', 'RECEIVEDDATE']);
+              const parsedReceived = rawReceived ? keepOnlyDate(rawReceived) : null;
+              const receivedDate = parsedReceived ? `${parsedReceived}T00:00:00.000Z` : new Date().toISOString();
+
+              const rawDeadline = getVal(['NGÀY HẸN TRẢ', 'HẸN TRẢ', 'HẠN TRẢ', 'HẠN GIẢI QUYẾT', 'HẠN TRẢ KẾT QUẢ', 'DEADLINE', 'HEN TRA', 'HAN TRA', 'NGAY HEN TRA']);
+              const parsedDeadline = rawDeadline ? keepOnlyDate(rawDeadline) : null;
+              const deadline = parsedDeadline || calculateDeadline(String(recordType), receivedDate.split('T')[0]);
 
               newBulkRecords.push({
                   tempId: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
@@ -157,6 +165,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   customerName: String(customerName),
                   phoneNumber: String(getVal(['SĐT', 'ĐIỆN THOẠI']) || ''),
                   ward: String(ward),
+                  handoverWard: handoverWard || null,
                   landPlot: String(getVal(['THỬA']) || ''),
                   mapSheet: String(getVal(['TỜ']) || ''),
                   area: parseFloat(String(getVal(['DIỆN TÍCH']) || '0')),

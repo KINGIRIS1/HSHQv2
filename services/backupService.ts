@@ -617,3 +617,172 @@ export const restoreSystemJsonBackupAsync = async (
         message: `Đã khôi phục thành công ${missingRecords.length} hồ sơ bị thiếu. Đã bỏ qua ${skippedCount} hồ sơ đã có sẵn trên hệ thống.`
     };
 };
+
+/* --- INDEXED DB RESTORE POINTS MANAGEMENT --- */
+
+const DB_NAME = 'app_backup_restore_db';
+const STORE_NAME = 'restore_points';
+
+const openBackupDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export interface LocalRestorePoint {
+    id: string;
+    timestamp: string;
+    isAuto: boolean;
+    totalRecords: number;
+    sizeKb: number;
+    counts: {
+        records: number;          // Đo đạc / Tiếp nhận
+        contracts: number;        // Hợp đồng dịch vụ
+        archiveVaoso: number;     // Hồ sơ Lưu trữ GCN
+        archiveSaoluc: number;    // Kho hồ sơ GCN
+        nganChan: number;         // Dữ liệu Ngăn chặn
+        iGate: number;            // Hồ sơ Đăng ký (iGate)
+        usersAndStaff: number;    // Nhân viên & User
+        vphc: number;             // Xử phạt VPHC
+        bienBan: number;          // Biên bản bàn giao
+        chinhLy: number;          // Chỉnh lý bản đồ
+        tachThua: number;         // Tách thửa / Hợp thửa
+        workSchedules: number;    // Lịch đo đạc
+    };
+    fullData?: FullBackupData;
+}
+
+export const getStoredRestorePoints = async (): Promise<LocalRestorePoint[]> => {
+    try {
+        const db = await openBackupDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const list: LocalRestorePoint[] = req.result || [];
+                list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                resolve(list);
+            };
+            req.onerror = () => reject(req.error);
+        });
+    } catch (e) {
+        console.error("Lỗi đọc restore points từ IndexedDB:", e);
+        return [];
+    }
+};
+
+export const saveLocalRestorePoint = async (
+    backupObj: FullBackupData,
+    isAuto = true,
+    mode: 'new' | 'overwrite' = 'new',
+    maxLimit = 5
+): Promise<LocalRestorePoint[]> => {
+    try {
+        const db = await openBackupDB();
+        const existing = await getStoredRestorePoints();
+        
+        const payload = backupObj.data || (backupObj as any);
+        const jsonStr = JSON.stringify(backupObj);
+        const sizeKb = Math.round(jsonStr.length / 1024);
+
+        const recs = payload.records || [];
+        const ctrs = payload.contracts || [];
+        const vaoso = payload.archive_vaoso || [];
+        const saoluc = payload.archive_saoluc || [];
+        const nganChan = payload.thongtin_records || [];
+        const iGate = payload.archive_congvan || [];
+        const users = payload.users || [];
+        const emps = payload.employees || [];
+        const vphc = payload.vphc_records || [];
+        const bienban = payload.bienban_records || [];
+        const chinhly = payload.chinhly_records || [];
+        const tachthua = payload.tachthua_records || [];
+        const schedules = payload.work_schedules || [];
+
+        const totalRecords = recs.length + ctrs.length + vaoso.length + saoluc.length + 
+            nganChan.length + iGate.length + users.length + emps.length + 
+            vphc.length + bienban.length + chinhly.length + tachthua.length + schedules.length;
+
+        const newPoint: LocalRestorePoint = {
+            id: `rp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            timestamp: backupObj.backup_time || new Date().toISOString(),
+            isAuto,
+            totalRecords,
+            sizeKb,
+            counts: {
+                records: recs.length,
+                contracts: ctrs.length,
+                archiveVaoso: vaoso.length,
+                archiveSaoluc: saoluc.length,
+                nganChan: nganChan.length,
+                iGate: iGate.length,
+                usersAndStaff: users.length + emps.length,
+                vphc: vphc.length,
+                bienBan: bienban.length,
+                chinhLy: chinhly.length,
+                tachThua: tachthua.length,
+                workSchedules: schedules.length
+            },
+            fullData: backupObj
+        };
+
+        let updatedList: LocalRestorePoint[] = [];
+
+        if (mode === 'overwrite' && existing.length > 0) {
+            updatedList = [newPoint, ...existing.slice(1)];
+        } else {
+            updatedList = [newPoint, ...existing].slice(0, maxLimit);
+        }
+
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        await new Promise<void>((resolve, reject) => {
+            const clearReq = store.clear();
+            clearReq.onsuccess = () => {
+                let pending = updatedList.length;
+                if (pending === 0) resolve();
+                updatedList.forEach(item => {
+                    const putReq = store.put(item);
+                    putReq.onsuccess = () => {
+                        pending--;
+                        if (pending === 0) resolve();
+                    };
+                    putReq.onerror = () => reject(putReq.error);
+                });
+            };
+            clearReq.onerror = () => reject(clearReq.error);
+        });
+
+        localStorage.setItem('last_json_backup_timestamp', Date.now().toString());
+        return updatedList;
+    } catch (e) {
+        console.error("Lỗi lưu Restore Point vào IndexedDB:", e);
+        return [];
+    }
+};
+
+export const deleteStoredRestorePoint = async (id: string): Promise<LocalRestorePoint[]> => {
+    try {
+        const db = await openBackupDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        await new Promise<void>((resolve, reject) => {
+            const delReq = store.delete(id);
+            delReq.onsuccess = () => resolve();
+            delReq.onerror = () => reject(delReq.error);
+        });
+        return await getStoredRestorePoints();
+    } catch (e) {
+        console.error("Lỗi xóa Restore Point:", e);
+        return [];
+    }
+};

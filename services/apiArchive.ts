@@ -296,7 +296,7 @@ export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
     const d = (typeof r.data === 'object' && r.data !== null) ? r.data : {};
     const code = r.code || r.so_hieu || d.ma_ho_so || r.id || '';
     const customerName = r.customerName || r.noi_nhan_gui || d.ten_chu_su_dung || '';
-    const recordType = r.recordType || r.content || r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận';
+    const recordType = r.recordType || d.loai_bien_dong || (r.trich_yeu ? getShortRecordType(r.trich_yeu) : '') || 'Cấp Giấy chứng nhận';
     const ward = r.ward || d.dia_danh || d.xa_phuong || '';
     const mapSheet = r.mapSheet || d.so_to || d.to_ban_do || '';
     const landPlot = r.landPlot || d.so_thua || d.thua_dat || '';
@@ -359,7 +359,7 @@ export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
         type: 'vaoso',
         status: st,
         so_hieu: code,
-        trich_yeu: recordType,
+        trich_yeu: r.trich_yeu || r.content || r.description || '',
         ngay_thang: receivedDate,
         noi_nhan_gui: customerName,
         exportBatch: r.exportBatch ? String(r.exportBatch) : (d.exportBatch || null),
@@ -901,7 +901,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             const approvalDate = d.ngay_ky_gcn || (record as any).approvalDate || (record as any).issueDate || null;
             const issueDate = d.ngay_ky_gcn || (record as any).issueDate || (record as any).approvalDate || null;
             const receivedDate = d.ngay_nhan || record.ngay_thang || (record as any).receivedDate || null;
-            const recordType = record.trich_yeu || d.loai_bien_dong || (record as any).recordType || 'Cấp Giấy chứng nhận';
+            const recordType = d.loai_bien_dong || (record as any).recordType || (record.trich_yeu ? getShortRecordType(record.trich_yeu) : '') || 'Cấp Giấy chứng nhận';
             const notes = d.ghi_chu || (record as any).notes || '';
 
             const dangkyPayload: Record<string, any> = {
@@ -919,7 +919,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 issueDate,
                 receivedDate,
                 recordType,
-                content: recordType,
+                content: record.trich_yeu || (record as any).content || '',
                 notes,
                 status: (record as any).status || 'DA_KY',
                 data: d,
@@ -1200,8 +1200,8 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
                     approvalDate: d.ngay_ky_gcn || d.approvalDate || null,
                     issueDate: d.ngay_ky_gcn || d.issueDate || null,
                     receivedDate: d.ngay_nhan || r.ngay_thang || null,
-                    recordType: r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận',
-                    content: r.trich_yeu || d.loai_bien_dong || 'Cấp Giấy chứng nhận',
+                    recordType: d.loai_bien_dong || (r as any).recordType || (r.trich_yeu ? getShortRecordType(r.trich_yeu) : '') || 'Cấp Giấy chứng nhận',
+                    content: r.trich_yeu || (r as any).content || '',
                     notes: d.ghi_chu || '',
                     status: 'DA_KY',
                     data: d,
