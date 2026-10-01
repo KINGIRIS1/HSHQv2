@@ -1,4 +1,4 @@
-import { supabase, isConfigured } from './supabaseClient';
+import { supabase, isConfigured, SUPABASE_URL, SUPABASE_ANON_KEY, hasAuthenticatedSession } from './supabaseClient';
 
 export type ConnectionState = {
     isOnline: boolean;
@@ -151,6 +151,14 @@ class ConnectionManager {
                     }
 
                     if (isConfigured && supabase) {
+                        if (!(await hasAuthenticatedSession())) {
+                            const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+                                headers: { apikey: SUPABASE_ANON_KEY },
+                                signal: AbortSignal.timeout(7000),
+                            });
+                            if (!response.ok) throw new Error('Không kết nối được dịch vụ đăng nhập.');
+                            return true;
+                        }
                         // Ping kiểm tra Supabase
                         const { error } = await supabase.from('system_settings').select('key').limit(1);
                         

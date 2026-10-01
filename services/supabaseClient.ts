@@ -20,6 +20,12 @@ export const supabase = createClient(
     { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'hshq-auth-v1' }, db: { schema: 'public' } }
 );
 
+export const hasAuthenticatedSession = async (): Promise<boolean> => {
+    if (!isConfigured) return false;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    return !error && Boolean(session);
+};
+
 // Staff still enter their username; Auth uses an internal deterministic alias.
 export const usernameToAuthEmail = async (username: string): Promise<string> => {
     const normalized = username.normalize('NFC').trim().toLowerCase();

@@ -1,4 +1,4 @@
-import { supabase, isConfigured, usernameToAuthEmail } from './supabaseClient';
+import { supabase, isConfigured, usernameToAuthEmail, hasAuthenticatedSession } from './supabaseClient';
 import { User } from '../types';
 import { mapUserFromDb, saveToCache, CACHE_KEYS } from './apiCore';
 import { enrichUsersList, enrichUserWithEmployees } from './apiPeople';
@@ -9,8 +9,7 @@ const cleanProfile = (row: any): User => {
     return profile;
 };
 export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!isConfigured || !session) return [];
+    if (!(await hasAuthenticatedSession())) return [];
     const { data, error } = await supabase.from('users').select(profileFields);
     if (error) throw error;
     const profiles = await enrichUsersList((data || []).map(cleanProfile));
@@ -19,11 +18,13 @@ export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
 };
 export const fetchUsers = fetchUsersDirectFromDb;
 export const findUserInDbDirectly = async (username: string): Promise<User | null> => {
+    if (!(await hasAuthenticatedSession())) return null;
     const { data, error } = await supabase.from('users').select(profileFields).eq('username', username).maybeSingle();
     if (error || !data) return null;
     return enrichUserWithEmployees(cleanProfile(data));
 };
 export const getAuthenticatedAppUser = async (): Promise<User | null> => {
+    if (!(await hasAuthenticatedSession())) return null;
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return null;
     const { data, error: profileError } = await supabase.from('users').select(profileFields).eq('auth_id', user.id).maybeSingle();
