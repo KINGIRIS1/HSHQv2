@@ -1,11 +1,11 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RecordFile, Employee, User, UserRole, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, deleteRecordsBatchApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting,
     enrichUsersList, enrichUserWithEmployees, RECENTLY_UPDATED_RECORDS, migrateEmployeeIdInAllTables} from '../services/api';
-import { supabase } from '../services/supabaseClient';
+import { supabase, hasAuthenticatedSession } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
 import { fetchAllArchiveRecordsAsRecordFiles } from '../services/apiArchive';
 import { getIndexedDBItem } from '../services/storageService';
@@ -54,7 +54,10 @@ const reconcileWithProtectedRecords = (incomingRecords: RecordFile[], currentPre
     });
 };
 
-export const useAppData = (_currentUser?: any) => {
+export const useAppData = (currentUser: User | null) => {
+    const userKey = currentUser?.username || null;
+    const activeUserRef = useRef(userKey);
+    activeUserRef.current = userKey;
     // Khởi tạo danh sách hồ sơ ban đầu (sẽ được nạp tức thì từ IndexedDB & Cloud)
     const [records, setRecords] = useState<RecordFile[]>([]);
     const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
@@ -83,6 +86,8 @@ export const useAppData = (_currentUser?: any) => {
     const [updateUrl, setUpdateUrl] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
+        if (!userKey || !(await hasAuthenticatedSession())) return;
+        const isCurrentUser = () => activeUserRef.current === userKey;
         try {
             // Helper bọc timeout an toàn cho từng tác vụ tải dữ liệu
             const safeFetch = async <T>(promise: Promise<T>, fallbackValue: T, timeoutMs = 15000): Promise<T> => {
@@ -111,11 +116,14 @@ export const useAppData = (_currentUser?: any) => {
                 safeFetch(syncGoogleDriveConfigFromCloud(), null, 5000)
             ]);
 
+            if (!isCurrentUser()) return;
+
             if (Array.isArray(empData) && empData.length > 0) {
                 setEmployees(empData);
             }
             if (Array.isArray(userData) && userData.length > 0) {
                 const enrichedUsers = await enrichUsersList(userData, empData || employees);
+                if (!isCurrentUser()) return;
                 setUsers(enrichedUsers);
             }
             if (Array.isArray(holidayData)) {
@@ -157,6 +165,7 @@ export const useAppData = (_currentUser?: any) => {
 
             // GIAI ĐOẠN 2: Nạp ngầm Hồ sơ công việc sau khi hệ thống & nhân sự đã sẵn sàng
             fetchRecords((_tier, partialList) => {
+                if (!isCurrentUser()) return;
                 if (Array.isArray(partialList) && partialList.length > 0) {
                     setRecords(prev => {
                         if (!prev || prev.length === 0) {
@@ -172,6 +181,7 @@ export const useAppData = (_currentUser?: any) => {
                     });
                 }
             }).then(recData => {
+                if (!isCurrentUser()) return;
                 if (Array.isArray(recData) && recData.length > 0) {
                     const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
                     setRecords(prev => {
@@ -187,8 +197,10 @@ export const useAppData = (_currentUser?: any) => {
                     });
                 }
             }).catch(async (err) => {
+                if (!isCurrentUser()) return;
                 console.warn("fetchRecords gặp lỗi mạng, đang nạp từ IndexedDB:", err);
                 const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS);
+                if (!isCurrentUser()) return;
                 if (Array.isArray(idb) && idb.length > 0) {
                     const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(idb));
                     setRecords(prev => prev.length > 0 ? prev : migratedRecords);
@@ -198,11 +210,13 @@ export const useAppData = (_currentUser?: any) => {
             // Tải ngầm kho hồ sơ lưu trữ vào RAM & IndexedDB để vào Báo cáo Lưu trữ tức thì 0ms
             fetchAllArchiveRecordsAsRecordFiles().catch(() => {});
         } catch (error) {
+            if (!isCurrentUser()) return;
             console.warn("Lỗi tải dữ liệu hoặc mất mạng, đang sử dụng dữ liệu đệm từ IndexedDB:", error);
             setConnectionStatus('offline');
             
             // Đảm bảo dữ liệu luôn sẵn sàng từ IndexedDB / Defaults
             getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS).then(idbRecords => {
+                if (!isCurrentUser()) return;
                 if (Array.isArray(idbRecords) && idbRecords.length > 0) {
                     const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(idbRecords));
                     setRecords(prev => prev.length > 0 ? prev : migratedRecords);
@@ -212,11 +226,14 @@ export const useAppData = (_currentUser?: any) => {
             setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
             setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
         }
-    }, []);
+    }, [userKey]);
 
     // Khởi tạo ngay lập tức từ IndexedDB khi mở app để chống treo hệ thống / màn hình trắng
     useEffect(() => {
+        if (!userKey) return;
+        let cancelled = false;
         getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS).then(idbRecords => {
+            if (cancelled) return;
             if (Array.isArray(idbRecords) && idbRecords.length > 0) {
                 setRecords(prev => {
                     if (prev.length === 0 || prev.length < idbRecords.length) {
@@ -240,9 +257,10 @@ export const useAppData = (_currentUser?: any) => {
 
         window.addEventListener('sync_queue_updated', handleSyncUpdate);
         return () => {
+            cancelled = true;
             window.removeEventListener('sync_queue_updated', handleSyncUpdate);
         };
-    }, []);
+    }, [userKey]);
 
     // Lắng nghe sự kiện hoàn tất đồng bộ tệp ngầm Google Drive để cập nhật giao diện tức thì
     useEffect(() => {
@@ -284,9 +302,19 @@ export const useAppData = (_currentUser?: any) => {
 
     // Initial Load & Fallback Auto-polling (Realtime handles instant updates)
     useEffect(() => {
+        if (!userKey) {
+            setRecords([]);
+            setUsers([]);
+            setEmployees([]);
+            setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
+            setDepartmentPermissions({});
+            return;
+        }
+        let cancelled = false;
         loadData();
         const intervalId = setInterval(() => {
             fetchRecords().then(recData => {
+                if (cancelled) return;
                 if (recData && Array.isArray(recData)) {
                     const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
                     setRecords(prev => {
@@ -308,12 +336,15 @@ export const useAppData = (_currentUser?: any) => {
                 console.error("Background sync poll error:", err);
             });
         }, 60000); // 60s fallback sync
-        return () => clearInterval(intervalId);
-    }, [loadData]);
+        return () => {
+            cancelled = true;
+            clearInterval(intervalId);
+        };
+    }, [loadData, userKey]);
 
     // Lắng nghe thay đổi Realtime từ các bảng land_records, luutru_records, dangky_records
     useEffect(() => {
-        if (!supabase) return;
+        if (!userKey || !supabase) return;
 
         const handleRealtimeUpdate = (newRow: any, table: 'land_records' | 'luutru_records' | 'dangky_records') => {
             const updated = mapRecordFromDb({ ...newRow, sourceTable: table }) as RecordFile;
@@ -469,13 +500,16 @@ export const useAppData = (_currentUser?: any) => {
             supabase.removeChannel(usersChannel);
             supabase.removeChannel(settingsChannel);
         };
-    }, []);
+    }, [userKey]);
 
     // Lắng nghe sự kiện cập nhật danh sách người dùng và phân quyền hệ thống liên tab/liên window
     useEffect(() => {
+        if (!userKey) return;
+        let cancelled = false;
         const refreshUsers = async () => {
             try {
                 const fresh = await fetchUsers();
+                if (cancelled) return;
                 if (Array.isArray(fresh) && fresh.length > 0) setUsers(fresh);
             } catch (e) {}
         };
@@ -484,6 +518,7 @@ export const useAppData = (_currentUser?: any) => {
             try {
                 const permsData = await getSystemSetting('role_permissions');
                 const deptPermsData = await getSystemSetting('department_permissions');
+                if (cancelled) return;
                 if (permsData) {
                     try {
                         const parsed = JSON.parse(permsData);
@@ -521,10 +556,11 @@ export const useAppData = (_currentUser?: any) => {
 
         window.addEventListener('users_updated', handleUserEvent);
         window.addEventListener('permissions_updated', handlePermEvent);
-        window.addEventListener('focus', () => {
+        const handleFocus = () => {
             refreshUsers();
             refreshPermissions();
-        });
+        };
+        window.addEventListener('focus', handleFocus);
 
         let usersBc: BroadcastChannel | null = null;
         let permsBc: BroadcastChannel | null = null;
@@ -550,16 +586,19 @@ export const useAppData = (_currentUser?: any) => {
         }, 5000);
 
         return () => {
+            cancelled = true;
             window.removeEventListener('users_updated', handleUserEvent);
             window.removeEventListener('permissions_updated', handlePermEvent);
+            window.removeEventListener('focus', handleFocus);
             if (usersBc) usersBc.close();
             if (permsBc) permsBc.close();
             clearInterval(userSyncInterval);
         };
-    }, []);
+    }, [userKey]);
 
     // Lắng nghe phiên bản mới từ Supabase Realtime & BroadcastChannel
     useEffect(() => {
+        if (!userKey) return;
         const checkUpdateStatus = async () => {
             try {
                 const updateInfo = await fetchUpdateInfo();
@@ -634,7 +673,7 @@ export const useAppData = (_currentUser?: any) => {
             window.removeEventListener('focus', handleFocus);
             window.removeEventListener('app_version_published', handleCustomPublished);
         };
-    }, []);
+    }, [userKey]);
 
     // --- Record Handlers ---
     const handleSyncPendingRecords = async () => {
