@@ -48,6 +48,7 @@ import { checkAndTriggerWeeklyBackup, downloadBackupAsFile, downloadSystemJsonBa
 import { checkAndTriggerPeriodicExcelBackup, performExcelBackup } from './services/excelBackupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
+import { connectionManager } from './services/connectionService';
 import { DriveSyncToastContainer } from './components/common/DriveSyncToastContainer';
 
 function App() {
@@ -64,9 +65,9 @@ function App() {
       try {
         const startCheck = Date.now();
         console.log(`🔍 [DIAGNOSTIC] Bắt đầu kiểm tra kết nối & đồng bộ dữ liệu ban đầu...`);
-        const res = await fetch('/api/ping').catch(() => null);
+        const online = await connectionManager.ping();
         const latency = Date.now() - startCheck;
-        console.log(`⚡ [DIAGNOSTIC] Phản hồi kết nối server: ${res?.ok ? 'OK' : 'Offline/Local'} (${latency}ms)`);
+        console.log(`⚡ [DIAGNOSTIC] Kết nối máy chủ dữ liệu: ${online ? 'OK' : 'Không kết nối được'} (${latency}ms)`);
       } catch (err) {
         console.warn(`⚠️ [DIAGNOSTIC] Lỗi kiểm tra kết nối khởi động:`, err);
       }

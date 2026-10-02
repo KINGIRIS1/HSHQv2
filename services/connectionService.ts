@@ -1,4 +1,4 @@
-import { supabase, isConfigured, SUPABASE_URL, SUPABASE_ANON_KEY, hasAuthenticatedSession } from './supabaseClient';
+import { isConfigured, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabaseClient';
 
 export type ConnectionState = {
     isOnline: boolean;
@@ -108,12 +108,7 @@ class ConnectionManager {
         }
     }
 
-    /**
-     * Cơ chế ping đa tầng thông minh (Multi-Tier Resilient Ping):
-     * 1. Kiểm tra trạng thái mạng của trình duyệt (navigator.onLine)
-     * 2. Ping nhẹ tới chính domain web app để xác nhận Internet vẫn hoạt động
-     * 3. Ping tới Supabase với timeout an toàn 25 giây
-     */
+    /** Check backend availability independently of the signed-in session. */
     public async ping(): Promise<boolean> {
         if (this.checkInProgress) {
             return this.checkInProgress;
@@ -130,52 +125,23 @@ class ConnectionManager {
                     throw new Error("Trình duyệt đang ở chế độ Offline");
                 }
 
-                // Tầng 2 & 3: Ping kiểm chứng máy chủ với timeout an toàn 7s (rút ngắn để người dùng không phải chờ lâu)
-                const timeoutPromise = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error("Timeout phản hồi kết nối")), 7000)
-                );
+                // Health checks must not wait for an Auth session or read protected tables.
+                // Abort the request itself, so retries cannot leave requests running in the background.
+                const response = isConfigured
+                    ? await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+                        headers: { apikey: SUPABASE_ANON_KEY },
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(7000),
+                    })
+                    : await fetch(`${window.location.origin}/icon.ico`, {
+                        method: 'HEAD',
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(7000),
+                    });
+                if (!response.ok) {
+                    throw new Error(`Máy chủ phản hồi HTTP ${response.status}`);
+                }
 
-                const pingPromise = (async () => {
-                    let internetOk = false;
-                    try {
-                        // Thử ping nhẹ vào static asset hoặc endpoint nội bộ của ứng dụng
-                        const staticResp = await fetch(`${window.location.origin}/favicon.ico?_ping=${Date.now()}`, { 
-                            method: 'HEAD', 
-                            cache: 'no-store' 
-                        }).catch(() => null);
-                        if (staticResp && (staticResp.ok || staticResp.status < 500)) {
-                            internetOk = true;
-                        }
-                    } catch {
-                        // Bỏ qua lỗi favicon
-                    }
-
-                    if (isConfigured && supabase) {
-                        // Before login, check Auth without reading protected application tables.
-                        if (!(await hasAuthenticatedSession())) {
-                            const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
-                                headers: { apikey: SUPABASE_ANON_KEY },
-                                signal: AbortSignal.timeout(7000),
-                            });
-                            if (!response.ok) throw new Error('Không kết nối được dịch vụ đăng nhập.');
-                            return true;
-                        }
-                        try {
-                            const { error } = await supabase.from('system_settings').select('key').limit(1);
-                            if (!error || error.code === 'PGRST116' || error.code === '42P01' || error.code === '42501') {
-                                return true;
-                            }
-                            if (internetOk) return true;
-                        } catch {
-                            if (internetOk) return true;
-                        }
-                        return true;
-                    } else {
-                        return internetOk || true;
-                    }
-                })();
-
-                await Promise.race([pingPromise, timeoutPromise]);
                 success = true;
             } catch (err: any) {
                 success = false;
