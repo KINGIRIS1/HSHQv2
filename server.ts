@@ -133,11 +133,20 @@ server.use((req: Request, res: Response, next: NextFunction) => {
     next();
 });
 
-// Custom Routes
-server.get('/api/ping', (req: Request, res: Response) => {
+// Custom Routes & Fast Ping/Health handlers for iframe ConnectionManager
+const handlePing = (req: Request, res: Response) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.status(200).json({ status: 'ok', timestamp: Date.now() });
-});
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
+    return res.status(200).json({ status: 'ok', timestamp: Date.now() });
+};
+
+server.use(['/api/ping', '/ping', '/health', '/api/health'], handlePing);
+server.get('/api/ping', handlePing);
+
 server.post('/api/backup', (req: Request, res: Response) => {
     try {
         const { backupData, customDirectory } = req.body;

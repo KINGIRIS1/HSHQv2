@@ -124,6 +124,15 @@
       <div style="font-family: sans-serif; color: #f1f5f9; font-weight: 700; font-size: 15px; letter-spacing: 0.05em; text-shadow: 0 2px 4px rgba(0,0,0,0.85); text-transform: uppercase;">Đang tải hệ thống...</div>
     </div>
     <div id="root"></div>
+    <script>
+      window.addEventListener('message', function(event) {
+        if (event.data && (event.data.type === 'ping' || event.data === 'ping' || event.data.type === 'PING' || event.data.action === 'ping')) {
+          if (event.source && typeof event.source.postMessage === 'function') {
+            event.source.postMessage({ type: 'pong', status: 'ok', timestamp: Date.now() }, '*');
+          }
+        }
+      });
+    </script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

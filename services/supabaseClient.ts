@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const buildEnv = (import.meta as any).env || {};
 const defaultUrl = buildEnv.VITE_SUPABASE_URL || 'https://api.qlhshq.info.vn';
-const defaultKey = buildEnv.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkwODQ2NjQxLCJleHAiOjIxMDYyMDY2NDF9.C_ZelJZ0v5pGRPhgjm6Z3ljdoXvPJUUc3RBOq89eVrM';
+const defaultKey = buildEnv.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkwODU5Mjc4LCJleHAiOjE5NDg1MzkyNzh9.NafaY1HgZZdSB9sddTztknHN3LAlJrn87bY5yDli_hQ';
 // Build configuration takes precedence over settings left by the Cloud app.
 const customUrl = !buildEnv.VITE_SUPABASE_URL && typeof localStorage !== 'undefined'
     ? localStorage.getItem('CUSTOM_SUPABASE_URL') : null;
@@ -22,15 +22,8 @@ export const supabase = createClient(
 
 export const hasAuthenticatedSession = async (): Promise<boolean> => {
     if (!isConfigured) return false;
-    try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (!error && Boolean(session)) return true;
-    } catch {}
-    if (typeof sessionStorage !== 'undefined') {
-        const userSession = sessionStorage.getItem('current_user_session');
-        if (userSession) return true;
-    }
-    return true;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    return !error && Boolean(session);
 };
 
 // Staff still enter their username; Auth uses an internal deterministic alias.

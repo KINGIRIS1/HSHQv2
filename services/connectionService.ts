@@ -151,6 +151,15 @@ class ConnectionManager {
                     }
 
                     if (isConfigured && supabase) {
+                        // Before login, check Auth without reading protected application tables.
+                        if (!(await hasAuthenticatedSession())) {
+                            const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+                                headers: { apikey: SUPABASE_ANON_KEY },
+                                signal: AbortSignal.timeout(7000),
+                            });
+                            if (!response.ok) throw new Error('Không kết nối được dịch vụ đăng nhập.');
+                            return true;
+                        }
                         try {
                             const { error } = await supabase.from('system_settings').select('key').limit(1);
                             if (!error || error.code === 'PGRST116' || error.code === '42P01' || error.code === '42501') {
