@@ -151,24 +151,14 @@ class ConnectionManager {
                     }
 
                     if (isConfigured && supabase) {
-                        if (!(await hasAuthenticatedSession())) {
-                            const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
-                                headers: { apikey: SUPABASE_ANON_KEY },
-                                signal: AbortSignal.timeout(7000),
-                            });
-                            if (!response.ok) throw new Error('Không kết nối được dịch vụ đăng nhập.');
-                            return true;
-                        }
-                        // Ping kiểm tra Supabase
-                        const { error } = await supabase.from('system_settings').select('key').limit(1);
-                        
-                        // Chỉ coi là lỗi kết nối nếu thật sự lỗi mạng, bỏ qua các mã lỗi logic dữ liệu
-                        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== '42501' && (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch'))) {
-                            // Nếu static app vẫn truy cập được, mạng máy khách vẫn bình thường -> coi như tạm kết nối
-                            if (internetOk) {
+                        try {
+                            const { error } = await supabase.from('system_settings').select('key').limit(1);
+                            if (!error || error.code === 'PGRST116' || error.code === '42P01' || error.code === '42501') {
                                 return true;
                             }
-                            throw error;
+                            if (internetOk) return true;
+                        } catch {
+                            if (internetOk) return true;
                         }
                         return true;
                     } else {

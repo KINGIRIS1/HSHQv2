@@ -300,7 +300,7 @@ export const useAppData = (currentUser: User | null) => {
         };
     }, [loadData]);
 
-    // Initial Load & Fallback Auto-polling (Realtime handles instant updates)
+    // Khởi tạo dữ liệu ban đầu 1 lần (Realtime sẽ nhận và cập nhật tức thì mọi thay đổi thay vì kéo lại toàn bộ CSDL)
     useEffect(() => {
         if (!userKey) {
             setRecords([]);
@@ -312,33 +312,16 @@ export const useAppData = (currentUser: User | null) => {
         }
         let cancelled = false;
         loadData();
-        const intervalId = setInterval(() => {
-            fetchRecords().then(recData => {
-                if (cancelled) return;
-                if (recData && Array.isArray(recData)) {
-                    const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
-                    setRecords(prev => {
-                        // Khóa bảo vệ đối chiếu: không cho phép polling nền đè lùi các hồ sơ vừa được người dùng thao tác
-                        const reconciledRecords = reconcileWithProtectedRecords(migratedRecords, prev);
 
-                        // Prevent unnecessary re-renders if data has not changed
-                        if (prev.length === reconciledRecords.length) {
-                            const isSame = prev.every((r, idx) => {
-                                const m = reconciledRecords[idx];
-                                return m && r.id === m.id && r.status === m.status && r.assignedTo === m.assignedTo && r.deadline === m.deadline && r.exportBatch === m.exportBatch && r.exportDate === m.exportDate;
-                            });
-                            if (isSame) return prev;
-                        }
-                        return reconciledRecords;
-                    });
-                }
-            }).catch(err => {
-                console.error("Background sync poll error:", err);
-            });
-        }, 60000); // 60s fallback sync
+        // Lắng nghe yêu cầu làm mới thủ công (nếu người dùng bấm nút làm mới)
+        const handleManualRefresh = () => {
+            if (!cancelled) loadData();
+        };
+        window.addEventListener('manual_refresh_records', handleManualRefresh);
+
         return () => {
             cancelled = true;
-            clearInterval(intervalId);
+            window.removeEventListener('manual_refresh_records', handleManualRefresh);
         };
     }, [loadData, userKey]);
 

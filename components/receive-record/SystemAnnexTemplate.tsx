@@ -786,14 +786,14 @@ const SystemAnnexTemplate: React.FC<SystemAnnexTemplateProps> = ({ data, employe
                                 
                                 {/* Header Quốc hiệu */}
                                 <div className="flex justify-between items-start mb-6">
-                                    <div className="text-center" style={{ width: '45%' }}>
-                                        <div className="font-bold uppercase" style={{ fontSize: '12pt' }}>VĂN PHÒNG ĐKĐĐ TP ĐỒNG NAI</div>
-                                        <div className="font-bold uppercase" style={{ fontSize: '13pt' }}>CHI NHÁNH HỚN QUẢN</div>
+                                    <div className="text-center" style={{ width: '47%' }}>
+                                        <div className="font-bold uppercase whitespace-nowrap" style={{ fontSize: '11pt' }}>VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI</div>
+                                        <div className="font-bold uppercase whitespace-nowrap" style={{ fontSize: '11.5pt' }}>THÀNH PHỐ ĐỒNG NAI - CHI NHÁNH HỚN QUẢN</div>
                                         <div className="line-title"></div>
                                     </div>
-                                    <div className="text-center" style={{ width: '53%' }}>
-                                        <div className="font-bold" style={{ fontSize: '12pt' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                                        <div className="font-bold" style={{ fontSize: '13pt' }}>Độc lập - Tự do - Hạnh phúc</div>
+                                    <div className="text-center" style={{ width: '51%' }}>
+                                        <div className="font-bold whitespace-nowrap" style={{ fontSize: '11.5pt' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                                        <div className="font-bold whitespace-nowrap" style={{ fontSize: '12pt' }}>Độc lập - Tự do - Hạnh phúc</div>
                                         <div className="line-sub"></div>
                                     </div>
                                 </div>

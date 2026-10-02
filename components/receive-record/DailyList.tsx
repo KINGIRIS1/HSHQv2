@@ -187,36 +187,51 @@ const DailyList: React.FC<DailyListProps> = ({
       const searchLower = searchTerm.toLowerCase();
       
       const list = records.filter(r => {
-          // Bỏ qua hồ sơ đã bàn giao
-          if (r.isHandedOver) {
-              return false;
-          }
-
           // 1. Lọc theo khoảng thời gian tiếp nhận
-          const recordDate = r.receivedDate ? r.receivedDate.split('T')[0] : '';
+          const recordDate = r.receivedDate ? r.receivedDate.split('T')[0] : (r.assignedDate ? r.assignedDate.split('T')[0] : '');
           if (filterFromDate && recordDate < filterFromDate) return false;
           if (filterToDate && recordDate > filterToDate) return false;
 
-          // 2. Lọc theo nhân viên tiếp nhận
+          // 2. Lọc theo nhân viên tiếp nhận (Cross-matching đa chiều cho TẤT CẢ cán bộ)
           if (selectedReceiver !== 'ALL') {
-              const recUser = (r.receivedBy || '').toLowerCase();
+              const recUser = (r.receivedBy || r.assignedTo || r.submittedTo || '').toLowerCase();
               const myEmpId = (currentUser?.employeeId || '').toLowerCase();
               const myId = (currentUser?.id || '').toLowerCase();
               const myUser = (currentUser?.username || '').toLowerCase();
               const myName = (currentUser?.name || '').toLowerCase();
 
-              if (selectedReceiver === 'ME' || (myEmpId && selectedReceiver.toLowerCase() === myEmpId) || (myId && selectedReceiver.toLowerCase() === myId) || (myUser && selectedReceiver.toLowerCase() === myUser)) {
-                  const matchesMe = (myEmpId && recUser === myEmpId) || 
+              const isSelectingMe = selectedReceiver === 'ME' || 
+                                    (myEmpId && selectedReceiver.toLowerCase() === myEmpId) || 
+                                    (myId && selectedReceiver.toLowerCase() === myId) || 
+                                    (myUser && selectedReceiver.toLowerCase() === myUser);
+
+              if (isSelectingMe) {
+                  const matchesMe = !recUser ||
+                                    (myEmpId && recUser === myEmpId) || 
                                     (myId && recUser === myId) || 
                                     (myUser && recUser === myUser) ||
                                     (myName && recUser === myName);
                   if (!matchesMe) return false;
               } else {
                   const selEmp = (employees || []).find(e => e.id === selectedReceiver || e.name === selectedReceiver);
-                  const targetId = (selectedReceiver || '').toLowerCase();
-                  const targetName = (selEmp?.name || '').toLowerCase();
-                  const matchesEmp = (targetId && recUser === targetId) || (targetName && recUser === targetName);
-                  if (!matchesEmp) return false;
+                  const linkedUsers = (users || []).filter(u => 
+                      (selEmp?.id && u.employeeId === selEmp.id) || 
+                      (selEmp?.name && u.name === selEmp.name) || 
+                      (selectedReceiver && (u.username === selectedReceiver || u.id === selectedReceiver || u.employeeId === selectedReceiver || u.name === selectedReceiver))
+                  );
+
+                  const targetKeys = new Set<string>();
+                  if (selectedReceiver) targetKeys.add(selectedReceiver.toLowerCase());
+                  if (selEmp?.id) targetKeys.add(selEmp.id.toLowerCase());
+                  if (selEmp?.name) targetKeys.add(selEmp.name.toLowerCase());
+                  linkedUsers.forEach(u => {
+                      if (u.username) targetKeys.add(u.username.toLowerCase());
+                      if (u.id) targetKeys.add(u.id.toLowerCase());
+                      if (u.employeeId) targetKeys.add(u.employeeId.toLowerCase());
+                      if (u.name) targetKeys.add(u.name.toLowerCase());
+                  });
+
+                  if (!targetKeys.has(recUser)) return false;
               }
           }
 
@@ -314,21 +329,24 @@ const DailyList: React.FC<DailyListProps> = ({
 
   // Priority list for export/preview:
   // 1. If items are selected -> only selected items
-  // 2. If filtered -> filtered records
-  // 3. Fallback -> all records
+  // 2. If date/filter active -> filtered records
+  // 3. If date empty & no items selected -> return empty (0 records)
   const getRecordsToExport = () => {
       if (selectedIds.size > 0) {
           return records.filter(r => selectedIds.has(r.id));
       }
-      if (filteredDailyRecords.length > 0) {
+      if ((filterFromDate || filterToDate || searchTerm || selectedRecordType !== 'ALL' || selectedDept !== 'ALL') && filteredDailyRecords.length > 0) {
           return filteredDailyRecords;
       }
-      return records;
+      return [];
   };
 
   const createDailyListWorkbook = () => {
       const recordsToExport = getRecordsToExport();
-      if (recordsToExport.length === 0) return null;
+      if (recordsToExport.length === 0) {
+          alert("Vui lòng chọn ngày tiếp nhận hoặc tích chọn các hồ sơ cần xem trước / xuất danh sách.");
+          return null;
+      }
       
       let mainTitle = "DANH SÁCH TIẾP NHẬN HỒ SƠ";
       let wardTitle = "DANH SÁCH TỔNG HỢP";

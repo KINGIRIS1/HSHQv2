@@ -71,7 +71,7 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
             <style>
               @page { 
                 size: A4 portrait; 
-                margin: 15mm 12mm 15mm 25mm; 
+                margin: 15mm 10mm 15mm 20mm; 
               }
               html, body { 
                 width: 100%;
@@ -82,7 +82,7 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
                 font-size: 13pt; 
                 color: #000;
                 -webkit-print-color-adjust: exact;
-                line-height: 1.3;
+                line-height: 1.35;
               }
               .docx-wrapper { 
                 background: white !important; 
@@ -100,6 +100,9 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
               }
               img { max-width: 100%; height: auto; }
               table { width: 100% !important; border-collapse: collapse; }
+              table:first-of-type td p, table:first-of-type td span, table:first-of-type td div {
+                white-space: nowrap !important;
+              }
               hr {
                 border: 0 !important;
                 border-top: 1px solid #000 !important;
@@ -181,7 +184,14 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
           <style>
             {`
               .docx-viewer-container .docx { width: 100% !important; max-width: 100% !important; }
-              .docx-viewer-container section { width: 100% !important; max-width: 100% !important; }
+              .docx-viewer-container section { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
+              .docx-viewer-container table { width: 100% !important; table-layout: fixed !important; }
+              .docx-viewer-container table:first-of-type td p, 
+              .docx-viewer-container table:first-of-type td span, 
+              .docx-viewer-container table:first-of-type td div {
+                white-space: nowrap !important;
+                font-size: 11pt !important;
+              }
               .docx-viewer-container hr { border-top: 1px solid #000 !important; display: block !important; margin: 10px 0 !important; opacity: 1 !important; }
             `}
           </style>
@@ -199,12 +209,13 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
             suppressContentEditableWarning={true}
             onKeyDown={handleKeyDown}
             spellCheck={false}
-            className="bg-white shadow-lg p-4 md:p-10 text-left transition-opacity duration-300 docx-viewer-container outline-none ring-0 focus:ring-4 focus:ring-blue-100/50 cursor-text border border-gray-200"
+            className="bg-white shadow-lg p-2 sm:p-6 md:p-8 text-left transition-opacity duration-300 docx-viewer-container outline-none ring-0 focus:ring-4 focus:ring-blue-100/50 cursor-text border border-gray-200"
             style={{
               width: '100%',
               maxWidth: '210mm',
               minHeight: '297mm',
               margin: '0 auto',
+              boxSizing: 'border-box',
               opacity: loading ? 0 : 1,
               fontFamily: '"Times New Roman", serif'
             }}

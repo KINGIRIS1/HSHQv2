@@ -29,7 +29,7 @@ export const POSITIONS = [
 export type PositionType = typeof POSITIONS[number];
 
 // PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG
-export const APP_VERSION = '2.1.1';
+export const APP_VERSION = '2.1.3';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',

@@ -161,6 +161,8 @@ export interface User {
   department?: string;      // Tổ / Phong ban
   position?: string;        // Chuc vu
   managedWards?: string[];  // Dia ban duoc phan cong
+  permissions?: string[];
+  avatar?: string;
 }
 
 export interface Employee {

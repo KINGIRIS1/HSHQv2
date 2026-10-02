@@ -18,11 +18,11 @@ let mainWindow;
 protocol.registerSchemesAsPrivileged([{ scheme: 'hshq', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 function getAppIconPath() {
-  const distIcon = path.join(__dirname, '../dist-desktop/icon.ico');
   const publicIcon = path.join(__dirname, '../public/icon.ico');
-  if (fs.existsSync(distIcon)) return distIcon;
+  const distIcon = path.join(__dirname, '../dist-desktop/icon.ico');
   if (fs.existsSync(publicIcon)) return publicIcon;
-  return distIcon;
+  if (fs.existsSync(distIcon)) return distIcon;
+  return publicIcon;
 }
 
 function createWindow() {
@@ -51,7 +51,14 @@ function createWindow() {
   }
   
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    // Cho phép mở các trang in nội bộ, blob, data, about:blank trong Electron
+    if (!url || url.startsWith('about:') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('hshq://')) {
+      return { action: 'allow' };
+    }
+    // Chỉ mở các liên kết web thực sự ra trình duyệt ngoài OS
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
 }

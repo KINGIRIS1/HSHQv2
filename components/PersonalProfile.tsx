@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { RecordFile, RecordStatus, User, Employee, Contract, UserRole, DossierComponentItem } from "../types";
 import StatusBadge from "./StatusBadge";
 import {
@@ -89,6 +89,9 @@ function removeVietnameseTones(str: string): string {
   return str;
 }
 
+let CACHED_ARCHIVE_RECORDS: ArchiveRecord[] | null = null;
+let CACHED_CONTRACTS: Contract[] | null = null;
+
 const PersonalProfile: React.FC<PersonalProfileProps> = ({
   user,
   records,
@@ -101,6 +104,29 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   onCreateLiquidation,
   onMapCorrection,
 }) => {
+  // Tập hợp tra cứu O(1) tất cả định danh nhân sự của user đăng nhập
+  const userEmpKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (!user.employeeId) return keys;
+    const target = user.employeeId.toLowerCase();
+    keys.add(target);
+    const emp = employees.find(e => e.id.toLowerCase() === target || e.name.toLowerCase() === target);
+    if (emp) {
+      if (emp.id) keys.add(emp.id.toLowerCase());
+      if (emp.name) keys.add(emp.name.toLowerCase());
+    }
+    if (user.username) keys.add(user.username.toLowerCase());
+    if (user.id) keys.add(user.id.toLowerCase());
+    if (user.name) keys.add(user.name.toLowerCase());
+    return keys;
+  }, [user.employeeId, user.username, user.id, user.name, employees]);
+
+  const isMyEmp = useCallback((idOrName?: string | null) => {
+    if (!idOrName) return false;
+    const clean = idOrName.toLowerCase();
+    if (userEmpKeys.has(clean)) return true;
+    return matchEmployeeId(idOrName, user.employeeId, employees);
+  }, [userEmpKeys, user.employeeId, employees]);
   const [activeTab, setActiveTab] = useState<
     | "all"
     | "pending"
@@ -210,29 +236,44 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   }, [isDirector, user.role, currentEmployee]);
 
   useEffect(() => {
+    let active = true;
     const loadArchive = async () => {
-      const saoluc = await fetchArchiveRecords("saoluc");
-      const congvan = await fetchArchiveRecords("congvan");
-      setArchiveRecords([...saoluc, ...congvan]);
+      if (CACHED_ARCHIVE_RECORDS) {
+        setArchiveRecords(CACHED_ARCHIVE_RECORDS);
+        return;
+      }
+      try {
+        const saoluc = await fetchArchiveRecords("saoluc");
+        const congvan = await fetchArchiveRecords("congvan");
+        const combined = [...saoluc, ...congvan];
+        CACHED_ARCHIVE_RECORDS = combined;
+        if (active) setArchiveRecords(combined);
+      } catch {}
     };
     const loadContracts = async () => {
+      if (CACHED_CONTRACTS) {
+        setContracts(CACHED_CONTRACTS);
+        return;
+      }
       try {
         const fetched = await fetchContracts();
-        setContracts(fetched);
+        CACHED_CONTRACTS = fetched;
+        if (active) setContracts(fetched);
       } catch (err) {
         console.error("Error loading contracts:", err);
       }
     };
     loadArchive();
     loadContracts();
+    return () => { active = false; };
   }, []);
 
   const myRecords = useMemo((): RecordFile[] => {
     const mainRecords = records.filter((r) => {
       if (!user.employeeId) return false;
       if (isDirector) {
-        if (matchEmployeeId(r.assignedTo, user.employeeId, employees)) return true;
-        if (matchEmployeeId(r.submittedTo, user.employeeId, employees)) {
+        if (isMyEmp(r.assignedTo)) return true;
+        if (isMyEmp(r.submittedTo)) {
           const reachedSignStage =
             r.status === RecordStatus.PENDING_SIGN ||
             r.status === RecordStatus.SIGNED ||
@@ -243,15 +284,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return false;
       }
       // Nếu là người kiểm tra, họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
-      const currentUserEmp = employees.find((e) => e.id === user.employeeId || matchEmployeeId(e.id, user.employeeId, employees));
       const isCheckerUser =
-        currentUserEmp?.position?.toLowerCase().includes("tổ") &&
-        (currentUserEmp?.department?.toLowerCase().includes("đo đạc") ||
-         currentUserEmp?.department?.toLowerCase().includes("kỹ thuật"));
+        currentEmployee?.position?.toLowerCase().includes("tổ") &&
+        (currentEmployee?.department?.toLowerCase().includes("đo đạc") ||
+         currentEmployee?.department?.toLowerCase().includes("kỹ thuật"));
       if (isCheckerUser) {
-        // Chỉ hiển thị hồ sơ giao xử lý (assignedTo) HOẶC hồ sơ đã tới khâu kiểm tra (status >= PENDING_CHECK) nếu họ là người kiểm tra (checkedBy)
-        if (matchEmployeeId(r.assignedTo, user.employeeId, employees)) return true;
-        if (matchEmployeeId(r.checkedBy, user.employeeId, employees)) {
+        // Chỉ hiển thị hồ sơ giao xử lý (assignedTo) HOẶC hồ sơ đã tới khâu kiểm tra nếu họ là người kiểm tra
+        if (isMyEmp(r.assignedTo)) return true;
+        if (isMyEmp(r.checkedBy)) {
           const reachedCheckStage =
             r.status !== RecordStatus.RECEIVED &&
             r.status !== RecordStatus.ASSIGNED &&
@@ -264,9 +304,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return false;
       }
       return (
-        matchEmployeeId(r.assignedTo, user.employeeId, employees) ||
-        matchEmployeeId(r.surveyorId, user.employeeId, employees) ||
-        matchEmployeeId(r.drafterId, user.employeeId, employees)
+        isMyEmp(r.assignedTo) ||
+        isMyEmp(r.surveyorId) ||
+        isMyEmp(r.drafterId)
       );
     });
 
@@ -274,8 +314,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       .filter((r) => {
         if (!user.employeeId) return false;
         if (isDirector) {
-          if (matchEmployeeId(r.data?.assigned_to, user.employeeId, employees)) return true;
-          if (matchEmployeeId(r.data?.submitted_to || r.data?.submittedTo, user.employeeId, employees)) {
+          if (isMyEmp(r.data?.assigned_to)) return true;
+          if (isMyEmp(r.data?.submitted_to || r.data?.submittedTo)) {
             let status: RecordStatus = RecordStatus.RECEIVED;
             const rawSt = String(r.status || '').toLowerCase();
             if (rawSt === 'assigned') status = RecordStatus.ASSIGNED;
@@ -296,14 +336,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           }
           return false;
         }
-        const currentUserEmp = employees.find((e) => e.id === user.employeeId || matchEmployeeId(e.id, user.employeeId, employees));
         const isCheckerUser =
-          currentUserEmp?.position?.toLowerCase().includes("tổ") &&
-          (currentUserEmp?.department?.toLowerCase().includes("đo đạc") ||
-           currentUserEmp?.department?.toLowerCase().includes("kỹ thuật"));
+          currentEmployee?.position?.toLowerCase().includes("tổ") &&
+          (currentEmployee?.department?.toLowerCase().includes("đo đạc") ||
+           currentEmployee?.department?.toLowerCase().includes("kỹ thuật"));
         if (isCheckerUser) {
-          if (matchEmployeeId(r.data?.assigned_to, user.employeeId, employees)) return true;
-          if (matchEmployeeId(r.data?.checked_by, user.employeeId, employees)) {
+          if (isMyEmp(r.data?.assigned_to)) return true;
+          if (isMyEmp(r.data?.checked_by)) {
             // Map status của archive để kiểm tra xem đã tới khâu kiểm tra chưa
             let status: RecordStatus = RecordStatus.RECEIVED;
             const rawSt = String(r.status || '').toLowerCase();
@@ -326,7 +365,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           }
           return false;
         }
-        return matchEmployeeId(r.data?.assigned_to, user.employeeId, employees);
+        return isMyEmp(r.data?.assigned_to);
       })
       .map((r) => {
         // Map status
