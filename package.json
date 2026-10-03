@@ -2,7 +2,7 @@
   "name": "he-thong-quan-ly-ho-so",
   "private": true,
   "version": "2.1.3",
-  "main": "dist/server.cjs",
+  "main": "electron/main.js",
   "author": "DonViHanhChinh",
   "description": "Phan mem quan ly ho so dia chinh",
   "scripts": {
@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "backup:cloud": "node backup_supabase.cjs",
     "electron:dev": "wait-on tcp:5173 && electron .",
-    "electron:build": "npm run build && electron-builder --win --x64 -p never"
+    "electron:build": "npm run build && electron-builder --config electron-builder.json --win --x64 -p never"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",

@@ -184,21 +184,11 @@ export const performExcelBackup = async (
 };
 
 /**
- * Kiểm tra chu kỳ 5 ngày và tự động thực hiện sao lưu
+ * Kiểm tra chu kỳ 5 ngày và tự động thực hiện sao lưu (Đã vô hiệu hóa theo yêu cầu)
  */
 export const checkAndTriggerPeriodicExcelBackup = async (
     records: RecordFile[],
     employees: Employee[]
 ): Promise<{ triggered: boolean; result?: ExcelBackupResult }> => {
-    const lastTime = await getLastExcelBackupTime();
-    const now = Date.now();
-
-    // Nếu chưa từng sao lưu hoặc đã đủ 5 ngày (432,000,000 ms)
-    if (!lastTime || (now - lastTime) >= EXCEL_BACKUP_PERIOD_MS) {
-        console.log(`[EXCEL BACKUP] Đã đến hạn định kỳ (hoặc lần đầu). Bắt đầu sao lưu ${records.length} hồ sơ...`);
-        const result = await performExcelBackup(records, employees);
-        return { triggered: true, result };
-    }
-
     return { triggered: false };
 };

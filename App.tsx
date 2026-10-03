@@ -523,29 +523,6 @@ function App() {
   const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
   const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
 
-  // Tự động kiểm tra và thực hiện sao lưu định kỳ 5 ngày ra file Excel (Tải về máy) hoàn toàn tự động, không hiện thông báo modal
-  const hasCheckedPeriodicBackupRef = useRef(false);
-
-  useEffect(() => {
-    if (isAdmin && records.length > 0 && employees.length > 0 && !hasCheckedPeriodicBackupRef.current) {
-      hasCheckedPeriodicBackupRef.current = true;
-      const timer = setTimeout(async () => {
-        try {
-          const res = await checkAndTriggerPeriodicExcelBackup(records, employees);
-          if (res.triggered && res.result?.success) {
-            setToast({
-              type: 'success',
-              message: `Đã tự động sao lưu dữ liệu định kỳ 5 ngày (${records.length} hồ sơ) và tải về máy thành công!`
-            });
-          }
-        } catch (err) {
-          console.error('Lỗi khi tự động sao lưu định kỳ:', err);
-        }
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [isAdmin, records, employees]);
-
   // --- UPDATE HANDLERS ---
   
   // Lắng nghe sự kiện update từ Electron
@@ -1076,6 +1053,8 @@ function App() {
           if (updated) {
               setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
               setToast({ type: 'success', message: 'Đã cập nhật dữ liệu thành công!' });
+          } else {
+              setToast({ type: 'error', message: '⚠️ LỖI: Cơ sở dữ liệu từ chối lưu thay đổi. Vui lòng kiểm tra lại kết nối!' });
           }
       } catch (e: any) { 
           console.error("Quick update failed", e); 
@@ -1123,6 +1102,8 @@ function App() {
               setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
               setReturnRecord(null);
               setIsReturnModalOpen(false);
+          } else {
+              setToast({ type: 'error', message: '⚠️ LỖI: Cơ sở dữ liệu từ chối lưu dữ liệu trả kết quả. Vui lòng thử lại!' });
           }
       } catch (e: any) {
           console.error("Return result failed", e);

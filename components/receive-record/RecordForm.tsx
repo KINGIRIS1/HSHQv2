@@ -427,9 +427,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         receivedBy: recBy 
     } as RecordFile;
 
-    const savedRecord = await onSave(recordToSave);
+    let savedRecord: RecordFile | null = null;
+    try {
+        savedRecord = await onSave(recordToSave);
+    } catch (saveErr) {
+        console.error("Lỗi ngoại lệ khi lưu hồ sơ:", saveErr);
+        savedRecord = null;
+    }
+
     setLoading(false);
-    if (savedRecord) {
+    
+    if (savedRecord && savedRecord.code) {
         setNotification({ type: 'success', message: initialData ? `Cập nhật thành công: ${savedRecord.code}` : `Đã tiếp nhận mới: ${savedRecord.code}` });
         if (!initialData && onPrint) {
             onPrint(savedRecord);
@@ -439,7 +447,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         // Kích hoạt đồng bộ ngầm Google Drive trong nền (0ms delay cho thao tác giao diện)
         enqueueRecordForBackgroundDriveSync(savedRecord);
     } else {
-        setNotification({ type: 'error', message: "Lỗi khi lưu hồ sơ." });
+        setNotification({ 
+            type: 'error', 
+            message: "⚠️ LỖI LƯU HỒ SƠ: Dữ liệu chưa được lưu thành công vào cơ sở dữ liệu! Hệ thống đã từ chối mở bảng in biên nhận. Vui lòng kiểm tra lại kết nối và thử lưu lại." 
+        });
+        alert("⚠️ LỖI LƯU HỒ SƠ: Dữ liệu chưa được lưu thành công vào hệ thống. Từ chối mở bảng in biên nhận!");
     }
   };
 
