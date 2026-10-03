@@ -769,7 +769,9 @@ function App() {
           setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
       } catch (err: any) {
           console.error("Batch assign error:", err);
-          setToast({ type: 'error', message: `Phân công thất bại: ${err?.message || 'Lỗi lưu dữ liệu'}` });
+          const errMsg = err?.message || 'Lỗi lưu dữ liệu';
+          setToast({ type: 'error', message: `Phân công thất bại: ${errMsg}` });
+          alert(`⚠️ LỖI CSDL: Không thể lưu dữ liệu phân công vào cơ sở dữ liệu!\nChi tiết: ${errMsg}\nVui lòng kiểm tra lại kết nối.`);
       }
   };
 
@@ -1001,7 +1003,9 @@ function App() {
           setSelectedRecordIds(new Set()); 
       } catch (err: any) {
           console.error("Batch update error:", err);
-          setToast({ type: 'error', message: `Cập nhật thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+          const errMsg = err?.message || 'Không thể lưu vào CSDL';
+          setToast({ type: 'error', message: `Cập nhật thất bại: ${errMsg}` });
+          alert(`⚠️ LỖI CSDL: Không thể lưu dữ liệu cập nhật hàng loạt vào cơ sở dữ liệu!\nChi tiết: ${errMsg}\nVui lòng kiểm tra lại kết nối.`);
       }
   };
 

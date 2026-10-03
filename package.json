@@ -14,7 +14,9 @@
     "preview": "vite preview",
     "backup:cloud": "node backup_supabase.cjs",
     "electron:dev": "wait-on tcp:5173 && electron .",
-    "electron:build": "npm run build && electron-builder --config electron-builder.json --win --x64 -p never"
+    "electron:build": "npm run build && electron-builder --config electron-builder.json --win --x64 -p never",
+    "electron:portable": "npm run build && electron-builder --config electron-builder.json --win portable --x64 -p never",
+    "electron:dir": "npm run build && electron-builder --config electron-builder.json --win dir --x64 -p never"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
