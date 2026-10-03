@@ -93,6 +93,82 @@ const SystemAnnexTemplate: React.FC<SystemAnnexTemplateProps> = ({ data, employe
     const [clause2, setClause2] = useState<string>('');
 
     const printHtml = (htmlContent: string, title: string) => {
+        const fullHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>${title}</title>
+                <style>
+                    @page { 
+                        size: A4;
+                        margin: 20mm 15mm 15mm 15mm; 
+                    }
+                    body { 
+                        font-family: 'Times New Roman', Times, serif; 
+                        font-size: 13pt;
+                        line-height: 1.45;
+                        color: #000;
+                        margin: 0;
+                        padding: 0;
+                        -webkit-print-color-adjust: exact;
+                    }
+                    .print-body {
+                        padding: 0;
+                    }
+                    .w-full { width: 100%; }
+                    .flex { display: flex; }
+                    .flex-col { flex-direction: column; }
+                    .justify-between { justify-content: space-between; }
+                    .items-center { align-items: center; }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .font-bold { font-weight: bold; }
+                    .italic { font-style: italic; }
+                    .underline { text-decoration: underline; }
+                    .uppercase { text-transform: uppercase; }
+                    .mb-1 { margin-bottom: 4px; }
+                    .mb-2 { margin-bottom: 8px; }
+                    .mb-4 { margin-bottom: 16px; }
+                    .mb-6 { margin-bottom: 24px; }
+                    .mt-4 { margin-top: 16px; }
+                    .mt-6 { margin-top: 24px; }
+                    .mt-8 { margin-top: 32px; }
+                    .ml-8 { margin-left: 28pt; }
+                    .ml-6 { margin-left: 20pt; }
+                    .space-y-0.5 > * + * { margin-top: 4px; }
+                    .space-y-2 > * + * { margin-top: 12px; }
+                    .text-xs { font-size: 11pt; }
+                    .text-lg { font-size: 14pt; }
+                    .text-xl { font-size: 16pt; }
+                    .line-title { border-bottom: 1.5px solid #000; width: 100px; margin: 4px auto 0 auto; }
+                    .line-sub { border-bottom: 1.5px solid #000; width: 150px; margin: 4px auto 0 auto; }
+                    .content-indent {
+                        text-indent: 10mm;
+                        margin-bottom: 8px;
+                        text-align: justify;
+                    }
+                    .clause-list {
+                        margin-left: 10mm;
+                        margin-bottom: 12px;
+                    }
+                    .clause-item {
+                        margin-bottom: 6px;
+                        text-align: justify;
+                    }
+                    @media print {
+                        .print-body { padding: 0 !important; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-body">
+                    ${htmlContent}
+                </div>
+            </body>
+            </html>
+        `;
+
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
         iframe.style.right = '0';
@@ -106,71 +182,7 @@ const SystemAnnexTemplate: React.FC<SystemAnnexTemplateProps> = ({ data, employe
         const doc = iframe.contentWindow?.document;
         if (doc) {
             doc.open();
-            doc.write(`
-                <html>
-                <head>
-                    <title>${title}</title>
-                    <style>
-                        @page { 
-                            size: A4;
-                            margin: 20mm 15mm 15mm 15mm; 
-                        }
-                        body { 
-                            font-family: 'Times New Roman', Times, serif; 
-                            font-size: 13pt;
-                            line-height: 1.45;
-                            color: #000;
-                            margin: 0;
-                            padding: 0;
-                            -webkit-print-color-adjust: exact;
-                        }
-                        .w-full { width: 100%; }
-                        .flex { display: flex; }
-                        .flex-col { flex-direction: column; }
-                        .justify-between { justify-content: space-between; }
-                        .items-center { align-items: center; }
-                        .text-center { text-align: center; }
-                        .text-right { text-align: right; }
-                        .font-bold { font-weight: bold; }
-                        .italic { font-style: italic; }
-                        .underline { text-decoration: underline; }
-                        .uppercase { text-transform: uppercase; }
-                        .mb-1 { margin-bottom: 4px; }
-                        .mb-2 { margin-bottom: 8px; }
-                        .mb-4 { margin-bottom: 16px; }
-                        .mb-6 { margin-bottom: 24px; }
-                        .mt-4 { margin-top: 16px; }
-                        .mt-6 { margin-top: 24px; }
-                        .mt-8 { margin-top: 32px; }
-                        .ml-8 { margin-left: 28pt; }
-                        .ml-6 { margin-left: 20pt; }
-                        .space-y-0.5 > * + * { margin-top: 4px; }
-                        .space-y-2 > * + * { margin-top: 12px; }
-                        .text-xs { font-size: 11pt; }
-                        .text-lg { font-size: 14pt; }
-                        .text-xl { font-size: 16pt; }
-                        .line-title { border-bottom: 1.5px solid #000; width: 100px; margin: 4px auto 0 auto; }
-                        .line-sub { border-bottom: 1.5px solid #000; width: 150px; margin: 4px auto 0 auto; }
-                        .content-indent {
-                            text-indent: 10mm;
-                            margin-bottom: 8px;
-                            text-align: justify;
-                        }
-                        .clause-list {
-                            margin-left: 10mm;
-                            margin-bottom: 12px;
-                        }
-                        .clause-item {
-                            margin-bottom: 6px;
-                            text-align: justify;
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${htmlContent}
-                </body>
-                </html>
-            `);
+            doc.write(fullHtml);
             doc.close();
 
             iframe.contentWindow?.focus();
@@ -181,7 +193,7 @@ const SystemAnnexTemplate: React.FC<SystemAnnexTemplateProps> = ({ data, employe
                         document.body.removeChild(iframe);
                     }
                 }, 1000);
-            }, 500);
+            }, 300);
         }
     };
 

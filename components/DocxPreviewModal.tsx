@@ -50,6 +50,72 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
   const handlePrint = () => {
     if (!containerRef.current) return;
 
+    const content = containerRef.current.innerHTML;
+    const htmlDocument = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${fileName}</title>
+          <style>
+            @page { 
+              size: A4 portrait; 
+              margin: 15mm 10mm 15mm 20mm; 
+            }
+            html, body { 
+              width: 100%;
+              margin: 0; 
+              padding: 0;
+              background: white;
+              font-family: "Times New Roman", serif; 
+              font-size: 13pt; 
+              color: #000;
+              -webkit-print-color-adjust: exact;
+              line-height: 1.35;
+            }
+            .docx-wrapper { 
+              background: white !important; 
+              padding: 0 !important; 
+              margin: 0 !important; 
+            }
+            section { 
+              width: 100% !important; 
+              margin: 0 auto !important; 
+              padding: 0 !important; 
+              box-shadow: none !important; 
+              box-sizing: border-box;
+              overflow: visible;
+              page-break-after: always;
+            }
+            img { max-width: 100%; height: auto; }
+            table { width: 100% !important; border-collapse: collapse; }
+            table:first-of-type td p, table:first-of-type td span, table:first-of-type td div {
+              white-space: nowrap !important;
+            }
+            hr {
+              border: 0 !important;
+              border-top: 1px solid #000 !important;
+              display: block !important;
+              width: 100% !important;
+              height: 1px !important;
+              margin: 10px 0 !important;
+              background-color: #000 !important;
+            }
+            p[style*="border-bottom"] { border-bottom: 1px solid #000 !important; }
+            table:last-of-type { margin-top: 20px; width: 100% !important; }
+            table:last-of-type td, table:last-of-type th { border: none !important; padding: 5px; vertical-align: top; }
+            table:last-of-type td { width: 50% !important; text-align: center !important; }
+            section:last-child { page-break-after: auto; }
+            @media print {
+              .docx-wrapper { padding: 0 !important; }
+            }
+          </style>
+        </head>
+        <body>
+          ${content}
+        </body>
+      </html>
+    `;
+
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -57,80 +123,24 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
     iframe.style.width = '0';
     iframe.style.height = '0';
     iframe.style.border = '0';
+    iframe.style.zIndex = '-1';
     document.body.appendChild(iframe);
 
-    const content = containerRef.current.innerHTML;
     const doc = iframe.contentWindow?.document;
-
     if (doc) {
       doc.open();
-      doc.write(`
-        <html>
-          <head>
-            <title>${fileName}</title>
-            <style>
-              @page { 
-                size: A4 portrait; 
-                margin: 15mm 10mm 15mm 20mm; 
-              }
-              html, body { 
-                width: 100%;
-                margin: 0; 
-                padding: 0;
-                background: white;
-                font-family: "Times New Roman", serif; 
-                font-size: 13pt; 
-                color: #000;
-                -webkit-print-color-adjust: exact;
-                line-height: 1.35;
-              }
-              .docx-wrapper { 
-                background: white !important; 
-                padding: 0 !important; 
-                margin: 0 !important; 
-              }
-              section { 
-                width: 100% !important; 
-                margin: 0 auto !important; 
-                padding: 0 !important; 
-                box-shadow: none !important; 
-                box-sizing: border-box;
-                overflow: visible;
-                page-break-after: always;
-              }
-              img { max-width: 100%; height: auto; }
-              table { width: 100% !important; border-collapse: collapse; }
-              table:first-of-type td p, table:first-of-type td span, table:first-of-type td div {
-                white-space: nowrap !important;
-              }
-              hr {
-                border: 0 !important;
-                border-top: 1px solid #000 !important;
-                display: block !important;
-                width: 100% !important;
-                height: 1px !important;
-                margin: 10px 0 !important;
-                background-color: #000 !important;
-              }
-              p[style*="border-bottom"] { border-bottom: 1px solid #000 !important; }
-              table:last-of-type { margin-top: 20px; width: 100% !important; }
-              table:last-of-type td, table:last-of-type th { border: none !important; padding: 5px; vertical-align: top; }
-              table:last-of-type td { width: 50% !important; text-align: center !important; }
-              section:last-child { page-break-after: auto; }
-            </style>
-          </head>
-          <body>${content}</body>
-        </html>
-      `);
+      doc.write(htmlDocument);
       doc.close();
 
       iframe.contentWindow?.focus();
       setTimeout(() => {
         iframe.contentWindow?.print();
         setTimeout(() => {
-          document.body.removeChild(iframe);
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
         }, 1000);
-      }, 500);
+      }, 300);
     }
   };
 

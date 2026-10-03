@@ -41,6 +41,145 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     }, [data?.code]);
 
     const printPages = (pages: string[], title: string) => {
+        const renderedPages = pages.map(pageContent => `
+            <div class="print-page">
+                ${pageContent}
+            </div>
+        `).join('\n');
+
+        const htmlDocument = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>${title}</title>
+                <style>
+                    @page { 
+                        size: A4 portrait; 
+                        margin: 10mm 15mm 10mm 15mm; 
+                    }
+                    * {
+                        box-sizing: border-box !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    html, body { 
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #fff !important;
+                        font-family: 'Times New Roman', Times, serif !important; 
+                        font-size: 14px !important;
+                        line-height: 1.35 !important;
+                        color: #000 !important;
+                        height: auto !important;
+                        min-height: auto !important;
+                        overflow: visible !important;
+                    }
+                    .print-page {
+                        display: block !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        margin: 0 auto !important;
+                        padding: 0 !important;
+                        background: #fff !important;
+                        color: #000 !important;
+                        font-family: 'Times New Roman', Times, serif !important;
+                        font-size: 14px !important;
+                        line-height: 1.35 !important;
+                        box-sizing: border-box !important;
+                        clear: both !important;
+                        position: relative !important;
+                        page-break-after: always !important;
+                        break-after: page !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                    .print-page:last-child {
+                        page-break-after: auto !important;
+                        break-after: auto !important;
+                    }
+                    .avoid-break { 
+                        page-break-inside: avoid !important; 
+                        break-inside: avoid !important;
+                    }
+                    .flex { display: flex !important; }
+                    .flex-col { flex-direction: column !important; }
+                    .justify-between { justify-content: space-between !important; }
+                    .items-center { align-items: center !important; }
+                    .items-end { align-items: flex-end !important; }
+                    .text-center { text-align: center !important; }
+                    .text-left { text-align: left !important; }
+                    .text-right { text-align: right !important; }
+                    .font-bold { font-weight: bold !important; }
+                    .italic { font-style: italic !important; }
+                    .underline { text-decoration: underline !important; }
+                    .uppercase { text-transform: uppercase !important; }
+                    .whitespace-nowrap { white-space: nowrap !important; }
+                    .w-full { width: 100% !important; }
+                    .w-half, .w-1\\/2 { width: 50% !important; }
+                    .w-12 { width: 48px !important; }
+                    .w-20 { width: 80px !important; }
+                    .w-24 { width: 96px !important; }
+                    .mb-1 { margin-bottom: 4px !important; }
+                    .mb-2 { margin-bottom: 8px !important; }
+                    .mb-4 { margin-bottom: 14px !important; }
+                    .mt-1 { margin-top: 4px !important; }
+                    .mt-2 { margin-top: 8px !important; }
+                    .mt-4 { margin-top: 14px !important; }
+                    .mt-6 { margin-top: 18px !important; }
+                    .mt-8 { margin-top: 24px !important; }
+                    .text-sm { font-size: 12px !important; }
+                    .text-gray-500 { color: #555 !important; }
+                    .border-t { border-top: 1px solid #777 !important; }
+                    .border-gray-400 { border-color: #777 !important; }
+                    .pt-4 { padding-top: 12px !important; }
+                    table { 
+                        width: 100% !important; 
+                        border-collapse: collapse !important; 
+                        margin-top: 6px !important; 
+                        margin-bottom: 8px !important; 
+                    }
+                    th, td { 
+                        border: 1px solid #000 !important; 
+                        padding: 4px 6px !important; 
+                        font-size: 13.5px !important;
+                    }
+                    th { 
+                        text-align: center !important; 
+                        font-weight: bold !important; 
+                    }
+                    .receipt-line {
+                        margin-bottom: 5px !important;
+                        font-size: 14px !important;
+                        line-height: 1.35 !important;
+                    }
+                    @media print {
+                        html, body {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                        }
+                        .print-page {
+                            page-break-after: always !important;
+                            break-after: page !important;
+                            page-break-inside: avoid !important;
+                            break-inside: avoid !important;
+                        }
+                        .print-page:last-child {
+                            page-break-after: auto !important;
+                            break-after: auto !important;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                ${renderedPages}
+            </body>
+            </html>
+        `;
+
+        // Chỉ mở 1 Cửa sổ in máy in trực tiếp (Cửa sổ 1) bằng Iframe ẩn ngầm
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
         iframe.style.right = '0';
@@ -51,146 +190,10 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         iframe.style.zIndex = '-1';
         document.body.appendChild(iframe);
 
-        const renderedPages = pages.map(pageContent => `
-            <div class="print-page">
-                ${pageContent}
-            </div>
-        `).join('\n');
-
         const doc = iframe.contentWindow?.document;
         if (doc) {
             doc.open();
-            doc.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8" />
-                    <title>${title}</title>
-                    <style>
-                        @page { 
-                            size: A4 portrait; 
-                            margin: 10mm 15mm 10mm 15mm; 
-                        }
-                        * {
-                            box-sizing: border-box !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                        }
-                        html, body { 
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            background: #fff !important;
-                            font-family: 'Times New Roman', Times, serif !important; 
-                            font-size: 14px !important;
-                            line-height: 1.35 !important;
-                            color: #000 !important;
-                            height: auto !important;
-                            min-height: auto !important;
-                            overflow: visible !important;
-                        }
-                        .print-page {
-                            display: block !important;
-                            width: 100% !important;
-                            max-width: 100% !important;
-                            margin: 0 auto !important;
-                            padding: 0 !important;
-                            background: #fff !important;
-                            color: #000 !important;
-                            font-family: 'Times New Roman', Times, serif !important;
-                            font-size: 14px !important;
-                            line-height: 1.35 !important;
-                            box-sizing: border-box !important;
-                            clear: both !important;
-                            position: relative !important;
-                            page-break-after: always !important;
-                            break-after: page !important;
-                            page-break-inside: avoid !important;
-                            break-inside: avoid !important;
-                        }
-                        .print-page:last-child {
-                            page-break-after: auto !important;
-                            break-after: auto !important;
-                        }
-                        .avoid-break { 
-                            page-break-inside: avoid !important; 
-                            break-inside: avoid !important;
-                        }
-                        .flex { display: flex !important; }
-                        .flex-col { flex-direction: column !important; }
-                        .justify-between { justify-content: space-between !important; }
-                        .items-center { align-items: center !important; }
-                        .items-end { align-items: flex-end !important; }
-                        .text-center { text-align: center !important; }
-                        .text-left { text-align: left !important; }
-                        .text-right { text-align: right !important; }
-                        .font-bold { font-weight: bold !important; }
-                        .italic { font-style: italic !important; }
-                        .underline { text-decoration: underline !important; }
-                        .uppercase { text-transform: uppercase !important; }
-                        .whitespace-nowrap { white-space: nowrap !important; }
-                        .w-full { width: 100% !important; }
-                        .w-half, .w-1\\/2 { width: 50% !important; }
-                        .w-12 { width: 48px !important; }
-                        .w-20 { width: 80px !important; }
-                        .w-24 { width: 96px !important; }
-                        .mb-1 { margin-bottom: 4px !important; }
-                        .mb-2 { margin-bottom: 8px !important; }
-                        .mb-4 { margin-bottom: 14px !important; }
-                        .mt-1 { margin-top: 4px !important; }
-                        .mt-2 { margin-top: 8px !important; }
-                        .mt-4 { margin-top: 14px !important; }
-                        .mt-6 { margin-top: 18px !important; }
-                        .mt-8 { margin-top: 24px !important; }
-                        .text-sm { font-size: 12px !important; }
-                        .text-gray-500 { color: #555 !important; }
-                        .border-t { border-top: 1px solid #777 !important; }
-                        .border-gray-400 { border-color: #777 !important; }
-                        .pt-4 { padding-top: 12px !important; }
-                        table { 
-                            width: 100% !important; 
-                            border-collapse: collapse !important; 
-                            margin-top: 6px !important; 
-                            margin-bottom: 8px !important; 
-                        }
-                        th, td { 
-                            border: 1px solid #000 !important; 
-                            padding: 4px 6px !important; 
-                            font-size: 13.5px !important;
-                        }
-                        th { 
-                            text-align: center !important; 
-                            font-weight: bold !important; 
-                        }
-                        .receipt-line {
-                            margin-bottom: 5px !important;
-                            font-size: 14px !important;
-                            line-height: 1.35 !important;
-                        }
-                        @media print {
-                            html, body {
-                                margin: 0 !important;
-                                padding: 0 !important;
-                                height: auto !important;
-                                overflow: visible !important;
-                            }
-                            .print-page {
-                                page-break-after: always !important;
-                                break-after: page !important;
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                            }
-                            .print-page:last-child {
-                                page-break-after: auto !important;
-                                break-after: auto !important;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${renderedPages}
-                </body>
-                </html>
-            `);
+            doc.write(htmlDocument);
             doc.close();
 
             iframe.contentWindow?.focus();
@@ -201,7 +204,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                         document.body.removeChild(iframe);
                     }
                 }, 1000);
-            }, 500);
+            }, 300);
         }
     };
 
