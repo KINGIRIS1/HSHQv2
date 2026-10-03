@@ -1230,9 +1230,9 @@ export const checkRecordCodeExistsInDb = async (code: string, excludeId?: string
         const clean = code.trim();
         if (!clean || clean.toUpperCase() === 'HS' || clean === '--') return false;
 
-        let qLand = supabase.from('land_records').select('id').ilike('code', clean);
-        let qDangky = supabase.from('dangky_records').select('id').ilike('code', clean);
-        let qLuutru = supabase.from('luutru_records').select('id').ilike('code', clean);
+        let qLand = supabase.from('land_records').select('id, code').ilike('code', clean);
+        let qDangky = supabase.from('dangky_records').select('id, code').ilike('code', clean);
+        let qLuutru = supabase.from('luutru_records').select('id, code').ilike('code', clean);
 
         if (excludeId) {
             qLand = qLand.neq('id', excludeId);
@@ -1241,11 +1241,14 @@ export const checkRecordCodeExistsInDb = async (code: string, excludeId?: string
         }
 
         const [r1, r2, r3] = await Promise.all([
-            qLand.limit(1),
-            qDangky.limit(1),
-            qLuutru.limit(1)
+            qLand.limit(5),
+            qDangky.limit(5),
+            qLuutru.limit(5)
         ]);
-        if ((r1.data && r1.data.length > 0) || (r2.data && r2.data.length > 0) || (r3.data && r3.data.length > 0)) {
+
+        const allRows = [...(r1.data || []), ...(r2.data || []), ...(r3.data || [])];
+        const realDuplicates = allRows.filter(r => !excludeId || r.id !== excludeId);
+        if (realDuplicates.length > 0) {
             return true;
         }
     } catch (e) {

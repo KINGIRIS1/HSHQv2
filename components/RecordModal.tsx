@@ -270,11 +270,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     const codeToTest = (formData.code || '').trim().toLowerCase();
     if (!codeToTest || codeToTest === 'hs') return null;
     if (!records || records.length === 0) return null;
+    const currentId = initialData?.id || formData.id;
     return records.find(r => {
-      if (initialData?.id && r.id === initialData.id) return false;
+      if (currentId && r.id === currentId) return false;
       return (r.code || '').trim().toLowerCase() === codeToTest;
     }) || null;
-  }, [formData.code, records, initialData]);
+  }, [formData.code, records, initialData, formData.id]);
 
   const isArchiveView = [
     "archive_records",
@@ -587,14 +588,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     }
 
     const finalCode = (formData.code || 'HS').trim();
+    const currentRecordId = initialData?.id || formData.id;
+    const isCodeUnchanged = isEdit && initialData?.code && finalCode.toLowerCase() === initialData.code.trim().toLowerCase();
 
     if (duplicateRecord) {
       alert(`⚠️ LỖI TRÙNG MÃ HỒ SƠ:\n\nMã "${finalCode}" đã tồn tại trên hệ thống cho hồ sơ:\n• Chủ sử dụng: ${duplicateRecord.customerName || 'Chưa tên'}\n• Địa chỉ: ${duplicateRecord.customerAddress || 'Không địa chỉ'}\n• Người tiếp nhận: ${duplicateRecord.receivedBy || '---'}\n\nVui lòng thay đổi mã khác trước khi lưu!`);
       return;
     }
 
-    if (finalCode && finalCode.toUpperCase() !== 'HS' && finalCode !== '--') {
-      const isDbDup = await checkRecordCodeExistsInDb(finalCode, initialData?.id);
+    if (!isCodeUnchanged && finalCode && finalCode.toUpperCase() !== 'HS' && finalCode !== '--') {
+      const isDbDup = await checkRecordCodeExistsInDb(finalCode, currentRecordId);
       if (isDbDup) {
         alert(`⚠️ LỖI TRÙNG MÃ HỒ SƠ:\n\nMã "${finalCode}" đã tồn tại trên cơ sở dữ liệu đám mây.\n\nVui lòng thay đổi mã khác trước khi lưu!`);
         return;

@@ -121,25 +121,55 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
         status = row.status as RecordStatus;
     }
 
-    const batchVal = row.exportBatch || row.export_batch || row.data?.exportBatch || row.data?.danh_sach || null;
+    const rawData = typeof row.data === 'string' ? (() => { try { return JSON.parse(row.data); } catch { return {}; } })() : (row.data || {});
+    const batchVal = row.exportBatch || row.export_batch || rawData?.exportBatch || rawData?.danh_sach || null;
+
+    // Resolve Code (Prefer standard code / so_hieu / receiptNumber over raw UUID)
+    let resolvedCode = row.code || row.so_hieu || rawData.code || rawData.so_hieu || rawData.ma_ho_so || rawData.so_bien_nhan || rawData.receiptNumber || '';
+    if (!resolvedCode || (resolvedCode.length > 25 && resolvedCode.includes('-'))) {
+        if (row.so_hieu && !row.so_hieu.includes('-')) resolvedCode = row.so_hieu;
+        else if (rawData.so_hieu && !rawData.so_hieu.includes('-')) resolvedCode = rawData.so_hieu;
+        else if (rawData.so_bien_nhan) resolvedCode = rawData.so_bien_nhan;
+        else if (rawData.ma_ho_so) resolvedCode = rawData.ma_ho_so;
+        else if (rawData.code && !rawData.code.includes('-')) resolvedCode = rawData.code;
+        else if (row.receiptNumber || rawData.receiptNumber) resolvedCode = row.receiptNumber || rawData.receiptNumber;
+        else if (row.code && !row.code.includes('-')) resolvedCode = row.code;
+        else resolvedCode = row.code || row.so_hieu || row.id;
+    }
+
+    // Resolve Customer Name / Agency
+    let resolvedCustomerName = row.customerName || row.noi_nhan_gui || rawData.customerName || rawData.noi_nhan_gui || rawData.ten_chu_su_dung || rawData.chu_su_dung || rawData.nguoi_gui || rawData.ho_ten || rawData.ten_khach_hang || rawData.ten_to_chuc_ca_nhan || rawData.receiverName || row.receiverName || '';
+    if (!resolvedCustomerName || resolvedCustomerName === 'Chưa có tên' || resolvedCustomerName === 'Chua co ten') {
+        if (rawData.customerName && rawData.customerName !== 'Chưa có tên' && rawData.customerName !== 'Chua co ten') resolvedCustomerName = rawData.customerName;
+        else if (rawData.noi_nhan_gui) resolvedCustomerName = rawData.noi_nhan_gui;
+        else if (rawData.ten_chu_su_dung) resolvedCustomerName = rawData.ten_chu_su_dung;
+        else if (rawData.chu_su_dung) resolvedCustomerName = rawData.chu_su_dung;
+        else if (rawData.ho_ten) resolvedCustomerName = rawData.ho_ten;
+        else if (rawData.ten_khach_hang) resolvedCustomerName = rawData.ten_khach_hang;
+        else if (row.noi_nhan_gui) resolvedCustomerName = row.noi_nhan_gui;
+        else if (rawData.nguoi_gui) resolvedCustomerName = rawData.nguoi_gui;
+        else if (row.receiverName) resolvedCustomerName = row.receiverName;
+        else if (rawData.receiverName) resolvedCustomerName = rawData.receiverName;
+        else resolvedCustomerName = row.customerName || row.noi_nhan_gui || '';
+    }
 
     return {
         id: row.id,
-        code: row.code || row.so_hieu || row.id,
-        customerName: row.customerName || row.noi_nhan_gui || 'Chưa có tên',
-        phoneNumber: row.phoneNumber || null,
-        cccd: row.cccd || null,
-        customerAddress: row.customerAddress || null,
-        ward: row.ward || null,
-        landPlot: row.landPlot || null,
-        mapSheet: row.mapSheet || null,
-        area: row.area || null,
-        address: row.address || null,
-        group: row.group || null,
-        content: row.content || row.trich_yeu || null,
-        recordType: row.recordType || '1.1 Cung cấp dữ liệu đất đai',
-        receivedDate: row.receivedDate || row.ngay_thang || (row.created_at ? row.created_at.split('T')[0] : null),
-        receivedBy: row.receivedBy || row.created_by || null,
+        code: resolvedCode || row.id,
+        customerName: resolvedCustomerName,
+        phoneNumber: row.phoneNumber || rawData.phoneNumber || null,
+        cccd: row.cccd || rawData.cccd || null,
+        customerAddress: row.customerAddress || rawData.customerAddress || null,
+        ward: row.ward || rawData.ward || rawData.xa_phuong || null,
+        landPlot: row.landPlot || rawData.landPlot || rawData.thua_dat || null,
+        mapSheet: row.mapSheet || rawData.mapSheet || rawData.to_ban_do || null,
+        area: row.area || rawData.area || null,
+        address: row.address || rawData.address || null,
+        group: row.group || rawData.group || null,
+        content: row.content || row.trich_yeu || rawData.content || rawData.trich_yeu || null,
+        recordType: row.recordType || rawData.recordType || '1.1 Cung cấp dữ liệu đất đai',
+        receivedDate: row.receivedDate || row.ngay_thang || rawData.receivedDate || rawData.ngay_thang || (row.created_at ? row.created_at.split('T')[0] : null),
+        receivedBy: row.receivedBy || row.created_by || rawData.receivedBy || null,
         deadline: row.deadline || null,
         assignedDate: row.assignedDate || null,
         assignedTo: row.assignedTo || null,
@@ -538,18 +568,36 @@ export const migrateArchiveRecordsFromLandRecords = async (forceManualRun: boole
     }
 };
 
+export const isValidArchiveCustomerName = (name?: string | null): boolean => {
+    if (!name) return false;
+    const clean = String(name).trim().toLowerCase();
+    return clean !== '' && 
+           clean !== 'chưa có tên' && 
+           clean !== 'chua co ten' && 
+           clean !== 'chưa có' && 
+           clean !== 'chua co' && 
+           clean !== 'null' && 
+           clean !== 'undefined' && 
+           clean !== '-' && 
+           clean !== 'chưa cập nhật' && 
+           clean !== 'chua cap nhat' && 
+           clean !== 'n/a' && 
+           clean !== 'na';
+};
+
 // Giữ alias tương thích
 export const migrateCungCapTaiLieu = migrateArchiveRecordsFromLandRecords;
 
 export const getCachedArchiveRecords = async (): Promise<RecordFile[]> => {
     if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
-        return memoryArchiveRecordsCache;
+        return memoryArchiveRecordsCache.filter(r => isValidArchiveCustomerName(r.customerName));
     }
     try {
         const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
         if (Array.isArray(idb) && idb.length > 0) {
-            memoryArchiveRecordsCache = idb;
-            return idb;
+            const filtered = idb.filter(r => isValidArchiveCustomerName(r.customerName));
+            memoryArchiveRecordsCache = filtered;
+            return filtered;
         }
     } catch {
         // ignore
@@ -675,7 +723,7 @@ export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[
                     }
                 });
 
-                const result = Array.from(uniqueMap.values());
+                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveCustomerName(r.customerName));
                 memoryArchiveRecordsCache = result;
                 setIndexedDBItem(CACHE_KEY_LUUTRU_RECORDS, result).catch(() => {});
                 return result;
@@ -683,26 +731,28 @@ export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[
 
             // Nếu kết nối lỗi hoặc không tải được dữ liệu, an toàn fallback về bộ nhớ đệm / IndexedDB (KHÔNG ghi đè rỗng)
             if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
-                return memoryArchiveRecordsCache;
+                return memoryArchiveRecordsCache.filter(r => isValidArchiveCustomerName(r.customerName));
             }
 
             const idbFallback = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
             if (Array.isArray(idbFallback) && idbFallback.length > 0) {
-                memoryArchiveRecordsCache = idbFallback;
-                return idbFallback;
+                const filtered = idbFallback.filter(r => isValidArchiveCustomerName(r.customerName));
+                memoryArchiveRecordsCache = filtered;
+                return filtered;
             }
 
             return [];
         } catch (error: any) {
             logError('fetchAllArchiveRecordsAsRecordFiles', error, true);
             if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
-                return memoryArchiveRecordsCache;
+                return memoryArchiveRecordsCache.filter(r => isValidArchiveCustomerName(r.customerName));
             }
             try {
                 const idbFallback = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
                 if (Array.isArray(idbFallback) && idbFallback.length > 0) {
-                    memoryArchiveRecordsCache = idbFallback;
-                    return idbFallback;
+                    const filtered = idbFallback.filter(r => isValidArchiveCustomerName(r.customerName));
+                    memoryArchiveRecordsCache = filtered;
+                    return filtered;
                 }
             } catch {}
             return [];
@@ -725,10 +775,10 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
     const promise = (async () => {
         if (!isConfigured) {
             const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
-            if (cached.length > 0) return cached.filter(r => r.type === type);
+            if (cached.length > 0) return cached.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
             const legacyCached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
             if (MOCK_ARCHIVE.length === 0 && legacyCached.length > 0) MOCK_ARCHIVE = legacyCached;
-            return MOCK_ARCHIVE.filter(r => r.type === type);
+            return MOCK_ARCHIVE.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
         }
         try {
             // Khi lấy dữ liệu Vào sổ GCN: chỉ truy vấn duy nhất từ bảng dangky_records, tuyệt đối không lấy từ luutru_records
@@ -771,7 +821,7 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                         uniqueMap.set(key, r);
                     }
                 });
-                const result = Array.from(uniqueMap.values());
+                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
                 saveToCache(cacheKey, result);
                 memoryArchiveTypeCaches.set(type, result);
                 return result;
@@ -810,7 +860,7 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                         uniqueMap.set(key, r);
                     }
                 });
-                const result = Array.from(uniqueMap.values());
+                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
 
                 // Lưu vào cache riêng độc lập theo từng loại hồ sơ (không đè lẫn nhau)
                 saveToCache(cacheKey, result);
@@ -821,13 +871,14 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             // Fallback an toàn về cache riêng cũ (không ghi đè rỗng)
             const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
             if (cached.length > 0) {
-                memoryArchiveTypeCaches.set(type, cached);
-                return cached.filter(r => r.type === type);
+                const filtered = cached.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+                memoryArchiveTypeCaches.set(type, filtered);
+                return filtered;
             }
             const legacyCached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-            if (legacyCached.length > 0) return legacyCached.filter(r => r.type === type);
+            if (legacyCached.length > 0) return legacyCached.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
             if (MOCK_ARCHIVE.length === 0 && legacyCached.length > 0) MOCK_ARCHIVE = legacyCached;
-            return MOCK_ARCHIVE.filter(r => r.type === type);
+            return MOCK_ARCHIVE.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
         } catch (error: any) {
             logError(`fetchArchiveRecords-${type}`, error, true);
             const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);

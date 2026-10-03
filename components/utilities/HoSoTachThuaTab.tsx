@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User as UserType, RecordFile, NotifyFunction } from '../../types';
 import { fetchRecords } from '../../services/apiRecords';
 import { TachThuaRecord, fetchTachThuaRecords, saveTachThuaRecord, deleteTachThuaRecord } from '../../services/apiUtilities';
-import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, Layers, CheckSquare, Square, ArrowRight, FolderCheck, RotateCcw, AlertTriangle, CheckCircle2, X, Grid } from 'lucide-react';
+import { Search, Plus, Save, List, Edit, Trash2, FileSpreadsheet, Layers, CheckSquare, Square, ArrowRight, FolderCheck, RotateCcw, AlertTriangle, CheckCircle2, X, Grid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import * as XLSX from 'xlsx-js-style';
 
@@ -68,7 +68,11 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
     const [records, setRecords] = useState<RecordFile[]>([]);
     const [savedList, setSavedList] = useState<TachThuaRecord[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
+    // Thay đổi: Quản lý từ khóa tìm kiếm riêng cho từng tab
+    const [searchTerms, setSearchTerms] = useState<{ pending: string; sent: string }>({
+        pending: '',
+        sent: ''
+    });
     
     // Selection State
     const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
@@ -89,7 +93,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
     // Reset selection khi đổi tab danh sách và xóa tìm kiếm
     useEffect(() => {
         setSelectedGroups(new Set());
-        setSearchTerm('');
+        setSearchTerms({ pending: '', sent: '' });
     }, [listTab]);
 
     const loadData = async () => {
@@ -100,6 +104,9 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         setRecords(appRecords);
         setSavedList(utilityRecords);
     };
+
+    const pendingCount = useMemo(() => savedList.filter(i => (i.data.STATUS || 'pending') === 'pending').length, [savedList]);
+    const sentCount = useMemo(() => savedList.filter(i => i.data.STATUS === 'sent').length, [savedList]);
 
     // --- LOGIC FORM ---
     const handleAddDetailRow = () => {
@@ -401,12 +408,12 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             const status = item.data.STATUS || 'pending';
             return status === listTab;
         });
-        if (searchTerm) {
-            const lower = searchTerm.toLowerCase();
+        const currentSearch = (searchTerms[listTab] || '').toLowerCase().trim();
+        if (currentSearch) {
             list = list.filter(item => 
-                (item.customer_name || '').toLowerCase().includes(lower) ||
-                (item.data.XA || '').toLowerCase().includes(lower) ||
-                (item.data.SO_HD || '').toLowerCase().includes(lower)
+                (item.customer_name || '').toLowerCase().includes(currentSearch) ||
+                (item.data.XA || '').toLowerCase().includes(currentSearch) ||
+                (item.data.SO_HD || '').toLowerCase().includes(currentSearch)
             );
         }
         list.sort((a, b) => {
@@ -418,31 +425,64 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
             return hdA.localeCompare(hdB);
         });
         return list;
-    }, [savedList, searchTerm, listTab]);
+    }, [savedList, searchTerms, listTab]);
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+
+    // Reset pagination on tab/search change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [listTab, searchTerms]);
+
+    const uniqueGroupKeys = useMemo(() => {
+        const keys: string[] = [];
+        groupedList.forEach(item => {
+            const key = item.data.SO_HD || item.id;
+            if (!keys.includes(key)) {
+                keys.push(key);
+            }
+        });
+        return keys;
+    }, [groupedList]);
+
+    const totalPages = Math.max(1, Math.ceil(uniqueGroupKeys.length / itemsPerPage));
+
+    const paginatedGroupedList = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const pageKeys = new Set(uniqueGroupKeys.slice(startIndex, startIndex + itemsPerPage));
+        return groupedList.filter(item => {
+            const key = item.data.SO_HD || item.id;
+            return pageKeys.has(key);
+        });
+    }, [groupedList, uniqueGroupKeys, currentPage, itemsPerPage]);
 
     const getRowSpan = (index: number, field: string) => {
-        const current = groupedList[index];
-        const prev = groupedList[index - 1];
+        const current = paginatedGroupedList[index];
+        const prev = paginatedGroupedList[index - 1];
         if (!current.data.SO_HD) return 1;
         if (prev && prev.data.SO_HD === current.data.SO_HD) return 0; 
         let count = 1;
-        for (let i = index + 1; i < groupedList.length; i++) {
-            if (groupedList[i].data.SO_HD === current.data.SO_HD) count++; else break;
+        for (let i = index + 1; i < paginatedGroupedList.length; i++) {
+            if (paginatedGroupedList[i].data.SO_HD === current.data.SO_HD) count++; else break;
         }
         return count;
     };
     
     const getGroupSTT = (index: number) => {
-        const current = groupedList[index];
-        if (!current.data.SO_HD) return index + 1;
-        let firstIdx = index;
-        while(firstIdx > 0 && groupedList[firstIdx - 1].data.SO_HD === current.data.SO_HD) firstIdx--;
+        const current = paginatedGroupedList[index];
+        if (!current.data.SO_HD) return (currentPage - 1) * itemsPerPage + index + 1;
+
+        const currentInGrouped = groupedList.findIndex(g => g.id === current.id);
+        let firstIdx = currentInGrouped !== -1 ? currentInGrouped : index;
+        while(firstIdx > 0 && groupedList[firstIdx - 1]?.data.SO_HD === current.data.SO_HD) firstIdx--;
         let groupCount = 0;
         let i = 0;
         while (i < firstIdx) {
             groupCount++;
-            const hd = groupedList[i].data.SO_HD;
-            if (hd) { while (i < firstIdx && groupedList[i].data.SO_HD === hd) i++; } else i++;
+            const hd = groupedList[i]?.data.SO_HD;
+            if (hd) { while (i < firstIdx && groupedList[i]?.data.SO_HD === hd) i++; } else i++;
         }
         return groupCount + 1;
     }
@@ -638,14 +678,106 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
     return (
         <div className="flex flex-col h-full bg-[#f1f5f9]">
-            {/* SUB-HEADER TABS */}
-            <div className="flex items-center gap-2 px-4 pt-2 border-b border-gray-200 bg-white shadow-sm shrink-0 z-20">
-                <button onClick={() => { setMode('create'); handleReset(); }} className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'create' ? 'border-orange-600 text-orange-600 bg-orange-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    <Plus size={16} /> Nhập liệu
-                </button>
-                <button onClick={() => setMode('list')} className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors ${mode === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    <List size={16} /> Danh sách
-                </button>
+            {/* SUB-HEADER TABS & TOOLBAR - SINGLE UNIFIED ROW */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-gray-200 bg-white shadow-sm shrink-0 z-20">
+                {/* Left: 3 Direct Mode Tabs */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <button 
+                        onClick={() => { setMode('create'); handleReset(); }} 
+                        className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+                            mode === 'create' 
+                                ? 'border-orange-600 text-orange-600 bg-orange-50/50 rounded-t' 
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        <Plus size={16} /> Nhập liệu
+                    </button>
+                    <button 
+                        onClick={() => { setMode('list'); setListTab('pending'); }} 
+                        className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+                            mode === 'list' && listTab === 'pending' 
+                                ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t' 
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        <List size={16} /> Chờ lập danh sách
+                        {pendingCount > 0 && (
+                            <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded-full text-[11px] font-bold">
+                                {pendingCount}
+                            </span>
+                        )}
+                    </button>
+                    <button 
+                        onClick={() => { setMode('list'); setListTab('sent'); }} 
+                        className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+                            mode === 'list' && listTab === 'sent' 
+                                ? 'border-green-600 text-green-600 bg-green-50/50 rounded-t' 
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        <FolderCheck size={16} /> Đã chuyển tách thửa
+                        {sentCount > 0 && (
+                            <span className="px-1.5 py-0.2 bg-green-100 text-green-800 rounded-full text-[11px] font-bold">
+                                {sentCount}
+                            </span>
+                        )}
+                    </button>
+                </div>
+
+                {/* Right: Action Button -> Search Bar -> Excel Button (When in List Mode) */}
+                {mode === 'list' && (
+                    <div className="flex items-center gap-2 ml-auto flex-wrap">
+                        {/* TRANSFER BUTTON */}
+                        {listTab === 'pending' && selectedGroups.size > 0 && (
+                            <button 
+                                onClick={() => handleChangeStatus('sent')} 
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-bold hover:bg-blue-700 shadow-sm animate-pulse transition-all active:scale-95 cursor-pointer"
+                            >
+                                <ArrowRight size={15} /> Lập danh sách ({selectedGroups.size})
+                            </button>
+                        )}
+
+                        {/* REVERT BUTTON */}
+                        {listTab === 'sent' && selectedGroups.size > 0 && (
+                            <button 
+                                onClick={() => handleChangeStatus('pending')} 
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-600 text-white rounded-lg text-xs sm:text-sm font-bold hover:bg-orange-700 shadow-sm transition-all active:scale-95 cursor-pointer"
+                            >
+                                <RotateCcw size={15} /> Trả lại danh sách ({selectedGroups.size})
+                            </button>
+                        )}
+
+                        {/* Standard Search Bar */}
+                        <div className="relative w-64 sm:w-72 md:w-80">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input 
+                                className="w-full pl-9 pr-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white shadow-2xs" 
+                                placeholder="Tìm kiếm mã HĐ, xã..." 
+                                value={searchTerms[listTab]}
+                                onChange={e => setSearchTerms(prev => ({ ...prev, [listTab]: e.target.value }))}
+                            />
+                        </div>
+
+                        {/* Excel Export Button */}
+                        <button 
+                            onClick={handleExportExcel} 
+                            className={`relative flex items-center justify-center p-2 rounded-lg shadow-xs transition-all active:scale-95 shrink-0 border ${
+                                selectedGroups.size > 0 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-400 hover:bg-emerald-100' 
+                                    : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                            }`}
+                            title={selectedGroups.size > 0 ? `Xuất Excel ${selectedGroups.size} hồ sơ đã chọn` : "Xuất file Excel"}
+                            aria-label="Xuất file Excel"
+                        >
+                            <FileSpreadsheet size={18} className="text-emerald-600" />
+                            {selectedGroups.size > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                    {selectedGroups.size}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-hidden p-4">
@@ -836,76 +968,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                     </div>
                 ) : (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
-                        {/* LIST SUB-NAVIGATION */}
-                        <div className="flex border-b border-gray-200 bg-gray-50 px-4">
-                            <button 
-                                onClick={() => setListTab('pending')}
-                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${listTab === 'pending' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                            >
-                                <List size={16} /> Chờ lập danh sách
-                            </button>
-                            <button 
-                                onClick={() => setListTab('sent')}
-                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${listTab === 'sent' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                            >
-                                <FolderCheck size={16} /> Đã chuyển tách thửa
-                            </button>
-                        </div>
-
-                        {/* List Toolbar */}
-                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white">
-                            <div className="relative w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                <input 
-                                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none" 
-                                    placeholder="Tìm kiếm..." 
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                                {/* TRANSFER BUTTON */}
-                                {listTab === 'pending' && selectedGroups.size > 0 && (
-                                    <button 
-                                        onClick={() => handleChangeStatus('sent')} 
-                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm animate-pulse"
-                                    >
-                                        <ArrowRight size={16} /> Lập danh sách ({selectedGroups.size})
-                                    </button>
-                                )}
-
-                                {/* REVERT BUTTON */}
-                                {listTab === 'sent' && selectedGroups.size > 0 && (
-                                    <button 
-                                        onClick={() => handleChangeStatus('pending')} 
-                                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-bold hover:bg-orange-700 shadow-sm"
-                                    >
-                                        <RotateCcw size={16} /> Trả lại danh sách ({selectedGroups.size})
-                                    </button>
-                                )}
-
-                                <button 
-                                    onClick={handleExportExcel} 
-                                    className={`relative flex items-center justify-center p-2 rounded-lg shadow-xs transition-all active:scale-95 shrink-0 border ${
-                                        selectedGroups.size > 0 
-                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-400 hover:bg-emerald-100' 
-                                            : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
-                                    }`}
-                                    title={selectedGroups.size > 0 ? `Xuất Excel ${selectedGroups.size} hồ sơ đã chọn` : "Xuất file Excel"}
-                                    aria-label="Xuất file Excel"
-                                >
-                                    <FileSpreadsheet size={18} className="text-emerald-600" />
-                                    {selectedGroups.size > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
-                                            {selectedGroups.size}
-                                        </span>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-auto">
+                        <div className="flex-1 overflow-auto min-h-0">
                             <table className="w-full text-left border-collapse text-sm">
                                 <thead className="bg-gray-100 text-gray-600 font-bold sticky top-0 shadow-sm z-10 text-xs uppercase">
                                     <tr>
@@ -932,7 +995,7 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {groupedList.length > 0 ? groupedList.map((item, idx) => {
+                                    {paginatedGroupedList.length > 0 ? paginatedGroupedList.map((item, idx) => {
                                         // Logic Merge Rows
                                         const rowSpan = getRowSpan(idx, 'SO_HD');
                                         const shouldRenderCommon = rowSpan > 0;
@@ -1025,6 +1088,54 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* STANDARDIZED PAGINATION FOOTER */}
+                        {uniqueGroupKeys.length > 0 && (
+                            <div className="p-3 border-t border-gray-200 bg-white flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0 text-xs">
+                                <span className="text-gray-500">
+                                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, uniqueGroupKeys.length)}</strong> trên tổng <strong>{uniqueGroupKeys.length}</strong> nhóm hồ sơ ({groupedList.length} dòng)
+                                </span>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-1.5 text-gray-500">
+                                        <span>Số dòng:</span>
+                                        <select
+                                            value={itemsPerPage}
+                                            onChange={(e) => {
+                                                setItemsPerPage(Number(e.target.value));
+                                                setCurrentPage(1);
+                                            }}
+                                            className="border border-gray-300 rounded px-2 py-1 bg-white text-xs outline-none focus:ring-1 focus:ring-blue-500 font-bold cursor-pointer"
+                                        >
+                                            <option value={10}>10</option>
+                                            <option value={20}>20</option>
+                                            <option value={50}>50</option>
+                                            <option value={100}>100</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                            disabled={currentPage === 1}
+                                            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer text-gray-600"
+                                            title="Trang trước"
+                                        >
+                                            <ChevronLeft size={18} />
+                                        </button>
+                                        <span className="font-medium mx-2 text-gray-700">
+                                            Trang {currentPage} / {totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer text-gray-600"
+                                            title="Trang sau"
+                                        >
+                                            <ChevronRight size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

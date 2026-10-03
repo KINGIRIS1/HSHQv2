@@ -11,9 +11,20 @@ const BarcodeGeneratorView: React.FC = () => {
     const handlePrint = () => {
         if (!barcodeRef.current) return;
         
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(`
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.zIndex = '-1';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow?.document;
+        if (doc) {
+            doc.open();
+            doc.write(`
                 <html>
                     <head>
                         <title>In Mã Vạch - ${receiptNumber}</title>
@@ -34,16 +45,20 @@ const BarcodeGeneratorView: React.FC = () => {
                         <div class="print-container">
                             ${barcodeRef.current.innerHTML}
                         </div>
-                        <script>
-                            window.onload = () => {
-                                window.print();
-                                setTimeout(() => window.close(), 500);
-                            };
-                        </script>
                     </body>
                 </html>
             `);
-            printWindow.document.close();
+            doc.close();
+
+            iframe.contentWindow?.focus();
+            setTimeout(() => {
+                iframe.contentWindow?.print();
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            }, 500);
         }
     };
 

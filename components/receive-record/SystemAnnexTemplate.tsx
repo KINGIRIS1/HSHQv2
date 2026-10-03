@@ -93,9 +93,20 @@ const SystemAnnexTemplate: React.FC<SystemAnnexTemplateProps> = ({ data, employe
     const [clause2, setClause2] = useState<string>('');
 
     const printHtml = (htmlContent: string, title: string) => {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(`
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.zIndex = '-1';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow?.document;
+        if (doc) {
+            doc.open();
+            doc.write(`
                 <html>
                 <head>
                     <title>${title}</title>
@@ -160,12 +171,17 @@ const SystemAnnexTemplate: React.FC<SystemAnnexTemplateProps> = ({ data, employe
                 </body>
                 </html>
             `);
-            printWindow.document.close();
-            printWindow.focus();
+            doc.close();
+
+            iframe.contentWindow?.focus();
             setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 1000);
+                iframe.contentWindow?.print();
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            }, 500);
         }
     };
 

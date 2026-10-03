@@ -369,19 +369,24 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 records || []
             );
         } else {
-            // Quét kiểm tra trùng mã hồ sơ trên hệ thống local và DB
-            const isLocalDup = (records || []).some(r => {
-                if (initialData?.id && r.id === initialData.id) return false;
-                return (r.code || '').trim().toLowerCase() === finalCode.toLowerCase();
-            });
-            const isDbDup = await checkRecordCodeExistsInDb(finalCode, initialData?.id);
-            if (isLocalDup || isDbDup) {
-                setLoading(false);
-                setNotification({
-                    type: 'error',
-                    message: `Mã hồ sơ "${finalCode}" đã tồn tại trên hệ thống. Vui lòng kiểm tra lại!`
+            const currentRecordId = initialData?.id || formData.id;
+            const isCodeUnchanged = !!initialData?.code && finalCode.toLowerCase() === initialData.code.trim().toLowerCase();
+
+            if (!isCodeUnchanged) {
+                // Quét kiểm tra trùng mã hồ sơ trên hệ thống local và DB chỉ khi đổi mã
+                const isLocalDup = (records || []).some(r => {
+                    if (currentRecordId && r.id === currentRecordId) return false;
+                    return (r.code || '').trim().toLowerCase() === finalCode.toLowerCase();
                 });
-                return;
+                const isDbDup = await checkRecordCodeExistsInDb(finalCode, currentRecordId);
+                if (isLocalDup || isDbDup) {
+                    setLoading(false);
+                    setNotification({
+                        type: 'error',
+                        message: `Mã hồ sơ "${finalCode}" đã tồn tại trên hệ thống. Vui lòng kiểm tra lại!`
+                    });
+                    return;
+                }
             }
         }
     }

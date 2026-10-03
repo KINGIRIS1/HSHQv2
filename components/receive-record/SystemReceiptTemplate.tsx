@@ -41,16 +41,26 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     }, [data?.code]);
 
     const printPages = (pages: string[], title: string) => {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            const renderedPages = pages.map(pageContent => `
-                <div class="print-page">
-                    ${pageContent}
-                </div>
-            `).join('\n');
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.zIndex = '-1';
+        document.body.appendChild(iframe);
 
-            printWindow.document.open();
-            printWindow.document.write(`
+        const renderedPages = pages.map(pageContent => `
+            <div class="print-page">
+                ${pageContent}
+            </div>
+        `).join('\n');
+
+        const doc = iframe.contentWindow?.document;
+        if (doc) {
+            doc.open();
+            doc.write(`
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -181,12 +191,17 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                 </body>
                 </html>
             `);
-            printWindow.document.close();
-            printWindow.focus();
+            doc.close();
+
+            iframe.contentWindow?.focus();
             setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 600);
+                iframe.contentWindow?.print();
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            }, 500);
         }
     };
 

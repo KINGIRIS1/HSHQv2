@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { User as UserType, NotifyFunction } from '../../types';
 import saveAs from 'file-saver';
-import { Settings, List, PlusCircle, Save, Printer, FileText } from 'lucide-react';
+import { Settings, List, PlusCircle, Save, Printer, FileText, Search, Filter, Calendar, FileSpreadsheet, X } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
 import VPHCForm from './vphc-tab/VPHCForm';
 import VPHCPreview from './vphc-tab/VPHCPreview';
 import VPHCList from './vphc-tab/VPHCList';
@@ -57,6 +58,114 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
     const [isConfigOpen, setIsConfigOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [exportedFilePath, setExportedFilePath] = useState<string | null>(null);
+
+    // Filter States for List View
+    const [searchTerm, setSearchTerm] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const filterPopoverRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterPopoverRef.current && !filterPopoverRef.current.contains(event.target as Node)) {
+                setIsFilterOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const activeFilterCount = (fromDate ? 1 : 0) + (toDate ? 1 : 0);
+
+    const handleQuickDate = (range: 'today' | 'week' | 'month' | 'all') => {
+        const today = new Date();
+        const toStr = (d: Date) => d.toISOString().split('T')[0];
+        
+        if (range === 'today') {
+            const str = toStr(today);
+            setFromDate(str);
+            setToDate(str);
+        } else if (range === 'week') {
+            const firstDay = new Date(today);
+            firstDay.setDate(today.getDate() - today.getDay() + 1);
+            setFromDate(toStr(firstDay));
+            setToDate(toStr(today));
+        } else if (range === 'month') {
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            setFromDate(toStr(firstDay));
+            setToDate(toStr(today));
+        } else if (range === 'all') {
+            setFromDate('');
+            setToDate('');
+        }
+    };
+
+    const filteredSavedRecords = useMemo(() => {
+        return savedRecords.filter(item => {
+            const term = searchTerm.toLowerCase().trim();
+            const matchesSearch = !term || 
+                (item.customer_name || '').toLowerCase().includes(term) ||
+                (item.data?.DC_THUA || item.data?.NOIO || '').toLowerCase().includes(term) ||
+                (item.created_by || '').toLowerCase().includes(term);
+            
+            let matchesDate = true;
+            if (item.created_at) {
+                const itemDate = item.created_at.split('T')[0];
+                if (fromDate && itemDate < fromDate) matchesDate = false;
+                if (toDate && itemDate > toDate) matchesDate = false;
+            }
+            
+            return matchesSearch && matchesDate;
+        });
+    }, [savedRecords, searchTerm, fromDate, toDate]);
+
+    const handleExportExcel = (recordsToExport: VphcRecord[]) => {
+        if (recordsToExport.length === 0) {
+            notify("Không có dữ liệu để xuất.", "error");
+            return;
+        }
+
+        const dataRows = recordsToExport.map((item, index) => {
+            const d = item.data;
+            const typeText = item.record_type === 'mau01' ? 'Biên bản VPHC' : 'Biên bản Làm việc';
+            const formatDate = (dateStr: string) => {
+                if (!dateStr) return '';
+                const dt = new Date(dateStr);
+                return `${dt.getDate().toString().padStart(2, '0')}/${(dt.getMonth() + 1).toString().padStart(2, '0')}/${dt.getFullYear()}`;
+            };
+            return [
+                index + 1,
+                item.customer_name,
+                typeText,
+                d.DC_THUA || d.NOIO || '',
+                d.TGXRVV || '',
+                formatDate(item.created_at),
+                item.created_by
+            ];
+        });
+
+        const headers = ['STT', 'Họ và tên', 'Loại biên bản', 'Địa chỉ / Nơi ở', 'Thời gian vụ việc', 'Ngày lập', 'Người lập'];
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet([
+            ["DANH SÁCH BIÊN BẢN VI PHẠM HÀNH CHÍNH & LÀM VIỆC"],
+            [`Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}`],
+            [""], 
+            headers,
+            ...dataRows
+        ]);
+
+        ws['!cols'] = [{ wch: 5 }, { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 15 }];
+        
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } });
+        ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 6 } });
+
+        XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_VPHC");
+        XLSX.writeFile(wb, `DS_VPHC_${new Date().toISOString().split('T')[0]}.xlsx`);
+        notify(`Đã xuất file Excel ${recordsToExport.length} biên bản thành công!`, "success");
+    };
 
     // Initial Load
     useEffect(() => {
@@ -347,7 +456,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                         <p style="margin: 0; font-weight: bold;">CỦA NGƯỜI VI PHẠM</p>
                         <p style="margin: 0; font-style: italic; font-size: 11pt;">(Ký, ghi rõ họ và tên)</p>
                         <div style="height: 70px;"></div>
-                        <p style="margin: 0; font-weight: bold;">${data.NGUOI}</p>
+                        <p style="margin: 0; font-weight: bold;">&nbsp;</p>
                     </td>
                     <td style="width: 50%; text-align: center;">
                         <p style="margin: 0; font-weight: bold;">NGƯỜI LẬP BIÊN BẢN</p>
@@ -370,27 +479,168 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
 
     return (
         <div className="flex flex-col h-full bg-[#f1f5f9] overflow-hidden">
-            {/* SUB-HEADER TABS (MODE SWITCHER) */}
-            <div className="flex items-center gap-2 px-4 pt-2 border-b border-gray-200 bg-white shadow-sm shrink-0 z-25">
-                <button 
-                    onClick={() => { setMode('create'); handleResetForm(); }}
-                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors cursor-pointer ${mode === 'create' && !editingId ? 'border-red-600 text-red-600 bg-red-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <PlusCircle size={16} /> Soạn biên bản mới
-                </button>
-                <button 
-                    onClick={() => { setMode('list'); handleResetForm(); loadRecords(); }}
-                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors cursor-pointer ${mode === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <List size={16} /> Danh sách đã lập ({savedRecords.length})
-                </button>
-                {editingId && (
+            {/* SUB-HEADER TABS & TOOLBAR (SINGLE UNIFIED ROW) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-gray-200 bg-white shadow-sm shrink-0 z-25">
+                {/* Left side: Tabs */}
+                <div className="flex items-center gap-2">
                     <button 
-                        onClick={() => {}} 
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 border-orange-500 text-orange-600 bg-orange-50/50 transition-colors animate-pulse"
+                        onClick={() => { setMode('create'); handleResetForm(); }}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors cursor-pointer ${mode === 'create' && !editingId ? 'border-red-600 text-red-600 bg-red-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
-                        <Settings size={16} /> Đang chỉnh sửa
+                        <PlusCircle size={16} /> Soạn biên bản mới
                     </button>
+                    <button 
+                        onClick={() => { setMode('list'); handleResetForm(); loadRecords(); }}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors cursor-pointer ${mode === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <List size={16} /> Danh sách đã lập ({savedRecords.length})
+                    </button>
+                    {editingId && (
+                        <button 
+                            onClick={() => {}} 
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 border-orange-500 text-orange-600 bg-orange-50/50 transition-colors animate-pulse"
+                        >
+                            <Settings size={16} /> Đang chỉnh sửa
+                        </button>
+                    )}
+                </div>
+
+                {/* Right side: Thanh tìm kiếm -> Icon Lọc xổ xuống (ở giữa) -> Nút Xuất Excel (ngoài cùng bên phải) */}
+                {mode === 'list' && (
+                    <div className="flex items-center gap-2 ml-auto flex-wrap">
+                        {/* 1. Thanh tìm kiếm */}
+                        <div className="relative w-64 sm:w-72 md:w-80">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input 
+                                type="text" 
+                                placeholder="Tìm tên người vi phạm, địa chỉ..." 
+                                className="w-full pl-9 pr-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white shadow-2xs"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+
+                        {/* 2. Icon Lọc xổ xuống (Từ ngày đến ngày) đặt ở giữa */}
+                        <div className="relative" ref={filterPopoverRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                                className={`relative p-2 rounded-lg text-sm transition-all shadow-xs border cursor-pointer flex items-center justify-center ${
+                                    activeFilterCount > 0
+                                        ? "border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                                        : "border-gray-300 text-gray-600 bg-white hover:bg-gray-50"
+                                }`}
+                                title="Bộ lọc thời gian (Từ ngày - Đến ngày)"
+                            >
+                                <Filter size={16} className={activeFilterCount > 0 ? "text-blue-600" : "text-gray-600"} />
+                                {activeFilterCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full font-bold flex items-center justify-center shadow-xs">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Dropdown Popover Panel */}
+                            {isFilterOpen && (
+                                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 z-50 animate-fade-in text-gray-800">
+                                    <div className="flex items-center justify-between pb-2 border-b border-gray-100 mb-3">
+                                        <div className="flex items-center gap-1.5 font-bold text-gray-800 text-xs sm:text-sm">
+                                            <Calendar size={15} className="text-blue-600" />
+                                            <span>Lọc theo thời gian</span>
+                                        </div>
+                                        {activeFilterCount > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setFromDate(''); setToDate(''); }}
+                                                className="text-[11px] text-red-500 hover:underline font-bold cursor-pointer"
+                                            >
+                                                Xóa lọc
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Quick Preset Buttons */}
+                                    <div className="grid grid-cols-4 gap-1 mb-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleQuickDate('today')}
+                                            className="px-2 py-1 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors text-center cursor-pointer"
+                                        >
+                                            Hôm nay
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleQuickDate('week')}
+                                            className="px-2 py-1 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors text-center cursor-pointer"
+                                        >
+                                            Tuần này
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleQuickDate('month')}
+                                            className="px-2 py-1 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors text-center cursor-pointer"
+                                        >
+                                            Tháng này
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleQuickDate('all')}
+                                            className="px-2 py-1 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors text-center cursor-pointer"
+                                        >
+                                            Tất cả
+                                        </button>
+                                    </div>
+
+                                    {/* Date Range Inputs */}
+                                    <div className="space-y-2.5">
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Từ ngày</label>
+                                            <input
+                                                type="date"
+                                                value={fromDate}
+                                                onChange={e => setFromDate(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Đến ngày</label>
+                                            <input
+                                                type="date"
+                                                value={toDate}
+                                                onChange={e => setToDate(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3.5 pt-2.5 border-t border-gray-100 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsFilterOpen(false)}
+                                            className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
+                                        >
+                                            Áp dụng
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 3. Nút xuất Excel (Đặt ngoài cùng bên phải) */}
+                        <button 
+                            onClick={() => handleExportExcel(filteredSavedRecords)}
+                            className="relative flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer"
+                            title={`Xuất file Excel (${filteredSavedRecords.length} biên bản)`}
+                            aria-label="Xuất file Excel"
+                        >
+                            <FileSpreadsheet size={18} className="text-emerald-600" />
+                            {filteredSavedRecords.length > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                    {filteredSavedRecords.length}
+                                </span>
+                            )}
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -430,7 +680,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                 ) : (
                     <div className="h-full p-4 overflow-y-auto">
                         <VPHCList 
-                            data={savedRecords}
+                            data={filteredSavedRecords}
                             onEdit={handleEditFromList}
                             onPrint={handlePrintFromList}
                             onDelete={handleDeleteRecord}

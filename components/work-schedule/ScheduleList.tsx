@@ -16,6 +16,20 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'week' | 'month' | 'range'>('month');
     const [dateRange, setDateRange] = useState({ from: '', to: '' });
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const filterPopoverRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterPopoverRef.current && !filterPopoverRef.current.contains(event.target as Node)) {
+                setIsFilterOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const activeFilterCount = filterType !== 'all' ? 1 : 0;
 
     // Pagination States
     const [currentPage, setCurrentPage] = useState(1);
@@ -179,69 +193,147 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
 
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-full overflow-hidden">
-            <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2">
-                {/* Header row with Title, Presets & Date Range */}
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm shrink-0">
-                        <CalendarDays size={18} className="text-blue-600"/> Lịch công tác ({filteredList.length})
-                    </h3>
-                    
-                    <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
-                        <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm shrink-0">
-                            <button onClick={() => handleFilterPreset('week')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'week' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tuần này</button>
-                            <button onClick={() => handleFilterPreset('month')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'month' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tháng này</button>
-                            <button onClick={() => setFilterType('all')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tất cả</button>
-                        </div>
-
-                        <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
-                            <span className="text-gray-500 text-xs shrink-0 font-bold">Từ:</span>
-                            <FlexibleDateInput
-                                value={dateRange.from}
-                                onChange={(isoStr) => { setDateRange(prev => ({ ...prev, from: isoStr })); setFilterType('range'); }}
-                                placeholder="dd/mm/yyyy"
-                                size="sm"
-                                className="w-[85px] shrink-0"
-                                inputClassName="w-full border-none bg-transparent py-0 px-0 text-xs font-semibold tracking-tight pr-3.5"
-                            />
-                            <span className="text-gray-400 font-bold text-xs">-</span>
-                            <FlexibleDateInput
-                                value={dateRange.to}
-                                onChange={(isoStr) => { setDateRange(prev => ({ ...prev, to: isoStr })); setFilterType('range'); }}
-                                placeholder="dd/mm/yyyy"
-                                size="sm"
-                                className="w-[85px] shrink-0"
-                                inputClassName="w-full border-none bg-transparent py-0 px-0 text-xs font-semibold tracking-tight pr-3.5"
-                            />
-                        </div>
-
-                        <button 
-                            onClick={handleExport} 
-                            className="relative flex items-center justify-center bg-white text-emerald-700 border border-emerald-300 p-2 rounded-lg hover:bg-emerald-50 shadow-xs shrink-0 transition-all active:scale-95 cursor-pointer"
-                            title={`Xuất lịch công tác ra file Excel (${filteredList.length} lịch)`}
-                            aria-label="Xuất file Excel"
-                        >
-                            <FileSpreadsheet size={16} className="text-emerald-600" />
-                            {filteredList.length > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
-                                    {filteredList.length}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Filter controls on a single horizontal row */}
-                <div className="flex items-center gap-2 overflow-x-auto w-full py-0.5">
-                    <div className="relative flex-1 min-w-[150px]">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+            <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+                {/* Left side: Title */}
+                <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm shrink-0">
+                    <CalendarDays size={18} className="text-blue-600"/> Lịch công tác ({filteredList.length})
+                </h3>
+                
+                {/* Right side: Search -> Filter Popover (in middle) -> Export Excel */}
+                <div className="flex items-center gap-2 ml-auto flex-wrap">
+                    {/* 1. Search Bar */}
+                    <div className="relative w-64 sm:w-72 md:w-80">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input 
                             type="text" 
                             placeholder="Tìm nội dung, người thực hiện..." 
-                            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                            className="w-full pl-9 pr-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white shadow-2xs"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
+
+                    {/* 2. Filter Dropdown Popover */}
+                    <div className="relative" ref={filterPopoverRef}>
+                        <button
+                            type="button"
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            className={`relative p-2 rounded-lg text-sm transition-all shadow-xs border cursor-pointer flex items-center justify-center ${
+                                activeFilterCount > 0
+                                    ? "border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                                    : "border-gray-300 text-gray-600 bg-white hover:bg-gray-50"
+                            }`}
+                            title="Bộ lọc thời gian lịch công tác"
+                        >
+                            <Filter size={16} className={activeFilterCount > 0 ? "text-blue-600" : "text-gray-600"} />
+                            {activeFilterCount > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full font-bold flex items-center justify-center shadow-xs">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {isFilterOpen && (
+                            <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 z-50 animate-fade-in text-gray-800">
+                                <div className="flex items-center justify-between pb-2 border-b border-gray-100 mb-3">
+                                    <div className="flex items-center gap-1.5 font-bold text-gray-800 text-xs sm:text-sm">
+                                        <CalendarDays size={15} className="text-blue-600" />
+                                        <span>Lọc theo thời gian</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilterType('all')}
+                                        className="text-[11px] text-red-500 hover:underline font-bold cursor-pointer"
+                                    >
+                                        Tất cả
+                                    </button>
+                                </div>
+
+                                {/* Quick Presets */}
+                                <div className="grid grid-cols-3 gap-1 mb-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleFilterPreset('week')}
+                                        className={`px-2 py-1 text-[11px] font-medium rounded transition-colors text-center cursor-pointer ${
+                                            filterType === 'week' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-600'
+                                        }`}
+                                    >
+                                        Tuần này
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleFilterPreset('month')}
+                                        className={`px-2 py-1 text-[11px] font-medium rounded transition-colors text-center cursor-pointer ${
+                                            filterType === 'month' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-600'
+                                        }`}
+                                    >
+                                        Tháng này
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilterType('all')}
+                                        className={`px-2 py-1 text-[11px] font-medium rounded transition-colors text-center cursor-pointer ${
+                                            filterType === 'all' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-600'
+                                        }`}
+                                    >
+                                        Tất cả
+                                    </button>
+                                </div>
+
+                                {/* Custom Date Range Inputs */}
+                                <div className="space-y-2 mb-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Từ ngày</label>
+                                        <FlexibleDateInput
+                                            value={dateRange.from}
+                                            onChange={(isoStr) => { setDateRange(prev => ({ ...prev, from: isoStr })); setFilterType('range'); }}
+                                            placeholder="dd/mm/yyyy"
+                                            size="sm"
+                                            className="w-full"
+                                            inputClassName="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Đến ngày</label>
+                                        <FlexibleDateInput
+                                            value={dateRange.to}
+                                            onChange={(isoStr) => { setDateRange(prev => ({ ...prev, to: isoStr })); setFilterType('range'); }}
+                                            placeholder="dd/mm/yyyy"
+                                            size="sm"
+                                            className="w-full"
+                                            inputClassName="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-gray-100 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFilterOpen(false)}
+                                        className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
+                                    >
+                                        Áp dụng
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 3. Export Excel Button */}
+                    <button 
+                        onClick={handleExport} 
+                        className="relative flex items-center justify-center bg-white text-emerald-700 border border-emerald-300 p-2 rounded-lg hover:bg-emerald-50 shadow-xs shrink-0 transition-all active:scale-95 cursor-pointer"
+                        title={`Xuất lịch công tác ra file Excel (${filteredList.length} lịch)`}
+                        aria-label="Xuất file Excel"
+                    >
+                        <FileSpreadsheet size={16} className="text-emerald-600" />
+                        {filteredList.length > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                {filteredList.length}
+                            </span>
+                        )}
+                    </button>
                 </div>
             </div>
 
