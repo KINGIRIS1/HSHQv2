@@ -301,11 +301,15 @@ export interface RecordFile {
   supplementReturnedDate?: string | null;
   pendingSupplementReason?: string | null;
 
-  // Cột mốc riêng cho Module Cấp giấy
-  appraisalDate?: string | null;
+  // Cột mốc & Nhân sự chuyên biệt theo từng khâu Module Cấp giấy
+  appraisalStaff?: string | null;     // Cán bộ thẩm định (Bước 2)
+  appraisalDate?: string | null;      // Ngày thẩm định
   postingDate?: string | null;       // Ngày phát hành công văn gửi UBND xã niêm yết
   postingEndDate?: string | null;    // Ngày hết hạn 30 ngày niêm yết tại xã
-  taxTransferDate?: string | null;
+  taxStaff?: string | null;          // Cán bộ lập phiếu chuyển thuế (Bước 3)
+  taxTransferStaff?: string | null;  // Đồng bộ cán bộ chuyển thuế
+  taxTransferAssignedDate?: string | null; // Ngày giao làm phiếu chuyển thuế
+  taxTransferDate?: string | null;   // Ngày lập phiếu chuyển thuế
   taxKv7Date?: string | null;
   taxNoticeDate?: string | null;      // Ngày TBT (Thông báo thuế)
   taxPaymentDate?: string | null;
@@ -313,6 +317,7 @@ export interface RecordFile {
   pendingHandoverDate?: string | null;
 
   // Giao trước In GCN & Xác nhận GNT (Module Cấp giấy)
+  printStaff?: string | null;        // Cán bộ in GCN (Bước 6)
   printStaffId?: string | null;
   print_staff_id?: string | null;
   printStaffAssignedAt?: string | null;
@@ -346,6 +351,9 @@ export interface DossierComponentItem {
   name: string; // Tên giấy tờ / thành phần
   original?: number;
   copy?: number;
+  isOriginal?: boolean;
+  copyCount?: number;
+  pageCount?: number;
   note?: string;
   stage?: string; // Công đoạn tải lên
   attachedFile?: AttachedFileMeta;
@@ -371,6 +379,7 @@ export interface AttachedFileMeta {
   fileSize: number;
   fileType: string;
   uploadedAt: string;
+  uploadedBy?: string;
   department: string; // 'Tổ Lưu trữ' | 'Tổ Đo đạc' | 'Tổ Cấp giấy'
   stage?: string; // 'Tiếp nhận' | 'Biên tập bản đồ' | 'Trình kiểm tra' | 'Trình ký' | 'Ký duyệt'
   storageId?: string; // Khóa trong IndexedDB

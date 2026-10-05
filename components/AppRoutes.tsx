@@ -18,6 +18,7 @@ import {
   ARCHIVE_SELECTABLE_STATUSES,
   CAP_GIAY_SELECTABLE_STATUSES,
   getNormalizedWard,
+  isCertificateRecordType,
 } from "../constants";
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey, groupEmployeesByDepartment } from "../utils/appHelpers";
 import { checkUserPermission } from "../utils/permissionUtils";
@@ -1237,7 +1238,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {/* 3 Sub-tabs cho Tab Thuế (đặt ngoài cùng bên trái trong Tab Thuế) */}
             {currentView === "test_measurement_office" && (() => {
-              const isDangkyRecord = (r: any) => r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+              const isDangkyRecord = (r: any) => isCertificateRecordType(r) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
               const transferCount = records.filter((r) => isDangkyRecord(r) && r.status === RecordStatus.TAX_TRANSFER).length;
               const area7Count = records.filter((r) => isDangkyRecord(r) && r.status === RecordStatus.PENDING_TAX_KV7).length;
               const noticeCount = records.filter((r) => isDangkyRecord(r) && r.status === RecordStatus.PENDING_TAX_PAYMENT).length;

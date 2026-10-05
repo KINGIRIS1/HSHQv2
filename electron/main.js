@@ -19,7 +19,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'hshq', privileges: { standard: 
 
 function getAppIconPath() {
   const publicIcon = path.join(__dirname, '../public/icon.ico');
-  const distIcon = path.join(__dirname, '../dist-desktop/icon.ico');
+  const distIcon = path.join(__dirname, '../dist/icon.ico');
   if (fs.existsSync(publicIcon)) return publicIcon;
   if (fs.existsSync(distIcon)) return distIcon;
   return publicIcon;
@@ -257,17 +257,65 @@ ipcMain.handle('show-confirm-dialog', async (event, { message, title }) => {
   return result.response === 1; 
 });
 
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject'
+};
+
 app.whenReady().then(() => {
-  // Serve bundled assets from a stable secure origin. All data uses Supabase.
+  // Serve bundled assets from a stable secure origin using Node fs (which handles .asar files)
   protocol.handle('hshq', request => {
-    const base = path.resolve(__dirname, '../dist-desktop');
+    const base = path.resolve(__dirname, '../dist');
     let relative;
     try { relative = decodeURIComponent(new URL(request.url).pathname); }
     catch { return new Response('Bad request', { status: 400 }); }
-    const file = path.resolve(base, '.' + relative);
-    if (!file.startsWith(base + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return new Response('Not found', { status: 404 });
-    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
-    return net.fetch(pathToFileURL(file).toString());
+    
+    if (!relative || relative === '/' || relative === '') {
+      relative = '/index.html';
+    }
+    
+    let file = path.resolve(base, '.' + relative);
+    
+    // SPA Fallback: If file doesn't exist or is a directory, load index.html
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+      const indexFile = path.resolve(base, 'index.html');
+      if (fs.existsSync(indexFile)) {
+        file = indexFile;
+      } else {
+        return new Response('Not found', { status: 404 });
+      }
+    }
+    
+    if (!file.startsWith(base + path.sep) && file !== path.resolve(base, 'index.html')) {
+      return new Response('Access denied', { status: 403 });
+    }
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return new Response('Method not allowed', { status: 405 });
+    }
+
+    try {
+      const ext = path.extname(file).toLowerCase();
+      const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+      const data = fs.readFileSync(file);
+      return new Response(data, {
+        status: 200,
+        headers: { 'content-type': mimeType }
+      });
+    } catch (err) {
+      log.error('Protocol read error:', err);
+      return new Response('Not found', { status: 404 });
+    }
   });
   createWindow();
   app.on('activate', () => {

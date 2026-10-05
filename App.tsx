@@ -1263,10 +1263,14 @@ function App() {
                   if (res) {
                       setRecords(prev => prev.map(r => r.id === record.id ? res : r));
                       setToast({ type: 'success', message: `Đã chuyển hồ sơ sang: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
+                  } else {
+                      throw new Error("CSDL không trả về kết quả lưu");
                   }
               } catch (err: any) {
                   console.error("advanceStatus background error:", err);
-                  setToast({ type: 'error', message: `Lỗi chuyển bước: ${err?.message || 'Không thể lưu vào CSDL'}` });
+                  const errMsg = err?.message || 'Không thể lưu vào CSDL';
+                  setToast({ type: 'error', message: `Lỗi chuyển bước: ${errMsg}` });
+                  alert(`⚠️ CẢNH BÁO LỖI CSDL:\nKhông thể lưu chuyển bước cho hồ sơ ${record.code} vào Cơ sở dữ liệu!\n\nChi tiết: ${errMsg}\n\n👉 Hồ sơ chưa được lưu. Vui lòng kiểm tra lại kết nối mạng.`);
               }
           }
           return;
@@ -1327,10 +1331,14 @@ function App() {
               if (res) {
                   setRecords(prev => prev.map(r => r.id === record.id ? res : r));
                   setToast({ type: 'success', message: `Đã chuyển hồ sơ sang: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
+              } else {
+                  throw new Error("CSDL không trả về kết quả lưu");
               }
           } catch (err: any) {
               console.error("advanceStatus background error:", err);
-              setToast({ type: 'error', message: `Lỗi chuyển bước: ${err?.message || 'Không thể lưu vào CSDL'}` });
+              const errMsg = err?.message || 'Không thể lưu vào CSDL';
+              setToast({ type: 'error', message: `Lỗi chuyển bước: ${errMsg}` });
+              alert(`⚠️ CẢNH BÁO LỖI CSDL:\nKhông thể lưu chuyển bước cho hồ sơ ${record.code} vào Cơ sở dữ liệu!\n\nChi tiết: ${errMsg}\n\n👉 Hồ sơ chưa được lưu. Vui lòng kiểm tra lại kết nối mạng.`);
           }
       }
   }, [currentUser]);
@@ -1343,7 +1351,14 @@ function App() {
           (isSurveyRecordType(r.recordType) || r.sourceTable === 'land_records') && 
           (r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER || ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch) || r.status === RecordStatus.HANDOVER)
       );
-      if (recordsToExport.length === 0) return;
+      if (recordsToExport.length === 0) {
+          const errMsg = candidates.length > 0
+              ? `Có ${candidates.length} hồ sơ được chọn nhưng không có hồ sơ Đo đạc nào ở bước "Đã ký / Chờ bàn giao" hợp lệ để chốt đợt!`
+              : 'Vui lòng chọn hồ sơ Đo đạc để chốt xuất giao 1 cửa.';
+          setToast({ type: 'error', message: errMsg });
+          alert(`⚠️ CẢNH BÁO CHỐT ĐỢT GIAO 1 CỬA:\n${errMsg}`);
+          throw new Error(errMsg);
+      }
       const updatesToApply = recordsToExport.map(r => {
           const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
           const existingLogs = Array.isArray(r.statusLogs) ? r.statusLogs : [];
@@ -1375,7 +1390,10 @@ function App() {
           setIsExportModalOpen(true);
       } catch (err: any) {
           console.error("Lỗi khi chốt đợt xuất giao 1 cửa Đo đạc:", err);
-          setToast({ type: 'error', message: `Chốt đợt thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+          const errMsg = err?.message || 'Không thể lưu vào CSDL';
+          setToast({ type: 'error', message: `Chốt đợt thất bại: ${errMsg}` });
+          alert(`⚠️ CẢNH BÁO LỖI CSDL:\nKhông thể lưu chốt đợt Đo đạc vào CSDL!\n\nChi tiết: ${errMsg}\n\n👉 Vui lòng kiểm tra lại kết nối mạng.`);
+          throw err;
       }
   };
 
@@ -1387,7 +1405,14 @@ function App() {
           (isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records') && 
           (r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER || ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch) || r.status === RecordStatus.HANDOVER)
       );
-      if (recordsToExport.length === 0) return;
+      if (recordsToExport.length === 0) {
+          const errMsg = candidates.length > 0
+              ? `Có ${candidates.length} hồ sơ được chọn nhưng không có hồ sơ Cấp giấy nào ở bước "Đã ký / Chờ bàn giao" hợp lệ để chốt đợt!`
+              : 'Vui lòng chọn hồ sơ Cấp giấy để chốt xuất giao 1 cửa.';
+          setToast({ type: 'error', message: errMsg });
+          alert(`⚠️ CẢNH BÁO CHỐT ĐỢT GIAO 1 CỬA:\n${errMsg}`);
+          throw new Error(errMsg);
+      }
       const updatesToApply = recordsToExport.map(r => {
           const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
           const existingLogs = Array.isArray(r.statusLogs) ? r.statusLogs : [];
@@ -1419,7 +1444,10 @@ function App() {
           setIsExportModalOpen(true);
       } catch (err: any) {
           console.error("Lỗi khi chốt đợt xuất giao 1 cửa Cấp giấy:", err);
-          setToast({ type: 'error', message: `Chốt đợt thất bại: ${err?.message || 'Không thể lưu vào CSDL'}` });
+          const errMsg = err?.message || 'Không thể lưu vào CSDL';
+          setToast({ type: 'error', message: `Chốt đợt thất bại: ${errMsg}` });
+          alert(`⚠️ CẢNH BÁO LỖI CSDL:\nKhông thể lưu chốt đợt Cấp giấy vào CSDL!\n\nChi tiết: ${errMsg}\n\n👉 Vui lòng kiểm tra lại kết nối mạng.`);
+          throw err;
       }
   };
 
@@ -1458,8 +1486,12 @@ function App() {
       );
 
       if (recordsToExport.length === 0) {
-          setToast({ type: 'error', message: 'Vui lòng chọn hoặc lọc các hồ sơ để chốt xuất giao 1 cửa.' });
-          return;
+          const errMsg = candidates.length > 0
+              ? `Có ${candidates.length} hồ sơ được chọn nhưng không có hồ sơ nào ở bước "Đã ký / Chờ bàn giao" hợp lệ để chốt đợt!`
+              : 'Vui lòng chọn hoặc lọc các hồ sơ để chốt xuất giao 1 cửa.';
+          setToast({ type: 'error', message: errMsg });
+          alert(`⚠️ CẢNH BÁO CHỐT ĐỢT GIAO 1 CỬA:\n${errMsg}`);
+          throw new Error(errMsg);
       }
 
       const updatesToApply = recordsToExport.map(r => {
@@ -1486,7 +1518,7 @@ function App() {
               createArchiveBatch(pureBatch, recordIds, 'global', batchDate)
           ]);
 
-          if (!batchRes.success) throw new Error("Lỗi lưu chốt đợt vào Supabase");
+          if (!batchRes.success) throw new Error(batchRes.error || "Lỗi lưu chốt đợt vào Supabase");
 
           const updateMap = new Map<string, RecordFile>();
           updatesToApply.forEach(u => updateMap.set(u.id, u));
@@ -1499,7 +1531,10 @@ function App() {
           setIsExportModalOpen(true);
       } catch (err: any) {
           console.error("Execute batch export error:", err);
-          setToast({ type: 'error', message: `Lỗi chốt đợt xuất giao 1 cửa: ${err?.message || 'Không thể lưu vào CSDL'}` });
+          const errMsg = err?.message || 'Không thể lưu vào CSDL';
+          setToast({ type: 'error', message: `Lỗi chốt đợt xuất giao 1 cửa: ${errMsg}` });
+          alert(`⚠️ CẢNH BÁO LỖI BẢO TỒN CSDL:\nKhông thể lưu chốt đợt xuất giao 1 cửa vào Cơ sở dữ liệu!\n\nChi tiết lỗi: ${errMsg}\n\n👉 Dữ liệu CHƯA được lưu. Vui lòng kiểm tra lại kết nối mạng và thực hiện lại.`);
+          throw err;
       }
   };
 

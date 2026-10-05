@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, AttachedDocItem, DossierComponentItem, AttachedFileMeta, CertificateOwnerItem } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, CAP_GIAY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, CAP_GIAY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType, getDefaultAttachedDocsForType, cleanDocumentName, DOCUMENT_SCAN_DICTIONARY } from '../constants';
 import { extractRecordSequence, checkRecordCodeExistsInDb } from '../services/apiRecords';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus, Users, Trash2 } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
@@ -10,14 +10,14 @@ import { fetchContracts } from '../services/api';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile, isPreviewableFile } from '../services/attachmentStorage';
 import DossierComponentSection from './receive-record/DossierComponentSection';
 
-const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
+const parseAttachedDocs = (otherDocsStr: string | null | undefined, recordType?: string | null): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
     try {
         const parsed = JSON.parse(otherDocsStr);
         if (Array.isArray(parsed)) {
             return parsed.map((item: any, idx: number) => ({
                 id: item.id || String(idx + 1),
-                name: item.name || '',
+                name: cleanDocumentName(item.name, recordType) || '',
                 type: item.type === 'Bản sao' ? 'Bản sao' : 'Bản chính',
                 original: typeof item.original === 'number' ? item.original : (item.type === 'Bản sao' ? 0 : 1),
                 copy: typeof item.copy === 'number' ? item.copy : (item.type === 'Bản sao' ? 1 : 0),
@@ -29,7 +29,7 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
         if (parts[0]) {
             return [{
                 id: '1',
-                name: parts[0],
+                name: cleanDocumentName(parts[0], recordType),
                 type: parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính',
                 original: parts[1] === 'Bản sao' ? 0 : 1,
                 copy: parts[1] === 'Bản sao' ? 1 : 0
@@ -346,7 +346,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 dataToSet.status = RecordStatus.RECEIVED;
             }
             setFormData(dataToSet);
-            setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
+            const parsedDocs = parseAttachedDocs(initialData.otherDocs, initialData.recordType);
+            if (parsedDocs.length > 0) {
+                setAttachedDocs(parsedDocs);
+            } else if (initialData.recordType) {
+                const defaultDocs = getDefaultAttachedDocsForType(initialData.recordType);
+                setAttachedDocs(defaultDocs);
+                dataToSet.otherDocs = JSON.stringify(defaultDocs);
+            } else {
+                setAttachedDocs([]);
+            }
             const initialComps: DossierComponentItem[] = extractAllRecordDossierComponents(initialData);
             setDossierComponents(initialComps);
             const parsed = parseAuthDocType(initialData.authDocType);
@@ -508,9 +517,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   };
 
   const handleUpdateDoc = (index: number, field: keyof AttachedDocItem, value: string) => {
+      let finalVal = value;
+      if (field === 'name' && typeof value === 'string') {
+          const clean = value.trim();
+          const match = DOCUMENT_SCAN_DICTIONARY.find(d => d.code.toLowerCase() === clean.toLowerCase());
+          if (match) {
+              finalVal = match.name;
+          }
+      }
       const updatedDocs = attachedDocs.map((doc, idx) => {
           if (idx === index) {
-              return { ...doc, [field]: value };
+              return { ...doc, [field]: finalVal };
           }
           return doc;
       });
@@ -754,21 +771,26 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     }
 
     const recType = cleanData.recordType || '';
-    if (isCertificateRecordType(recType) || String(recType).trim().startsWith('3.') || isTestMeasurementView) {
+    const shortType = getShortRecordType(recType);
+
+    if (shortType.startsWith('3.') || isCertificateRecordType(recType)) {
         cleanData.sourceTable = 'dangky_records';
-        if (!cleanData.group || cleanData.group.startsWith('1.') || cleanData.group.startsWith('2.')) {
-            cleanData.group = '3. Đăng ký đất đai, cấp GCN';
-        }
-    } else if (String(recType).trim().startsWith('1.') || isArchiveRecordType(recType) || isArchiveView) {
+        cleanData.group = '3. Đăng ký đất đai, cấp GCN';
+    } else if (shortType.startsWith('1.') || isArchiveRecordType(recType)) {
         cleanData.sourceTable = 'luutru_records';
-        if (!cleanData.group || cleanData.group.startsWith('2.') || cleanData.group.startsWith('3.')) {
-            cleanData.group = '1. Cung cấp thông tin, dữ liệu đất đai';
-        }
-    } else if (String(recType).trim().startsWith('2.') || isSurveyRecordType(recType) || isMeasurementView) {
+        cleanData.group = '1. Cung cấp thông tin, dữ liệu đất đai';
+    } else if (shortType.startsWith('2.') || isSurveyRecordType(recType)) {
         cleanData.sourceTable = 'land_records';
-        if (!cleanData.group || cleanData.group.startsWith('1.') || cleanData.group.startsWith('3.')) {
-            cleanData.group = '2. Đo đạc bản đồ';
-        }
+        cleanData.group = '2. Đo đạc bản đồ';
+    } else if (isTestMeasurementView) {
+        cleanData.sourceTable = 'dangky_records';
+        cleanData.group = '3. Đăng ký đất đai, cấp GCN';
+    } else if (isArchiveView) {
+        cleanData.sourceTable = 'luutru_records';
+        cleanData.group = '1. Cung cấp thông tin, dữ liệu đất đai';
+    } else if (isMeasurementView) {
+        cleanData.sourceTable = 'land_records';
+        cleanData.group = '2. Đo đạc bản đồ';
     } else if (initialData?.sourceTable) {
         cleanData.sourceTable = initialData.sourceTable;
     }
@@ -967,9 +989,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             String(rWard || '')
           );
         }
-        if (field === 'recordType' && !value) {
-          updated.price = undefined;
-          updated.returnedPrice = undefined;
+        if (field === 'recordType') {
+          if (value) {
+            const defaultDocs = getDefaultAttachedDocsForType(value);
+            setAttachedDocs(defaultDocs);
+            updated.otherDocs = JSON.stringify(defaultDocs);
+          } else {
+            updated.price = undefined;
+            updated.returnedPrice = undefined;
+            setAttachedDocs([]);
+            updated.otherDocs = '';
+          }
         }
       }
       return updated;
@@ -1467,8 +1497,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                             <input
                                                                 type="text"
                                                                 required
+                                                                list="recordmodal-scan-dict"
                                                                 className="w-full px-1.5 py-1 text-xs border border-slate-200 rounded outline-none focus:border-blue-500"
-                                                                placeholder="Nhập tên..."
+                                                                placeholder="Tên giấy tờ (hoặc gõ mã: DDKBD, HDCQ, HSKT...)"
                                                                 value={doc.name}
                                                                 onChange={(e) => handleUpdateDoc(idx, 'name', e.target.value)}
                                                             />
@@ -1915,6 +1946,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         })()}
                     </div>
                 </div>
+
+                {/* Datalist gợi ý tự động 97 loại giấy tờ theo Bảng quy chuẩn */}
+                <datalist id="recordmodal-scan-dict">
+                    {DOCUMENT_SCAN_DICTIONARY.map((item) => (
+                        <option key={item.code} value={item.name}>{`[${item.code}] ${item.name}`}</option>
+                    ))}
+                </datalist>
             </form>
         </div>
 

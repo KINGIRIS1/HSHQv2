@@ -1,6 +1,7 @@
 import { AttachedFileMeta, AttachmentDocType } from '../types';
 import { supabase, isConfigured } from './supabaseClient';
 import { getSystemSetting, saveSystemSetting } from './apiSystem';
+import { getScanCodeForDocName, getDocNameForScanCode, DOCUMENT_SCAN_DICTIONARY } from '../constants';
 
 export type DriveToastType = 'success' | 'warning' | 'error' | 'info';
 export type DriveToastCallback = (item: { type: DriveToastType; title: string; message: string }) => void;
@@ -57,58 +58,10 @@ export const DOC_TYPES: { type: AttachmentDocType; label: string }[] = [
 ];
 
 /**
- * Trích xuất mã viết tắt chuẩn hóa từ tên giấy tờ hoặc loại tài liệu
- * Ví dụ: "Giấy chứng nhận QSDĐ" -> "GCN", "Bản vẽ trích đo" -> "BANVE"
+ * Trích xuất mã viết tắt chuẩn hóa từ tên giấy tờ hoặc loại tài liệu theo Bảng quy chuẩn
  */
 export const getAbbreviationForDocName = (nameOrType: string): string => {
-  if (!nameOrType) return 'TLKHAC';
-  const clean = nameOrType.trim();
-  const lower = clean.toLowerCase();
-
-  if (clean === 'GCN' || lower.includes('chứng nhận') || lower.includes('sổ đỏ') || lower.includes('sổ hồng') || lower.includes('gcn')) {
-    return 'GCN';
-  }
-  if (clean === 'DON' || lower.includes('đơn') || lower.includes('don ')) {
-    return 'DON';
-  }
-  if (clean === 'BANVE' || lower.includes('bản vẽ') || lower.includes('trích đo') || lower.includes('trích lục') || lower.includes('bản đồ') || lower.includes('sơ đồ')) {
-    return 'BANVE';
-  }
-  if (clean === 'VBUQ' || lower.includes('ủy quyền') || lower.includes('hợp đồng')) {
-    return 'VBUQ';
-  }
-  if (clean === 'BIENBAN' || lower.includes('biên bản') || lower.includes('xác minh')) {
-    return 'BIENBAN';
-  }
-  if (clean === 'TAICHINH' || lower.includes('tài chính') || lower.includes('biên lai') || lower.includes('hóa đơn') || lower.includes('thuế')) {
-    return 'TAICHINH';
-  }
-  if (clean === 'PHIEU_KT' || lower.includes('kiểm tra') || lower.includes('phiếu kt')) {
-    return 'PHIEU_KT';
-  }
-  if (clean === 'TO_TRINH' || lower.includes('tờ trình') || lower.includes('trình ký')) {
-    return 'TO_TRINH';
-  }
-  if (clean === 'TLKHAC') return 'TLKHAC';
-
-  // Nếu là mã viết tắt ngắn đã viết hoa không dấu (2-6 ký tự)
-  if (/^[A-Z0-9_-]{2,8}$/.test(clean)) {
-    return clean;
-  }
-
-  // Tự động tạo chữ viết tắt từ các chữ cái đầu không dấu
-  const nonDiacritics = clean
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[đĐ]/g, 'd');
-  
-  const words = nonDiacritics.split(/[\s_-]+/).filter(Boolean);
-  if (words.length > 1) {
-    const abbr = words.map(w => w[0]?.toUpperCase() || '').join('');
-    if (abbr.length >= 2 && abbr.length <= 6) return abbr;
-  }
-
-  return 'TLKHAC';
+  return getScanCodeForDocName(nameOrType);
 };
 
 /**
@@ -175,8 +128,8 @@ export const isAllowedDocFile = (file: File): boolean => {
 
 /**
  * Tạo tên tệp chuẩn hóa theo yêu cầu:
- * Cú pháp: [Tên_Viết_Tắt] [STT]_[Mã_HS].[ext]
- * Ví dụ: GCN 1_260907-0002.pdf, BANVE 1_260907-0002.dwg
+ * Cú pháp: [MÃ_VIẾT_TẮT] [MÃ_HỒ_SƠ].[đuôi_tệp]
+ * Ví dụ: DDKBD TK-261003-1234.pdf, HDCQ TK-261003-1234.pdf
  */
 export const generateStandardizedFileName = (
   recordCode: string,
@@ -186,13 +139,15 @@ export const generateStandardizedFileName = (
 ): string => {
   const sanitizedCode = (recordCode || 'HS')
     .trim()
-    .replace(/[/\\?%*:|"<> ]/g, '-');
+    .replace(/[/\\?%*:|"<>]/g, '-');
   
   const ext = originalFileName.split('.').pop()?.toLowerCase() || 'pdf';
   const abbr = getAbbreviationForDocName(docTypeOrName);
-  const idx = sequenceIndex > 0 ? sequenceIndex : 1;
   
-  return `${abbr} ${idx}_${sanitizedCode}.${ext}`;
+  if (sequenceIndex > 1) {
+    return `${abbr}_${sequenceIndex} ${sanitizedCode}.${ext}`;
+  }
+  return `${abbr} ${sanitizedCode}.${ext}`;
 };
 
 // --- QUẢN LÝ ĐƯỜNG DẪN GOOGLE DRIVE LƯU DỮ LIỆU TIẾP NHẬN (DÙNG CHUNG TOÀN HỆ THỐNG QUA CLOUD) ---

@@ -2,20 +2,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, AttachedDocItem, AttachedFileMeta, CertificateOwnerItem } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
-import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel, isCertificateRecordType } from '../../constants';
+import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel, isCertificateRecordType, isArchiveRecordType, isSurveyRecordType, getPhieuYeuCauTitle, cleanDocumentName, getDefaultAttachedDocsForType, DOCUMENT_SCAN_DICTIONARY } from '../../constants';
 import { getDepartmentForRecord } from '../../utils/appHelpers';
 import { getVerifiedUniqueRecordCode, checkRecordCodeExistsInDb } from '../../services/apiRecords';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile } from '../../services/attachmentStorage';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2, Trash2, Users } from 'lucide-react';
 
-const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
+const parseAttachedDocs = (otherDocsStr: string | null | undefined, recordType?: string | null): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
     try {
         const parsed = JSON.parse(otherDocsStr);
         if (Array.isArray(parsed)) {
             return parsed.map((item: any, idx: number) => ({
                 id: item.id || String(idx + 1),
-                name: item.name || '',
+                name: cleanDocumentName(item.name, recordType) || '',
                 type: item.type === 'Bản sao' ? 'Bản sao' : 'Bản chính',
                 original: typeof item.original === 'number' ? item.original : (item.type === 'Bản sao' ? 0 : 1),
                 copy: typeof item.copy === 'number' ? item.copy : (item.type === 'Bản sao' ? 1 : 0),
@@ -28,7 +28,7 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
         if (parts[0]) {
             return [{
                 id: '1',
-                name: parts[0],
+                name: cleanDocumentName(parts[0], recordType),
                 type: parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính',
                 original: parts[1] === 'Bản sao' ? 0 : 1,
                 copy: parts[1] === 'Bản sao' ? 1 : 0
@@ -178,18 +178,10 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             } else {
                 newData.price = null;
 
-                // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
-                if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
-                    const defaultDocs: AttachedDocItem[] = [
-                        { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
-                        { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
-                    ];
-                    setAttachedDocs(defaultDocs);
-                    newData.otherDocs = JSON.stringify(defaultDocs);
-                } else {
-                    setAttachedDocs([]);
-                    newData.otherDocs = '';
-                }
+                // Auto-populate default documents using standardized function
+                const defaultDocs = getDefaultAttachedDocsForType(value);
+                setAttachedDocs(defaultDocs);
+                newData.otherDocs = defaultDocs.length > 0 ? JSON.stringify(defaultDocs) : '';
             }
         }
         return newData;
@@ -211,9 +203,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   };
 
   const handleUpdateDoc = (index: number, field: keyof AttachedDocItem, value: any) => {
+      let finalVal = value;
+      if (field === 'name' && typeof value === 'string') {
+          const cleanVal = value.trim();
+          const match = DOCUMENT_SCAN_DICTIONARY.find(d => d.code.toLowerCase() === cleanVal.toLowerCase());
+          if (match) {
+              finalVal = match.name;
+          }
+      }
       const updatedDocs = attachedDocs.map((doc, idx) => {
           if (idx === index) {
-              const next = { ...doc, [field]: value };
+              const next = { ...doc, [field]: finalVal };
               if (field === 'type') {
                   if (value === 'Bản chính') {
                       next.original = 1;
@@ -407,21 +407,25 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
     };
 
     const recType = updatedFormData.recordType || '';
+    const shortType = getShortRecordType(recType);
     let autoSourceTable: 'dangky_records' | 'luutru_records' | 'land_records' = 'land_records';
     let autoGroup = '2. Đo đạc bản đồ';
 
-    if (isCertificateRecordType(recType) || String(recType).trim().startsWith('3.')) {
+    if (shortType.startsWith('3.') || isCertificateRecordType(recType)) {
         autoSourceTable = 'dangky_records';
         autoGroup = '3. Đăng ký đất đai, cấp GCN';
-    } else if (String(recType).trim().startsWith('1.') || recType.toLowerCase().includes('sao lục') || recType.toLowerCase().includes('công văn')) {
+    } else if (shortType.startsWith('1.') || isArchiveRecordType(recType)) {
         autoSourceTable = 'luutru_records';
         autoGroup = '1. Cung cấp thông tin, dữ liệu đất đai';
+    } else {
+        autoSourceTable = 'land_records';
+        autoGroup = '2. Đo đạc bản đồ';
     }
 
     const recordToSave: RecordFile = { 
         ...updatedFormData, 
-        sourceTable: updatedFormData.sourceTable || autoSourceTable,
-        group: updatedFormData.group || autoGroup,
+        sourceTable: autoSourceTable,
+        group: autoGroup,
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
         receivedBy: recBy 
@@ -793,8 +797,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                                 <input
                                                     type="text"
                                                     required
+                                                    list="recordform-scan-dict"
                                                     className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none"
-                                                    placeholder="Tên giấy tờ..."
+                                                    placeholder="Tên giấy tờ (hoặc gõ mã viết tắt: DDKBD, HDCQ, HSKT...)"
                                                     value={doc.name}
                                                     onChange={(e) => handleUpdateDoc(idx, 'name', e.target.value)}
                                                 />
@@ -985,6 +990,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT' : 'LƯU VÀ IN')}
             </button>
         </div>
+
+        {/* Datalist gợi ý tự động 97 loại giấy tờ theo Bảng quy chuẩn */}
+        <datalist id="recordform-scan-dict">
+            {DOCUMENT_SCAN_DICTIONARY.map((item) => (
+                <option key={item.code} value={item.name}>{`[${item.code}] ${item.name}`}</option>
+            ))}
+        </datalist>
     </form>
   );
 };

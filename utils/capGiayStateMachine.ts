@@ -37,16 +37,16 @@ export const CAP_GIAY_STATUS_LABELS: Record<CapGiayStatus, string> = {
   [RecordStatus.PENDING_POSTING]: 'Niêm yết tại xã',
   [RecordStatus.TAX_TRANSFER]: 'Chờ chuyển thuế',
   [RecordStatus.PENDING_TAX_KV7]: 'Chờ thuế khu vực 7',
-  [RecordStatus.PENDING_TAX_NOTICE]: 'Ngày TBT',
-  [RecordStatus.PENDING_TAX_PAYMENT]: 'Ngày TBT',
+  [RecordStatus.PENDING_TAX_NOTICE]: 'Chờ thông báo thuế',
+  [RecordStatus.PENDING_TAX_PAYMENT]: 'Chờ giấy nộp tiền',
   [RecordStatus.PENDING_PRINT_CERT]: 'Chờ in giấy chứng nhận',
   [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
   [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
-  [RecordStatus.PENDING_HANDOVER]: 'Hoàn thành',
+  [RecordStatus.PENDING_HANDOVER]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
-  [RecordStatus.WITHDRAWN]: 'Csd rút hồ sơ',
+  [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',
   [RecordStatus.REJECTED]: 'Huỷ hồ sơ'
 };
 
@@ -60,18 +60,16 @@ export const CAP_GIAY_FORBIDDEN_STATUSES = [
 
 // Luồng chuyển trạng thái chính tuần tự (Strict Sequential Main Flow)
 export const CAP_GIAY_MAIN_FLOW: CapGiayStatus[] = [
-  RecordStatus.RECEIVED,             // Bước 1: Tiếp nhận hồ sơ
-  RecordStatus.APPRAISAL,            // Bước 2: Chờ thẩm định
-  RecordStatus.PENDING_POSTING,      // Bước 2b: Niêm yết tại xã
-  RecordStatus.TAX_TRANSFER,         // Bước 3: Chờ chuyển thuế
-  RecordStatus.PENDING_TAX_KV7,      // Bước 4: Chờ thuế khu vực 7
-  RecordStatus.PENDING_TAX_NOTICE,   // Bước 5: Ngày TBT (Thông báo thuế)
-  RecordStatus.PENDING_PRINT_CERT,   // Bước 6: Chờ in giấy chứng nhận
-  RecordStatus.PENDING_CHECK,        // Bước 7: Chờ kiểm tra
-  RecordStatus.PENDING_SIGN,         // Bước 8: Chờ ký duyệt (Trình ký)
-  RecordStatus.PENDING_HANDOVER,     // Bước 9: Hoàn thành (Chờ bàn giao)
-  RecordStatus.HANDOVER,             // Bước 10: Đã giao 1 cửa
-  RecordStatus.RETURNED              // Bước 11: Đã trả kết quả
+  RecordStatus.RECEIVED,             // Bước 1: Tiếp nhận
+  RecordStatus.APPRAISAL,            // Bước 2: Thẩm định
+  RecordStatus.TAX_TRANSFER,         // Bước 3: Phiếu chuyển thuế
+  RecordStatus.PENDING_TAX_KV7,      // Bước 4: Thuế Khu vực 7
+  RecordStatus.PENDING_TAX_PAYMENT,  // Bước 5: Thông báo thuế
+  RecordStatus.PENDING_PRINT_CERT,   // Bước 6: In Giấy chứng nhận
+  RecordStatus.PENDING_CHECK,        // Bước 7: Trình kiểm tra
+  RecordStatus.PENDING_SIGN,         // Bước 8: Trình ký duyệt
+  RecordStatus.PENDING_HANDOVER,     // Bước 9: Hoàn thành
+  RecordStatus.RETURNED              // Bước 10: Trả kết quả
 ];
 
 // Danh mục trạng thái chọn lựa cho Select/Dropdown của Module Cấp giấy

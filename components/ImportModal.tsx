@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
-import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType, isCertificateRecordType, getNormalizedWard, getWardLabel } from '../constants';
+import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType, isCertificateRecordType, isSurveyRecordType, getNormalizedWard, getWardLabel } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { keepOnlyDate } from '../services/apiCore';
 import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
@@ -410,10 +410,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             record.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
             
             const rTypeStr = String(record.recordType || '').trim();
-            if (isCertificateRecordType(rTypeStr) || rTypeStr.startsWith('3.')) {
+            const shortType = getShortRecordType(rTypeStr);
+            if (shortType.startsWith('3.') || isCertificateRecordType(rTypeStr)) {
                 record.sourceTable = 'dangky_records';
                 record.group = '3. Đăng ký đất đai, cấp GCN';
-            } else if (isArchiveRecordType(rTypeStr) || rTypeStr.startsWith('1.')) {
+            } else if (shortType.startsWith('1.') || isArchiveRecordType(rTypeStr)) {
                 record.sourceTable = 'luutru_records';
                 record.group = '1. Cung cấp thông tin, dữ liệu đất đai';
             } else {
@@ -439,14 +440,46 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     reader.readAsArrayBuffer(file);
   };
 
+  const extractCoreCode = (raw?: string | null): string => {
+    if (!raw) return '';
+    let s = String(raw).trim().toUpperCase().replace(/\s+/g, '');
+    // Bóc tách các tiền tố thông dụng: DD-, TK-, TQ-, TH-, MD-, CG-, LT-, HS-, 1.1-, 2.1-, 2.2-, 3.1-, v.v.
+    s = s.replace(/^(DD|TK|TQ|TH|MD|CG|LT|HS|[123]\.\d+)[-_/:\s]*/i, '');
+    return s;
+  };
+
   const validateRecords = (
     items: PreviewRecord[], 
     currentMode: 'create' | 'update', 
     existingRecords: RecordFile[] = []
   ): PreviewRecord[] => {
-    const existingCodeSet = new Set(
-      existingRecords.map(r => String(r.code || '').trim().toUpperCase()).filter(Boolean)
-    );
+    // 1. Tạo các bảng tra cứu hồ sơ đa tầng hỗ trợ khớp linh hoạt khi cập nhật
+    const codeMap = new Map<string, RecordFile>();
+    const noSpaceCodeMap = new Map<string, RecordFile>();
+    const coreCodeMap = new Map<string, RecordFile>();
+    const receiptMap = new Map<string, RecordFile>();
+    const landInfoMap = new Map<string, RecordFile>();
+
+    existingRecords.forEach(r => {
+      if (r.code) {
+        const cUpper = String(r.code).trim().toUpperCase();
+        codeMap.set(cUpper, r);
+        const noSpace = cUpper.replace(/\s+/g, '');
+        noSpaceCodeMap.set(noSpace, r);
+        const core = extractCoreCode(cUpper);
+        if (core && core.length >= 2) {
+          coreCodeMap.set(core, r);
+        }
+      }
+      if (r.receiptNumber) {
+        const rc = String(r.receiptNumber).trim().toUpperCase();
+        if (rc) receiptMap.set(rc, r);
+      }
+      if (r.customerName && r.ward && (r.landPlot || r.mapSheet)) {
+        const key = `${r.customerName.trim().toLowerCase()}_${r.ward.trim().toLowerCase()}_${String(r.landPlot || '').trim()}_${String(r.mapSheet || '').trim()}`;
+        landInfoMap.set(key, r);
+      }
+    });
 
     const fileCodeCounts = new Map<string, number>();
     items.forEach(r => {
@@ -462,15 +495,35 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       let isDupInFile = false;
       let notFoundInSoftware = false;
 
+      const cUpper = record.code ? String(record.code).trim().toUpperCase() : '';
+      const noSpace = cUpper.replace(/\s+/g, '');
+      const core = extractCoreCode(cUpper);
+      const rcUpper = record.receiptNumber ? String(record.receiptNumber).trim().toUpperCase() : '';
+      const landKey = record.customerName && record.ward && (record.landPlot || record.mapSheet)
+        ? `${record.customerName.trim().toLowerCase()}_${record.ward.trim().toLowerCase()}_${String(record.landPlot || '').trim()}_${String(record.mapSheet || '').trim()}`
+        : '';
+
+      // Tìm hồ sơ khớp theo thứ tự ưu tiên
+      let matchedRecord: RecordFile | undefined = undefined;
+      if (cUpper && codeMap.has(cUpper)) {
+        matchedRecord = codeMap.get(cUpper);
+      } else if (noSpace && noSpaceCodeMap.has(noSpace)) {
+        matchedRecord = noSpaceCodeMap.get(noSpace);
+      } else if (core && core.length >= 2 && coreCodeMap.has(core)) {
+        matchedRecord = coreCodeMap.get(core);
+      } else if (rcUpper && receiptMap.has(rcUpper)) {
+        matchedRecord = receiptMap.get(rcUpper);
+      } else if (landKey && landInfoMap.has(landKey)) {
+        matchedRecord = landInfoMap.get(landKey);
+      }
+
       if (currentMode === 'create') {
         if (!record.customerName) errors.push("Thiếu tên Chủ sử dụng.");
         if (!record.recordType) errors.push("Thiếu Loại hồ sơ.");
         
         if (record.code) {
-          const cUpper = String(record.code).trim().toUpperCase();
-          if (existingCodeSet.has(cUpper)) {
+          if (matchedRecord) {
             isDupInSoftware = true;
-            // Cơ chế Force Upsert tự động Ghi đè/Cập nhật thông minh hồ sơ đã có mã
           }
           if ((fileCodeCounts.get(cUpper) || 0) > 1) {
             isDupInFile = true;
@@ -478,14 +531,19 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           }
         }
       } else {
-        if (!record.code) {
-          errors.push("Thiếu Mã HS (Bắt buộc để cập nhật).");
+        // Chế độ CẬP NHẬT:
+        if (!record.code && !record.receiptNumber) {
+          errors.push("Thiếu Mã HS hoặc Số biên nhận (Bắt buộc để cập nhật).");
+        } else if (!matchedRecord) {
+          notFoundInSoftware = true;
+          errors.push(`⚠️ Không tìm thấy hồ sơ tương ứng trên phần mềm.`);
         } else {
-          const cUpper = String(record.code).trim().toUpperCase();
-          if (!existingCodeSet.has(cUpper)) {
-            notFoundInSoftware = true;
-            errors.push(`⚠️ Mã hồ sơ "${record.code}" chưa có trên phần mềm (Không thể cập nhật).`);
+          // Khớp thành công: Kế thừa ID và nguồn bảng từ phần mềm để cập nhật chính xác
+          record.id = matchedRecord.id;
+          if (matchedRecord.code && !record.code) {
+            record.code = matchedRecord.code;
           }
+          if (!record.sourceTable) record.sourceTable = matchedRecord.sourceTable;
         }
       }
 
@@ -495,6 +553,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         !e.includes("Thiếu tên") && 
         !e.includes("Thiếu Loại") && 
         !e.includes("Thiếu Mã HS") &&
+        !e.includes("Không tìm thấy") &&
         !e.includes("chưa có trên phần mềm")
       );
       

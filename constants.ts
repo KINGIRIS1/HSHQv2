@@ -1,5 +1,5 @@
 
-import { RecordStatus, Employee, RecordFile, User, UserRole, Contract } from './types';
+import { RecordStatus, Employee, RecordFile, User, UserRole, Contract, AttachedDocItem } from './types';
 
 // CẤU HÌNH KẾT NỐI
 // QUAN TRỌNG: Để dùng Cloud (Supabase), hãy dán URL dự án vào đây.
@@ -61,19 +61,19 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 export const CAP_GIAY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận hồ sơ' },
   { key: RecordStatus.APPRAISAL, label: 'Chờ thẩm định' },
-  { key: RecordStatus.PENDING_POSTING, label: 'Niêm yết tại xã' },
+  { key: RecordStatus.PENDING_POSTING, label: 'Niêm yết tại xã (30 ngày)' },
   { key: RecordStatus.TAX_TRANSFER, label: 'Chờ chuyển thuế' },
   { key: RecordStatus.PENDING_TAX_KV7, label: 'Chờ thuế khu vực 7' },
-  { key: RecordStatus.PENDING_TAX_NOTICE, label: 'Ngày TBT' },
-  { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Chờ Giấy nộp tiền' },
+  { key: RecordStatus.PENDING_TAX_NOTICE, label: 'Chờ thông báo thuế' },
+  { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Chờ giấy nộp tiền' },
   { key: RecordStatus.PENDING_PRINT_CERT, label: 'Chờ in giấy chứng nhận' },
   { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
   { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
-  { key: RecordStatus.PENDING_HANDOVER, label: 'Vô số GCN / Chờ bàn giao' },
+  { key: RecordStatus.PENDING_HANDOVER, label: 'Chờ bàn giao' },
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
   { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },
   { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
-  { key: RecordStatus.WITHDRAWN, label: 'Csd rút hồ sơ' },
+  { key: RecordStatus.WITHDRAWN, label: 'CSD rút hồ sơ' },
   { key: RecordStatus.REJECTED, label: 'Huỷ hồ sơ' },
 ];
 
@@ -418,14 +418,14 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };
 
-// Hàm hiển thị tên đầy đủ pháp lý của loại hồ sơ - CHỈ DÙNG KHI IN GIẤY TIẾP NHẬN / GIẤY HẸN TRẢ KẾT QUẢ
+// Hàm hiển thị tên đầy đủ pháp lý của loại hồ sơ CÓ CHỨA MÃ SỐ HIỆU (Dùng cho dòng 'Thủ tục hành chính cần giải quyết' trên Biên nhận)
 export const getFullRecordType = (type: string | null | undefined): string => {
   if (!type) return '';
   const short = getShortRecordType(type);
   if (short === '1.1 Sao lục') return '1.1 Sao lục hồ sơ';
   if (short === '1.2 Công văn') return '1.2 Công văn';
   if (short === '2.1 Trích lục') return '2.1 Trích lục bản đồ địa chính';
-  if (short === '2.2 Trích đo') return '2.2 Trích đo';
+  if (short === '2.2 Trích đo') return '2.2 Trích đo địa chính';
   if (short === '2.3 Duyệt đơn') return '2.3 Duyệt đơn & Cung cấp số thửa đất';
   if (short === '2.4 Cắm mốc') return '2.4 Trích đo Cắm mốc ranh giới thửa đất';
   if (short === '2.5 Tách-Hợp thửa') return '2.5 Trích đo Tách thửa - Hợp thửa đất';
@@ -450,6 +450,136 @@ export const getFullRecordType = (type: string | null | undefined): string => {
   return type;
 };
 
+// Hàm hiển thị tên đầy đủ pháp lý của loại hồ sơ KHÔNG CHỨA MÃ SỐ HIỆU (Dùng cho ghép Phiếu yêu cầu & làm sạch giấy tờ kèm theo)
+export const getFullRecordTypeWithoutCode = (type: string | null | undefined): string => {
+  if (!type) return '';
+  const full = getFullRecordType(type);
+  return full.replace(/^[0-9]+(\.[0-9]+)*\s*/, '').trim();
+};
+
+// Hàm tự động ghép "Phiếu yêu cầu " + [Tên đầy đủ của thủ tục in trên biên nhận]
+export const getPhieuYeuCauTitle = (type: string | null | undefined): string => {
+  if (!type) return 'Phiếu yêu cầu';
+  const fullWithoutCode = getFullRecordTypeWithoutCode(type);
+  if (!fullWithoutCode) return 'Phiếu yêu cầu';
+
+  let lowerName = fullWithoutCode;
+  if (lowerName.startsWith('Trích đo Cắm mốc')) {
+    lowerName = 'trích đo cắm mốc ranh giới thửa đất';
+  } else if (lowerName.startsWith('Trích đo Tách thửa')) {
+    lowerName = 'trích đo tách thửa - hợp thửa đất';
+  } else if (lowerName.startsWith('Trích lục bản đồ')) {
+    lowerName = 'trích lục bản đồ địa chính';
+  } else if (lowerName.startsWith('Trích đo địa chính') || lowerName === 'Trích đo') {
+    lowerName = 'trích đo địa chính';
+  } else if (lowerName.startsWith('Sao lục hồ sơ') || lowerName === 'Sao lục') {
+    lowerName = 'sao lục hồ sơ';
+  } else if (lowerName.startsWith('Duyệt đơn')) {
+    lowerName = 'duyệt đơn & cung cấp số thửa đất';
+  } else {
+    lowerName = lowerName.charAt(0).toLowerCase() + lowerName.slice(1);
+  }
+
+  return `Phiếu yêu cầu ${lowerName}`;
+};
+
+// Hàm loại bỏ hoàn toàn số hiệu mã thủ tục khỏi tên giấy tờ đính kèm
+export const cleanDocumentName = (docName: string | null | undefined, recordType?: string | null): string => {
+  if (!docName) return '';
+  let cleaned = String(docName).trim();
+
+  // Nếu chứa cụm từ "Phiếu yêu cầu" cũ hoặc chung chung, cập nhật lại thành tên Phiếu yêu cầu động
+  if (cleaned.toLowerCase().includes('phiếu yêu cầu') || cleaned.toLowerCase().includes('phieu yeu cau')) {
+    if (recordType) {
+      return getPhieuYeuCauTitle(recordType);
+    }
+  }
+
+  // Loại bỏ số hiệu mã ở đầu (vd: "2.1 ", "2.2 ", "1.1 ", "3.1.1 ")
+  cleaned = cleaned.replace(/^[0-9]+(\.[0-9]+)*\s*/, '').trim();
+  return cleaned;
+};
+
+// Hàm tự động sinh danh sách giấy tờ kèm theo mặc định cho từng loại thủ tục (1.x, 2.x, 3.x)
+export const getDefaultAttachedDocsForType = (type: string | null | undefined): AttachedDocItem[] => {
+  if (!type) return [];
+  const t = String(type).trim();
+  const short = getShortRecordType(t);
+  
+  if (short.startsWith('3.') || t.startsWith('3.')) {
+    // 3.1.1 Chuyển quyền: Thêm "Hợp đồng hoặc văn bản về việc bán hoặc tặng cho hoặc để thừa kế hoặc góp vốn..." vào vị trí số 3
+    if (short.startsWith('3.1.1') || t.startsWith('3.1.1') || short.includes('3.1.1') || t.includes('Chuyển quyền')) {
+      return [
+        { id: '1', name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '2', name: 'Giấy chứng nhận đã cấp.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '3', name: 'Hợp đồng hoặc văn bản về việc bán hoặc tặng cho hoặc để thừa kế hoặc góp vốn...', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '4', name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành (nếu có).', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '5', name: 'Hồ sơ kỷ thuật bản đồ địa chính thửa đất', type: 'Bản chính', original: 1, copy: 0 }
+      ];
+    }
+
+    // 3.1.2 Phân chia quyền: Thêm "Văn bản thỏa thuận về việc thay đổi quyền sử dụng đất..." vào vị trí số 3
+    if (short.startsWith('3.1.2') || t.startsWith('3.1.2') || short.includes('3.1.2') || t.includes('Phân chia quyền')) {
+      return [
+        { id: '1', name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '2', name: 'Giấy chứng nhận đã cấp.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '3', name: 'Văn bản thỏa thuận về việc thay đổi quyền sử dụng đất...', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '4', name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành (nếu có).', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '5', name: 'Hồ sơ kỷ thuật bản đồ địa chính thửa đất', type: 'Bản chính', original: 1, copy: 0 }
+      ];
+    }
+
+    // 3.1.3 Theo Bản án / QĐ: Thêm "QĐ, bản án, Văn bản thỏa thuận về việc thay đổi quyền sử dụng đất..." vào vị trí số 3
+    if (short.startsWith('3.1.3') || t.startsWith('3.1.3') || short.includes('3.1.3') || t.includes('Bản án') || t.includes('bản án')) {
+      return [
+        { id: '1', name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '2', name: 'Giấy chứng nhận đã cấp.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '3', name: 'QĐ, bản án, Văn bản thỏa thuận về việc thay đổi quyền sử dụng đất...', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '4', name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành (nếu có).', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '5', name: 'Hồ sơ kỷ thuật bản đồ địa chính thửa đất', type: 'Bản chính', original: 1, copy: 0 }
+      ];
+    }
+
+    // 3.4.x Tách - hợp thửa: Thêm "Đơn đề nghị tách thửa đất, hợp thửa đất theo quy định." vào vị trí số 3
+    if (short.startsWith('3.4.') || t.startsWith('3.4.') || short.includes('3.4.') || t.includes('Tách - hợp') || t.includes('Tách thửa')) {
+      return [
+        { id: '1', name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '2', name: 'Giấy chứng nhận đã cấp.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '3', name: 'Đơn đề nghị tách thửa đất, hợp thửa đất theo quy định.', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '4', name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành (nếu có).', type: 'Bản chính', original: 1, copy: 0 },
+        { id: '5', name: 'Hồ sơ kỷ thuật bản đồ địa chính thửa đất', type: 'Bản chính', original: 1, copy: 0 }
+      ];
+    }
+
+    // Các thủ tục 3.x khác
+    return [
+      { id: '1', name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính', original: 1, copy: 0 },
+      { id: '2', name: 'Giấy chứng nhận đã cấp.', type: 'Bản chính', original: 1, copy: 0 },
+      { id: '3', name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành (nếu có).', type: 'Bản chính', original: 1, copy: 0 },
+      { id: '4', name: 'Hồ sơ kỷ thuật bản đồ địa chính thửa đất', type: 'Bản chính', original: 1, copy: 0 }
+    ];
+  }
+  
+  // 2.3 Duyệt đơn & Cung cấp số thửa đất
+  if (short.startsWith('2.3') || t.startsWith('2.3') || short.includes('2.3') || t.includes('Duyệt đơn') || t.includes('duyệt đơn')) {
+    return [
+      { id: '1', name: getPhieuYeuCauTitle(t), type: 'Bản chính', original: 1, copy: 0 },
+      { id: '2', name: 'Giấy chứng nhận quyền sử dụng đất đã cấp', type: 'Bản sao', original: 0, copy: 1 },
+      { id: '3', name: 'Đơn đề nghị tách thửa đất, hợp thửa đất theo quy định.', type: 'Bản chính', original: 1, copy: 0 },
+      { id: '4', name: 'Hồ sơ kỷ thuật bản đồ địa chính thửa đất', type: 'Bản chính', original: 1, copy: 0 }
+    ];
+  }
+  
+  if (short.startsWith('1.') || short.startsWith('2.') || t.startsWith('1.') || t.startsWith('2.')) {
+    return [
+      { id: '1', name: getPhieuYeuCauTitle(t), type: 'Bản chính', original: 1, copy: 0 },
+      { id: '2', name: 'Giấy chứng nhận quyền sử dụng đất đã cấp', type: 'Bản sao', original: 0, copy: 1 }
+    ];
+  }
+
+  return [];
+};
+
 export const isArchiveRecordType = (type: string | null | undefined): boolean => {
   if (!type) return false;
   const t = type.trim();
@@ -460,11 +590,21 @@ export const isArchiveRecordType = (type: string | null | undefined): boolean =>
 
 export const isArchiveRecord = (r: Partial<RecordFile> | null | undefined): boolean => {
   if (!r) return false;
+  // Ưu tiên 1: Mã thủ tục (recordType hoặc content) thuộc nhóm 1.x
+  if (isArchiveRecordType(r.recordType) || isArchiveRecordType(r.content)) return true;
+  
+  // Ưu tiên 2: Thủ tục rõ ràng của các nhóm khác thì KHÔNG phải lưu trữ
+  const rType = String(r.recordType || r.content || '').trim();
+  if (rType) {
+    const short = getShortRecordType(rType);
+    if (short.startsWith('2.') || short.startsWith('3.')) return false;
+  }
+
+  // Ưu tiên 3: Fallback theo group hoặc sourceTable nếu chưa có loại thủ tục
   if (r.sourceTable === 'luutru_records' || r.sourceTable === 'archive_records') return true;
-  const type = String(r.recordType || '').trim();
-  const code = String(r.code || '').trim();
-  if (type.startsWith('1.') || code.startsWith('1.')) return true;
-  return isArchiveRecordType(r.recordType) || isArchiveRecordType(r.content);
+  const groupStr = String(r.group || '').trim();
+  if (groupStr.startsWith('1.') || groupStr.toLowerCase().includes('lưu trữ')) return true;
+  return false;
 };
 
 // Kiểm tra hồ sơ có thuộc thủ tục 1.1 (Sao lục / Cung cấp tài liệu / dữ liệu đất đai) hay không
@@ -478,53 +618,78 @@ export const isRecordType11 = (recordOrType: Partial<RecordFile> | string | null
   return t.startsWith('1.1') || short.startsWith('1.1');
 };
 
-// Kiểm tra hồ sơ có thuộc module Đo đạc (nhóm 2.x) hay không
+// Kiểm tra hồ sơ có thuộc module Đo đạc (nhóm 2.x) hay không - Phân loại theo Mã thủ tục
 export const isSurveyRecordType = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
   if (!recordOrType) return true;
   const str = typeof recordOrType === 'string' 
     ? recordOrType 
     : String(recordOrType.recordType || recordOrType.content || '');
   const t = str.trim();
-  if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
-  if (t.startsWith('3.') || isCertificateRecordType(str)) return false;
+
+  if (t) {
+    const short = getShortRecordType(str);
+    if (t.startsWith('2.') || short.startsWith('2.')) return true;
+    if (t.startsWith('1.') || short.startsWith('1.') || isArchiveRecordType(str)) return false;
+    if (t.startsWith('3.') || short.startsWith('3.') || isCertificateRecordType(str)) return false;
+    const lower = str.toLowerCase();
+    if (lower.includes('trích lục') || lower.includes('trích đo') || lower.includes('cắm mốc') || lower.includes('đo đạc') || lower.includes('số thửa') || lower.includes('duyệt đơn') || lower.includes('tách thửa') || lower.includes('hợp thửa')) {
+      return true;
+    }
+    return false;
+  }
+
+  // Fallback nếu recordType để trống: kiểm tra group hoặc sourceTable
+  if (typeof recordOrType === 'object' && recordOrType !== null) {
+    const groupStr = String(recordOrType.group || '').trim();
+    if (groupStr.startsWith('2.') || groupStr.includes('Đo đạc')) return true;
+    if (recordOrType.sourceTable === 'land_records') return true;
+    if (recordOrType.sourceTable === 'dangky_records' || recordOrType.sourceTable === 'luutru_records') return false;
+  }
+
   return true;
 };
 
-// Kiểm tra hồ sơ có thuộc module Cấp giấy / Đăng ký đất đai (nhóm 3.x) hay không
+// Kiểm tra hồ sơ có thuộc module Cấp giấy / Đăng ký đất đai (nhóm 3.x) hay không - Phân loại theo Mã thủ tục
 export const isCertificateRecordType = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
   if (!recordOrType) return false;
-
-  if (typeof recordOrType === 'object' && recordOrType !== null) {
-    if (recordOrType.sourceTable === 'luutru_records' || recordOrType.sourceTable === 'archive_records') return false;
-    if (recordOrType.sourceTable === 'land_records') return false;
-    const code = String(recordOrType.code || '').trim();
-    if (code.toUpperCase().startsWith('LT-') || code.startsWith('1.') || code.startsWith('2.')) return false;
-    const dept = String((recordOrType as any).department || '').toLowerCase();
-    if (dept.includes('lưu trữ') || dept.includes('luu tru') || dept.includes('đo đạc') || dept.includes('do dac')) return false;
-    const groupStr = String(recordOrType.group || '').trim();
-    if (groupStr.startsWith('1.') || groupStr.startsWith('2.') || groupStr.includes('Đo đạc')) return false;
-  }
 
   const str = typeof recordOrType === 'string' 
     ? recordOrType 
     : String(recordOrType.recordType || recordOrType.content || '');
   const t = str.trim();
-  if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
 
-  const short = getShortRecordType(str);
-  if (t.startsWith('2.') || short.startsWith('2.')) return false;
-  if (t.startsWith('3.') || short.startsWith('3.')) return true;
-  const lower = str.toLowerCase();
-  return lower.includes('cấp gcn') || 
-         lower.includes('đăng ký biến động') || 
-         lower.includes('biến động') || 
-         lower.includes('cấp giấy') ||
-         lower.includes('chuyển quyền') ||
-         lower.includes('thế chấp') ||
-         lower.includes('cấp đổi') ||
-         lower.includes('cấp lại') ||
-         lower.includes('gia hạn') ||
-         lower.includes('đính chính');
+  if (t) {
+    const short = getShortRecordType(str);
+    if (t.startsWith('3.') || short.startsWith('3.')) return true;
+    if (t.startsWith('1.') || short.startsWith('1.') || isArchiveRecordType(str)) return false;
+    if (t.startsWith('2.') || short.startsWith('2.')) return false;
+    const lower = str.toLowerCase();
+    if (lower.includes('cấp gcn') || 
+        lower.includes('đăng ký biến động') || 
+        lower.includes('biến động') || 
+        lower.includes('cấp giấy') ||
+        lower.includes('chuyển quyền') ||
+        lower.includes('thế chấp') ||
+        lower.includes('cấp đổi') ||
+        lower.includes('cấp lại') ||
+        lower.includes('gia hạn') ||
+        lower.includes('đính chính') ||
+        lower.includes('thỏa thuận vợ chồng') ||
+        lower.includes('bản án') ||
+        lower.includes('thi hành án')) {
+      return true;
+    }
+    return false;
+  }
+
+  // Fallback nếu recordType để trống: kiểm tra group hoặc sourceTable
+  if (typeof recordOrType === 'object' && recordOrType !== null) {
+    const groupStr = String(recordOrType.group || '').trim();
+    if (groupStr.startsWith('3.') || groupStr.includes('Đăng ký') || groupStr.includes('Cấp GCN') || groupStr.includes('Cấp giấy')) return true;
+    if (recordOrType.sourceTable === 'dangky_records') return true;
+  }
+
+  return false;
 };
 
 // Hàm lấy tiền tố mã hồ sơ đo đạc theo địa bàn của người phân công tiếp nhận
@@ -706,4 +871,161 @@ export const formatDisplayCode = (code?: string) => {
     return "..." + code.slice(-12);
   }
   return code;
+};
+
+// ==========================================
+// TỪ ĐIỂN TÊN VĂN BẢN VÀ MÃ VIẾT TẮT FILE SCAN
+// ==========================================
+export interface DocumentScanType {
+  name: string;
+  code: string;
+  keywords?: string[];
+}
+
+export const DOCUMENT_SCAN_DICTIONARY: DocumentScanType[] = [
+  { name: 'Đơn đăng ký đất đai, tài sản gắn liền với đất', code: 'DDK', keywords: ['đăng ký đất đai', 'đăng ký lần đầu', 'ddk'] },
+  { name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất', code: 'DDKBD', keywords: ['biến động đất đai', 'biến động', 'ddkbd'] },
+  { name: 'Đơn xin cấp đổi Giấy chứng nhận', code: 'DXCD', keywords: ['cấp đổi giấy', 'cấp đổi gcn', 'cấp đổi', 'dxcd'] },
+  { name: 'Đơn xin (đề nghị) chuyển mục đích sử dụng đất', code: 'DXCMD', keywords: ['chuyển mục đích', 'dxcmd'] },
+  { name: 'Đơn xin (đề nghị) tách thửa đất, hợp thửa đất', code: 'DXTHT', keywords: ['tách thửa', 'hợp thửa', 'tách - hợp', 'dxtht'] },
+  { name: 'Đơn xin (đề nghị) gia hạn sử dụng đất', code: 'DGH', keywords: ['gia hạn sử dụng đất', 'gia hạn', 'dgh'] },
+  { name: 'Đơn đề nghị sử dụng đất kết hợp đa mục đích', code: 'DMD', keywords: ['đa mục đích', 'dmd'] },
+  { name: 'Đơn xin xác nhận lại thời hạn sử dụng đất nông nghiệp', code: 'DXNTH', keywords: ['thời hạn sử dụng đất nông nghiệp', 'đất nông nghiệp', 'dxnth'] },
+  { name: 'Đơn xin (đề nghị) giao đất, cho thuê đất', code: 'DXGD', keywords: ['giao đất', 'cho thuê đất', 'dxgd'] },
+  { name: 'Đơn xin điều chỉnh thời hạn sử dụng đất của dự án đầu tư', code: 'DDCTH', keywords: ['dự án đầu tư', 'điều chỉnh thời hạn', 'ddcth'] },
+  { name: 'Danh sách công khai hồ sơ cấp giấy CNQSDĐ', code: 'DSCK', keywords: ['công khai hồ sơ cấp giấy', 'dsck'] },
+  { name: 'Danh sách chủ sử dụng và các thửa đất (mẫu 15)', code: 'DS15', keywords: ['mẫu 15', 'chủ sử dụng và các thửa đất', 'ds15'] },
+  { name: 'Hợp đồng chuyển nhượng, tặng cho quyền sử dụng đất', code: 'HDCQ', keywords: ['chuyển nhượng', 'tặng cho', 'thừa kế', 'góp vốn', 'hdcq'] },
+  { name: 'Hợp đồng mua bán tài sản bán đấu giá', code: 'HDBDG', keywords: ['bán đấu giá tài sản', 'bán đấu giá', 'hdbdg'] },
+  { name: 'Hợp đồng thuê đất, điều chỉnh hợp đồng thuê đất', code: 'HDTD', keywords: ['thuê đất', 'hdtd'] },
+  { name: 'Hợp đồng thế chấp quyền sử dụng đất', code: 'HDTHC', keywords: ['thế chấp', 'giao dịch bảo đảm', 'gdbd', 'hdthc'] },
+  { name: 'Hoá đơn giá trị gia tăng', code: 'hoadon', keywords: ['hóa đơn', 'hoá đơn', 'vat', 'hoadon'] },
+  { name: 'Hợp đồng thi công', code: 'HDTCO', keywords: ['thi công', 'hdtco'] },
+  { name: 'Phiếu kiểm tra hồ sơ', code: 'PKTHS', keywords: ['kiểm tra hồ sơ', 'pkths'] },
+  { name: 'Giấy chứng nhận quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất (Mới)', code: 'GCNM', keywords: ['gcn mới', 'sổ mới', 'gcnm'] },
+  { name: 'Giấy chứng nhận quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất', code: 'GCNC', keywords: ['gcn cũ', 'sổ cũ', 'giấy chứng nhận đã cấp', 'gcn đã cấp', 'bản gốc', 'gcnc'] },
+  { name: 'Giấy xác nhận đăng ký lần đầu', code: 'GXNDKLD', keywords: ['đăng ký lần đầu', 'gxndkld'] },
+  { name: 'Văn bản thỏa thuận phân chia di sản thừa kế', code: 'VBTK', keywords: ['phân chia di sản', 'thừa kế', 'vbtk'] },
+  { name: 'Văn bản từ chối nhận di sản thừa kế', code: 'VBTC', keywords: ['từ chối nhận di sản', 'từ chối thừa kế', 'vbtc'] },
+  { name: 'Di chúc', code: 'DICHUC', keywords: ['di chúc', 'dichuc'] },
+  { name: 'Thông báo công bố công khai di chúc', code: 'CKDC', keywords: ['công khai di chúc', 'ckdc'] },
+  { name: 'Biên bản về việc kết thúc công khai công bố di chúc', code: 'BBKTDC', keywords: ['kết thúc công khai di chúc', 'bbktdc'] },
+  { name: 'Đơn đề nghị miễn giảm Lệ phí trước bạ, thuế thu nhập cá nhân', code: 'DMG', keywords: ['miễn giảm lệ phí', 'miễn giảm thuế', 'dmg'] },
+  { name: 'Đơn đề nghị chuyển hình thức giao đất (cho thuê đất)', code: 'CHTGD', keywords: ['chuyển hình thức giao đất', 'chtgd'] },
+  { name: 'Đơn đề nghị điều chỉnh quyết định giao đất (cho thuê đất, cho phép chuyển mục đích)', code: 'DCQDGD', keywords: ['điều chỉnh quyết định giao đất', 'dcqdgd'] },
+  { name: 'Tờ trình về việc đăng ký đất đai, tài sản gắn liền với đất (UBND xã)', code: 'TTCG', keywords: ['tờ trình đăng ký đất đai', 'tờ trình ubnd xã', 'ttcg'] },
+  { name: 'Tờ trình về việc giao đất (cho thuê đất, cho phép chuyển mục đích)', code: 'TTr', keywords: ['tờ trình giao đất', 'ttr'] },
+  { name: 'Tờ khai thuế (trước bạ, thuế TNCN, tiền sử dụng đất)', code: 'TKT', keywords: ['tờ khai thuế', 'trước bạ', 'thuế tncn', 'tkt'] },
+  { name: 'Thông báo thuế (trước bạ, thuế TNCN, tiền sử dụng đất)', code: 'TBT', keywords: ['thông báo thuế', 'tbt'] },
+  { name: 'Phiếu chuyển thông tin nghĩa vụ tài chính', code: 'PCT', keywords: ['phiếu chuyển', 'nghĩa vụ tài chính', 'pct'] },
+  { name: 'Giấy nộp tiền vào Ngân sách nhà nước', code: 'GNT', keywords: ['giấy nộp tiền', 'ngân sách nhà nước', 'gnt'] },
+  { name: 'Biên lai thu thuế sử dụng đất phi nông nghiệp', code: 'BLTT', keywords: ['phi nông nghiệp', 'biên lai thu thuế', 'bltt'] },
+  { name: 'Thông báo xác nhận Hoàn thành nghĩa vụ tài chính', code: 'HTNVTC', keywords: ['hoàn thành nghĩa vụ tài chính', 'htnvtc'] },
+  { name: 'Quyết định cho phép tách thửa', code: 'QDTT', keywords: ['cho phép tách thửa', 'qdtt'] },
+  { name: 'Sơ đồ dự kiến tách thửa', code: 'SDTT', keywords: ['sơ đồ dự kiến', 'sdtt'] },
+  { name: 'Quyết định giao đất, cho thuê đất', code: 'QDGTD', keywords: ['quyết định giao đất', 'qdgtd'] },
+  { name: 'Quyết định cho phép chuyển mục đích', code: 'QDCMD', keywords: ['cho phép chuyển mục đích', 'qdcmd'] },
+  { name: 'Quyết định chuyển hình thức giao đất (cho thuê đất)', code: 'QDCHTGD', keywords: ['chuyển hình thức giao đất', 'qdchtgd'] },
+  { name: 'Quyết định điều chỉnh quyết định giao đất (cho thuê đất, cho phép chuyển mục đích)', code: 'QDDCGD', keywords: ['điều chỉnh quyết định giao đất', 'qddcgd'] },
+  { name: 'Quyết định gia hạn sử dụng đất khi hết thời hạn SDĐ', code: 'QDGH', keywords: ['gia hạn sử dụng đất', 'qdgh'] },
+  { name: 'Quyết định điều chỉnh thời hạn SDĐ của dự án đầu tư', code: 'QDDCTH', keywords: ['điều chỉnh thời hạn sdđ', 'qddcth'] },
+  { name: 'Quyết định về hình thức sử dụng đất', code: 'QDHTSD', keywords: ['hình thức sử dụng đất', 'qdhtsd'] },
+  { name: 'Quyết định phê duyệt phương án bồi thường, hỗ trợ, tái định cư', code: 'QDPDBT', keywords: ['bồi thường', 'hỗ trợ', 'tái định cư', 'qdpdbt'] },
+  { name: 'Quyết định thi hành án theo đơn yêu cầu', code: 'QDTHA', keywords: ['thi hành án', 'qdtha'] },
+  { name: 'Quyết định phê duyệt điều chỉnh quy hoạch', code: 'QDDCQH', keywords: ['điều chỉnh quy hoạch', 'qddcqh'] },
+  { name: 'Quyết định phê duyệt đơn giá', code: 'QDPDDG', keywords: ['phê duyệt đơn giá', 'qdpddg'] },
+  { name: 'Quyết định hủy Giấy chứng nhận quyền sử dụng đất', code: 'QDHG', keywords: ['hủy giấy chứng nhận', 'hủy gcn', 'qdhg'] },
+  { name: 'Quyết định thu hồi đất', code: 'QDTH', keywords: ['thu hồi đất', 'qdth'] },
+  { name: 'Biên bản bán đấu giá tài sản', code: 'BBBDG', keywords: ['bán đấu giá tài sản', 'bbbdg'] },
+  { name: 'Biên bản bàn giao đất trên thực địa', code: 'BBGD', keywords: ['bàn giao đất', 'thực địa', 'bbgd'] },
+  { name: 'Văn bản đề nghị chấp thuận nhận chuyển nhượng, thuê, góp vốn quyền sdđ', code: 'VBDNCT', keywords: ['chấp thuận nhận chuyển nhượng', 'vbdnct'] },
+  { name: 'Văn bản đề nghị thẩm định, phê duyệt phương án sdđ', code: 'PDPASDD', keywords: ['phê duyệt phương án sdđ', 'pdpasdd'] },
+  { name: 'Văn bản thỏa thuận quyền sử dụng đất của hộ gia đình', code: 'TTHGD', keywords: ['hộ gia đình', 'vợ và chồng', 'tthgd'] },
+  { name: 'Văn bản thỏa thuận về việc xác lập quyền hạn chế đối với thửa đất liền kề', code: 'HCLK', keywords: ['quyền hạn chế đối với thửa đất liền kề', 'hclk'] },
+  { name: 'Văn bản thoả thuận về việc chấm dứt quyền hạn chế đối với thửa đất liền kề', code: 'CDLK', keywords: ['chấm dứt quyền hạn chế', 'cdlk'] },
+  { name: 'Văn bản chấp thuận cho phép chuyển mục đích', code: 'VBCTCMD', keywords: ['chấp thuận cho phép chuyển mục đích', 'vbctcmd'] },
+  { name: 'Biên bản của Hội đồng đăng ký đất đai lần đầu', code: 'BBHDDK', keywords: ['hội đồng đăng ký đất đai', 'bbhddk'] },
+  { name: 'Thông báo về việc công khai kết quả thẩm tra xét duyệt hồ sơ cấp giấy chứng nhận quyền sử dụng đất', code: 'TBCKCG', keywords: ['công khai kết quả thẩm tra xét duyệt', 'tbckcg'] },
+  { name: 'Biên bản về việc kết thúc thông báo niêm yết công khai kết quả kiểm tra hồ sơ đăng ký cấp GCNQSD đất', code: 'KTCKCG', keywords: ['kết thúc thông báo niêm yết công khai', 'ktckcg'] },
+  { name: 'Thông báo về việc chuyển thông tin Giấy chứng nhận bị mất để niêm yết công khai', code: 'TBMG', keywords: ['chuyển thông tin giấy chứng nhận bị mất', 'tbmg'] },
+  { name: 'Thông báo về việc niêm yết công khai mất giấy chứng nhận quyền sử dụng đất', code: 'TBCKMG', keywords: ['mất giấy chứng nhận', 'mất gcn', 'tbckmg'] },
+  { name: 'Biên bản về việc kết thúc thông báo niêm yết công khai về việc mất GCNQSD đất', code: 'KTCKMG', keywords: ['kết thúc niêm yết mất gcn', 'ktckmg'] },
+  { name: 'Bảng liệt kê danh sách các thửa đất cấp giấy', code: 'DSCG', keywords: ['danh sách các thửa đất cấp giấy', 'dscg'] },
+  { name: 'Bảng kê khai diện tích đang sử dụng', code: 'BKKDT', keywords: ['kê khai diện tích', 'bkkdt'] },
+  { name: 'Phiếu xác nhận kết quả đo đạc', code: 'PXNKQDD', keywords: ['xác nhận kết quả đo đạc', 'pxnkqdd'] },
+  { name: 'Phiếu yêu cầu đăng ký biện pháp bảo đảm bằng quyền sử dụng đất, tài sản gắn liền với đất', code: 'DKTC', keywords: ['đăng ký biện pháp bảo đảm', 'đăng ký thế chấp', 'dktc'] },
+  { name: 'Phiếu yêu cầu xóa đăng ký biện pháp bảo đảm bằng quyền sử dụng đất, tài sản gắn liền với đất', code: 'DKXTC', keywords: ['xóa đăng ký biện pháp bảo đảm', 'xóa thế chấp', 'xóa đk gdbd', 'dkxtc'] },
+  { name: 'Phiếu yêu cầu đăng ký thay đổi nội dung biện pháp bảo đảm bằng quyền sdđ, tài sản gắn liền với đất', code: 'DKTD', keywords: ['thay đổi nội dung biện pháp bảo đảm', 'dktd'] },
+  { name: 'Giấy ủy quyền', code: 'GUQ', keywords: ['giấy ủy quyền', 'uỷ quyền', 'guq'] },
+  { name: 'Hợp đồng ủy quyền', code: 'HDUQ', keywords: ['hợp đồng ủy quyền', 'hợp đồng uỷ quyền', 'hduq'] },
+  { name: 'Quét mã QR', code: 'QR', keywords: ['mã qr', 'qr'] },
+  { name: 'Bản mô tả ranh giới, mốc giới thửa đất', code: 'BMT', keywords: ['ranh giới', 'mốc giới', 'bản mô tả', 'bmt'] },
+  { name: 'Biên bản kiểm tra, xác minh hiện trạng sử dụng đất', code: 'BBKTHT', keywords: ['xác minh hiện trạng', 'hiện trạng sử dụng đất', 'bbktht'] },
+  { name: 'Hồ sơ kỷ thuật bản đồ địa chính thửa đất', code: 'HSKT', keywords: ['hồ sơ kỷ thuật', 'hồ sơ kỹ thuật', 'trích lục', 'đo tách', 'chỉnh lý', 'bản vẽ', 'hskt'] },
+  { name: 'Bản vẽ nhà', code: 'BVN', keywords: ['bản vẽ nhà', 'bvn'] },
+  { name: 'Giấy xin phép xây dựng', code: 'GPXD', keywords: ['phép xây dựng', 'gpxd'] },
+  { name: 'Bản vẽ hoàn công', code: 'BVHC', keywords: ['hoàn công', 'bvhc'] },
+  { name: 'Biên bản kiểm tra sai sót trên Giấy chứng nhận', code: 'BBKTSS', keywords: ['sai sót trên giấy chứng nhận', 'bbktss'] },
+  { name: 'Giấy tờ liên quan (các loại giấy tờ kèm theo)', code: 'GTLQ', keywords: ['giấy tờ liên quan', 'tài liệu khác', 'gtlq'] },
+  { name: 'Giấy chứng nhận kết hôn', code: 'GKH', keywords: ['kết hôn', 'hôn thú', 'gkh'] },
+  { name: 'Căn cước công dân', code: 'CCCD', keywords: ['căn cước', 'cccd', 'cmnd'] },
+  { name: 'Giấy Khai Sinh', code: 'GKS', keywords: ['khai sinh', 'gks'] },
+  { name: 'Quyết định xử phạt', code: 'QDXP', keywords: ['xử phạt', 'vphc', 'qdxp'] },
+  { name: 'Đơn cam kết, Giấy cam Kết', code: 'DCK', keywords: ['cam kết', 'dck'] },
+  { name: 'Đơn xác nhận, Giấy Xác nhận', code: 'DXN', keywords: ['xác nhận', 'dxn'] },
+  { name: 'Phiếu lấy ý kiến khu dân cư', code: 'PLYKDC', keywords: ['ý kiến khu dân cư', 'plykdc'] },
+  { name: 'Giấy sang nhượng đất', code: 'GSND', keywords: ['sang nhượng đất', 'giấy tay', 'gsnd'] },
+  { name: 'Giấy đề nghị xác nhận các khoản nộp vào ngân sách', code: 'GXNNVTC', keywords: ['khoản nộp vào ngân sách', 'gxnnvtc'] },
+  { name: 'Biên bản kiểm tra nghiệm thu công trình xây dựng', code: 'BBNT', keywords: ['nghiệm thu công trình', 'bbnt'] },
+  { name: 'Hoàn thành công tác bồi thường hỗ trợ', code: 'HTBTH', keywords: ['hoàn thành công tác bồi thường', 'htbth'] },
+  { name: 'Thông báo cập nhật, chỉnh lý biến động', code: 'TBCNBD', keywords: ['cập nhật, chỉnh lý biến động', 'tbcnbd'] },
+  { name: 'Văn bản cam kết tài sản riêng', code: 'CKTSR', keywords: ['tài sản riêng', 'cktsr'] }
+];
+
+export const getScanCodeForDocName = (nameOrType: string | null | undefined): string => {
+  if (!nameOrType) return 'GTLQ';
+  const clean = nameOrType.trim();
+  const lower = clean.toLowerCase();
+
+  // 1. Khớp chính xác mã viết tắt
+  const exactCode = DOCUMENT_SCAN_DICTIONARY.find(d => d.code.toLowerCase() === lower);
+  if (exactCode) return exactCode.code;
+
+  // 2. Khớp chính xác tên văn bản
+  const exactName = DOCUMENT_SCAN_DICTIONARY.find(d => d.name.toLowerCase() === lower);
+  if (exactName) return exactName.code;
+
+  // 3. Khớp theo từ khóa đặc trưng
+  for (const item of DOCUMENT_SCAN_DICTIONARY) {
+    if (lower.includes(item.name.toLowerCase())) return item.code;
+    if (item.keywords?.some(kw => lower.includes(kw.toLowerCase()))) {
+      return item.code;
+    }
+  }
+
+  // 4. Nếu là mã viết tắt dạng ký tự in hoa 2-8 ký tự
+  if (/^[A-Za-z0-9_-]{2,8}$/.test(clean)) {
+    return clean.toUpperCase();
+  }
+
+  return 'GTLQ';
+};
+
+export const getDocNameForScanCode = (code: string | null | undefined): string => {
+  if (!code) return '';
+  const clean = code.trim().toUpperCase();
+  const match = DOCUMENT_SCAN_DICTIONARY.find(d => d.code.toUpperCase() === clean);
+  return match ? match.name : clean;
+};
+
+// Định dạng chuẩn tên file scan: [MÃ_VIẾT_TẮT] [MÃ_HỒ_SƠ].[đuôi_tệp]
+export const formatStandardScanFileName = (
+  scanCodeOrDocName: string,
+  recordCode: string,
+  originalFileName: string
+): string => {
+  const sanitizedCode = (recordCode || 'HS').trim().replace(/[/\\?%*:|"<>]/g, '-');
+  const ext = originalFileName.split('.').pop()?.toLowerCase() || 'pdf';
+  const abbr = getScanCodeForDocName(scanCodeOrDocName);
+  return `${abbr} ${sanitizedCode}.${ext}`;
 };

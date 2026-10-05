@@ -251,34 +251,22 @@ export const markRecordsRecentlyUpdated = (records: (RecordFile | Partial<Record
  */
 export const getExplicitGroup = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' | null => {
     const rawType = String(record.recordType || record.content || '').trim();
-    const code = String(record.code || '').trim();
+    const shortType = getShortRecordType(rawType);
     const groupStr = String(record.group || '').trim();
 
-    // 1. ƯU TIÊN 1: recordType hoặc content có tiền tố nhóm rõ ràng (1.x, 2.x, 3.x) hoặc tên loại trích lục/đo đạc/cấp giấy
-    if (/^1\.\d+/i.test(rawType) || isArchiveRecordType(rawType)) {
+    // 1. ƯU TIÊN TUYỆT ĐỐI 1: Mã thủ tục (recordType hoặc content)
+    if (shortType.startsWith('1.') || isArchiveRecordType(rawType)) {
         return 'luutru_records';
     }
-    if (/^2\.\d+/i.test(rawType) || isSurveyRecordType(rawType)) {
+    if (shortType.startsWith('2.') || isSurveyRecordType(rawType)) {
         return 'land_records';
     }
-    if (/^3\.\d+/i.test(rawType) || isCertificateRecordType(rawType)) {
+    if (shortType.startsWith('3.') || isCertificateRecordType(rawType)) {
         return 'dangky_records';
     }
 
-    // 2. ƯU TIÊN 2: Tiền tố mã CODE rõ ràng (1.x, 2.x, 3.x, LT-)
-    // Lưu ý: code phải có tiền tố dạng 1.xx, 2.xx, 3.xx hoặc LT- để không nhầm với mã ngày tháng (như 260919-7806)
-    if (/^1\.\d+/i.test(code) || code.toUpperCase().startsWith('LT-')) {
-        return 'luutru_records';
-    }
-    if (/^2\.\d+/i.test(code)) {
-        return 'land_records';
-    }
-    if (/^3\.\d+/i.test(code)) {
-        return 'dangky_records';
-    }
-
-    // 3. ƯU TIÊN 3: Tiền tố group rõ ràng
-    if (/^1\./i.test(groupStr)) {
+    // 2. ƯU TIÊN 2: Nhóm nghiệp vụ (group)
+    if (/^1\./i.test(groupStr) || groupStr.toLowerCase().includes('lưu trữ')) {
         return 'luutru_records';
     }
     if (/^2\./i.test(groupStr) || groupStr.includes('Đo đạc')) {
@@ -288,12 +276,24 @@ export const getExplicitGroup = (record: Partial<RecordFile>): 'dangky_records' 
         return 'dangky_records';
     }
 
+    // 3. ƯU TIÊN 3: Tiền tố mã CODE chỉ dùng khi hồ sơ hoàn toàn không có Mã thủ tục
+    const code = String(record.code || '').trim();
+    if (/^1\.\d+/i.test(code) || code.toUpperCase().startsWith('LT-')) {
+        return 'luutru_records';
+    }
+    if (/^2\.\d+/i.test(code) || code.toUpperCase().startsWith('DD-') || code.toUpperCase().startsWith('TK-') || code.toUpperCase().startsWith('TQ-') || code.toUpperCase().startsWith('MD-') || code.toUpperCase().startsWith('TH-')) {
+        return 'land_records';
+    }
+    if (/^3\.\d+/i.test(code) || code.toUpperCase().startsWith('CG-')) {
+        return 'dangky_records';
+    }
+
     return null;
 };
 
 /**
  * Định tuyến bảng dữ liệu suy đoán:
- * - Ưu tiên kiểm tra explicit group
+ * - Ưu tiên kiểm tra explicit group (Mã thủ tục)
  * - Sau đó kiểm tra isSurveyRecordType / isArchiveRecordType / isCertificateRecordType
  * - Sau đó kiểm tra nhóm, phòng ban, từ khóa và cache
  */
@@ -302,10 +302,12 @@ export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' 
     if (explicit) return explicit;
 
     const rawType = String(record.recordType || record.content || '').trim();
+    const shortType = getShortRecordType(rawType);
     const groupStr = String(record.group || '').trim();
 
     // 1. Nhóm Lưu trữ
     if (
+        shortType.startsWith('1.') ||
         isArchiveRecordType(record.recordType) ||
         isArchiveRecordType(record.content) ||
         rawType.toLowerCase().includes('sao lục') ||
@@ -316,18 +318,21 @@ export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' 
 
     // 2. Nhóm Đo đạc (2.x)
     if (
+        shortType.startsWith('2.') ||
         isSurveyRecordType(record.recordType) ||
         isSurveyRecordType(record.content) ||
         groupStr.includes('Đo đạc') ||
         rawType.toLowerCase().includes('trích lục') ||
         rawType.toLowerCase().includes('trích đo') ||
-        rawType.toLowerCase().includes('cắm mốc')
+        rawType.toLowerCase().includes('cắm mốc') ||
+        rawType.toLowerCase().includes('số thửa')
     ) {
         return 'land_records';
     }
 
     // 3. Nhóm Đăng ký / Cấp giấy (3.x)
     if (
+        shortType.startsWith('3.') ||
         isCertificateRecordType(record) ||
         groupStr.includes('Đăng ký') ||
         groupStr.includes('Cấp GCN') ||
@@ -372,31 +377,22 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
 
     const validSource = normalizeSource(record.sourceTable);
 
-    // Nếu nguồn gốc là lưu trữ (luutru_records) và recordType không phải là thủ tục cấp giấy (3.x), giữ nguyên luutru_records
-    if (validSource === 'luutru_records') {
-        const rType = String(record.recordType || '').trim();
-        const short = getShortRecordType(rType);
-        if (!rType.startsWith('3.') && !short.startsWith('3.') && !isCertificateRecordType(record)) {
-            return 'luutru_records';
-        }
-    }
-
+    // ƯU TIÊN 1: Phân loại theo Mã thủ tục
     const explicitGroup = getExplicitGroup(record);
     const inferredGroup = explicitGroup || getInferredTable(record);
 
-    // ƯU TIÊN 1-3: Phân loại theo recordType, tiền tố mã hoặc nhóm nghiệp vụ
     if (inferredGroup) {
         return inferredGroup;
     }
 
-    // ƯU TIÊN 4: Nếu không có dấu hiệu phân loại rõ ràng nhưng có sourceTable hợp lệ -> Sử dụng sourceTable
+    // ƯU TIÊN 2: Nguồn bảng hợp lệ từ trước
     if (validSource) {
         return validSource;
     }
 
-    // BẮT BUỘC BLOCK ROUTING_UNRESOLVED khi không thể xác định
-    console.error(`[ROUTING_GUARD][UNRESOLVED] Unable to resolve target table for record:`, record);
-    throw new Error(`ROUTING_UNRESOLVED: Unable to resolve target table for record (ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'}). Mutation blocked.`);
+    // ƯU TIÊN 3: Fallback an toàn về 'land_records' (Đo đạc), ngăn chặn hoàn toàn lỗi chặn lưu hồ sơ
+    console.warn(`[ROUTING_GUARD] Defaulting to land_records for record without clear procedure code:`, record.code || record.id);
+    return 'land_records';
 };
 
 /**
@@ -1650,16 +1646,8 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
     markRecordsRecentlyUpdated([record]);
 
     if (!isOnline()) {
-        console.log(`[MUTATION] Supabase offline mode (isOnline=false). Saved to offline queue.`);
-        const offlineRecord = { 
-            ...record, 
-            sourceTable: targetTable, 
-            _isOfflineSaved: true,
-            _baseUpdatedAt: (record as any)._baseUpdatedAt || record.updated_at || (record as any).updatedAt 
-        };
-        await addPendingRecord(offlineRecord, 'UPDATE', targetTable);
-        syncCacheOnUpdate(offlineRecord);
-        return offlineRecord;
+        console.error(`[MUTATION] Supabase offline mode (isOnline=false). Update refused to protect DB integrity.`);
+        throw new Error("Mất kết nối tới CSDL Supabase. Không thể lưu hồ sơ trực tiếp vào máy chủ!");
     }
 
     // Lấy previousUpdatedAt từ record truyền vào (_baseUpdatedAt nếu là mutation được lưu từ queue)
@@ -1826,13 +1814,6 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
     } catch (error: any) {
         console.error(`[MUTATION][FAIL] Supabase UPDATE failed for ID ${record.id}`, error);
         logError("updateRecordApi", error, true);
-        
-        if (isTransientError(error)) {
-            const offlineRecord = { ...record, sourceTable: targetTable, _isOfflineSaved: true };
-            await addPendingRecord(offlineRecord, 'UPDATE', targetTable);
-            syncCacheOnUpdate(offlineRecord);
-            return offlineRecord;
-        }
         throw error;
     }
 };
@@ -2843,33 +2824,12 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
     markRecordsRecentlyUpdated(updates);
 
     if (!isOnline()) {
-        console.log(`[MUTATION] Supabase offline mode (isOnline=false). Enqueueing ${updates.length} updates to sync queue.`);
-        const idToExistingMap = new Map<string, RecordFile>();
-        MOCK_RECORDS.forEach(r => idToExistingMap.set(r.id, r));
-
-        const fullMergedUpdates: RecordFile[] = updates.map(u => {
-            const existing = u.id ? idToExistingMap.get(u.id) : undefined;
-            const merged = { ...(existing || {}), ...u, _isOfflineSaved: true } as RecordFile;
-            merged.sourceTable = getTargetTable(merged);
-            return merged;
-        });
-
-        // 1. Lưu vào Sync Queue trước (Persistence-First)
-        for (const item of fullMergedUpdates) {
-            await addPendingRecord(item, 'UPDATE', item.sourceTable as any);
-        }
-
-        // 2. Chỉ cập nhật RAM & Cache sau khi đã persist vào Queue thành công
-        fullMergedUpdates.forEach(up => {
-            const idx = MOCK_RECORDS.findIndex(r => r.id === up.id);
-            if (idx !== -1) {
-                MOCK_RECORDS[idx] = { ...MOCK_RECORDS[idx], ...up } as RecordFile;
-            }
-        });
-        await syncCacheOnBatchUpdate(fullMergedUpdates);
-        saveToCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
-        if (onProgress) onProgress(updates.length, updates.length);
-        return { success: true, count: updates.length };
+        console.error(`[MUTATION] Supabase offline mode (isOnline=false). Update batch refused.`);
+        return { 
+            success: false, 
+            count: 0, 
+            error: 'Mất kết nối tới CSDL Supabase. Dữ liệu chưa được lưu vào hệ thống máy chủ!' 
+        };
     }
 
     try {
@@ -3005,7 +2965,7 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
                     }
                 }
             }
-            return { success: false, count: 0, error: 'Lỗi đồng bộ dữ liệu tới Supabase. Đã lưu vào hàng đợi đồng bộ.' };
+            return { success: false, count: 0, error: 'Lỗi đồng bộ dữ liệu tới Supabase: CSDL đã từ chối cập nhật.' };
         }
 
         console.log(`[MUTATION] Supabase UPDATE: SUCCESS for ${updates.length} records`);

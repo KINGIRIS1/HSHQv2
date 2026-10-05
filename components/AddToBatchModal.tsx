@@ -30,6 +30,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   const [selectedHandoverWard, setSelectedHandoverWard] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // State xác nhận danh sách chỉnh lý
   const [needsCorrectionConfirm, setNeedsCorrectionConfirm] = useState(false);
@@ -38,6 +39,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
     if (isOpen) {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
+      setErrorMsg(null);
     }
   }, [isOpen]);
 
@@ -234,6 +236,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       }
       const handoverWard = selectedHandoverWard;
 
+      setErrorMsg(null);
       isSubmittingRef.current = true;
       setIsSubmitting(true);
       try {
@@ -256,9 +259,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
           }
           setNeedsCorrectionConfirm(false);
           setSelectedHandoverWard('');
+          setErrorMsg(null);
           onClose();
-      } catch (err) {
+      } catch (err: any) {
           console.error("Lỗi chốt danh sách giao 1 cửa:", err);
+          const msg = err?.message || 'Không thể lưu vào Cơ sở dữ liệu Supabase!';
+          setErrorMsg(msg);
+          alert(`⚠️ LỖI CHỐT DANH SÁCH GIAO 1 CỬA:\n${msg}\n\n👉 Dữ liệu chưa được lưu. Vui lòng thử lại!`);
       } finally {
           setIsSubmitting(false);
           isSubmittingRef.current = false;
@@ -277,6 +284,16 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 
         {/* Body */}
         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+            {errorMsg && (
+                <div className="p-3 bg-red-50 border-2 border-red-300 rounded-xl text-red-800 text-xs flex items-start gap-2 shadow-xs">
+                    <span className="text-base leading-none">⚠️</span>
+                    <div className="flex-1">
+                        <strong className="block font-bold uppercase text-[11px] mb-0.5">Lỗi lưu cơ sở dữ liệu</strong>
+                        <p className="whitespace-pre-line leading-relaxed">{errorMsg}</p>
+                    </div>
+                    <button type="button" onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-700 font-bold text-sm">✕</button>
+                </div>
+            )}
             
             <p className="text-sm text-gray-600 leading-relaxed">
                 Bạn đang thực hiện chốt <strong className="text-sm font-bold text-gray-800">{selectedCount > 0 ? selectedCount : 'toàn bộ'}</strong> hồ sơ sang trạng thái "Đã giao".

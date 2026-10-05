@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { LogIn, Eye, EyeOff, Check } from 'lucide-react';
+import { LogIn, Eye, EyeOff, Check, RefreshCw, Cloud } from 'lucide-react';
 import { APP_VERSION } from '../constants';
 import { authenticateUserCloud } from '../services/apiPeople';
+import { resetToDefaultEndpoint, SUPABASE_URL } from '../services/supabaseClient';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -176,7 +177,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] active:bg-[#1e40af] text-white py-3 sm:py-3.5 rounded-2xl font-black text-sm sm:text-base shadow-lg shadow-blue-600/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed border border-blue-400/30 tracking-wide"
+              className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] active:bg-[#1e40af] text-white py-3 sm:py-3.5 rounded-2xl font-black text-sm sm:text-base shadow-lg shadow-blue-600/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed border border-blue-400/30 tracking-wide cursor-pointer"
             >
               {isLoading ? (
                 <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
@@ -187,6 +188,23 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                 </>
               )}
             </button>
+
+            {/* Nút khôi phục kết nối CSDL Cloud */}
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Khôi phục kết nối về Máy chủ Đám mây (Cloud Supabase) mặc định?')) {
+                    resetToDefaultEndpoint();
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 text-xs text-blue-200 hover:text-white font-medium underline underline-offset-4 cursor-pointer transition-colors"
+                title="Sử dụng CSDL Cloud đồng bộ giữa Web và PC"
+              >
+                <Cloud size={13} />
+                <span>Khôi phục kết nối CSDL Cloud</span>
+              </button>
+            </div>
           </form>
 
         </div>

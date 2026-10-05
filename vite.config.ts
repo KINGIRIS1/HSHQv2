@@ -20,8 +20,8 @@ customLogger.info = (msg, options) => {
 export default defineConfig({
   customLogger,
   plugins: [react()],
-  // Base path for web application deployment
-  base: '/', 
+  // Base path for web and desktop application deployment
+  base: './', 
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),

@@ -81,14 +81,150 @@ export const saveWorkingHoursConfig = (_h: any) => {};
 export const DEFAULT_PROCEDURES = [];
 export const formatDurationShort = (m: number) => `${m || 0}h`;
 export const formatMinutesToVietnamese = (m: number) => `${m || 0} phút`;
-export const calculateRecordStepSla = (_r: any, _s?: any, _p?: any) => ({
-  elapsedHours: 0,
-  remainingHours: 8,
-  status: 'ontime',
-  isOverdue: false,
-  percent: 0,
-  overdueHours: 0
-});
+export const calculateRecordStepSla = (
+  record: Partial<RecordFile>,
+  stepKey?: RecordStatus | string,
+  procedureCode?: string
+): StepSlaResult => {
+  const workflow = getRegistrationWorkflow(procedureCode || record.recordType || (record as any).procedureCode || '');
+  const steps = workflow.steps;
+  const currentStepIndex = getWorkflowStepIndex(stepKey || record.status || '', steps);
+  const activeIndex = currentStepIndex >= 0 ? currentStepIndex : 0;
+  const currentStep = steps[activeIndex] || steps[0];
+
+  if (!currentStep) {
+    return {
+      elapsedHours: 0,
+      remainingHours: 8,
+      status: 'ontime',
+      isOverdue: false,
+      isPaused: false,
+      percent: 0,
+      overdueHours: 0,
+      remainingLabel: '8 giờ',
+      overdueLabel: '0 giờ',
+      stepHeaderText: 'Định mức: 8h'
+    };
+  }
+
+  // Nếu là bước Tạm dừng / Ngoài SLA
+  const isStepPaused = currentStep.durationHours === 0 || 
+    currentStep.key === RecordStatus.PENDING_TAX_KV7 || 
+    currentStep.key === RecordStatus.PENDING_TAX_PAYMENT ||
+    currentStep.key === RecordStatus.RETURNED ||
+    record.status === RecordStatus.PENDING_SUPPLEMENT ||
+    record.status === RecordStatus.WITHDRAWN ||
+    record.status === RecordStatus.REJECTED;
+
+  if (isStepPaused) {
+    let pauseReason = 'Theo quy định';
+    if (currentStep.key === RecordStatus.PENDING_TAX_KV7) pauseReason = 'Cơ quan Thuế thụ lý (5 ngày - Ngoài SLA)';
+    else if (currentStep.key === RecordStatus.PENDING_TAX_PAYMENT) pauseReason = 'Chờ người dân nộp thuế NSNN';
+    else if (currentStep.key === RecordStatus.RETURNED) pauseReason = 'Đã hoàn thành trả kết quả';
+    else if (record.status === RecordStatus.PENDING_SUPPLEMENT) pauseReason = 'Chờ bổ sung hồ sơ';
+
+    return {
+      elapsedHours: 0,
+      remainingHours: 0,
+      status: 'paused',
+      isOverdue: false,
+      isPaused: true,
+      pauseReason,
+      percent: 100,
+      overdueHours: 0,
+      remainingLabel: 'Ngoài SLA',
+      overdueLabel: '0 giờ',
+      stepHeaderText: `Tạm dừng tính SLA (${pauseReason})`
+    };
+  }
+
+  const durationHours = currentStep.durationHours || 8;
+  const totalAllowedMinutes = durationHours * 60;
+  
+  // Thời gian bắt đầu của bước
+  const startTimeStr = record.updatedAt || record.assignedDate || record.receivedDate || new Date().toISOString();
+  const startDt = adjustStartWorkingTime(startTimeStr);
+  const nowDt = getVietnamNow();
+
+  let workingMinutesPassed = 0;
+  const curr = new Date(startDt);
+
+  if (nowDt > startDt) {
+    let limit = 0;
+    while (curr < nowDt && limit < 1500) {
+      limit++;
+      const day = curr.getDay();
+      if (day !== 0 && day !== 6) {
+        const h = curr.getHours();
+        const m = curr.getMinutes();
+        const timeNum = h * 60 + m;
+
+        const isSameDay = curr.getFullYear() === nowDt.getFullYear() && curr.getMonth() === nowDt.getMonth() && curr.getDate() === nowDt.getDate();
+        const endH = isSameDay ? nowDt.getHours() : 17;
+        const endM = isSameDay ? nowDt.getMinutes() : 30;
+        const endTimeNum = isSameDay ? (endH * 60 + endM) : 1050;
+
+        const mornStart = Math.max(timeNum, 450);
+        const mornEnd = Math.min(endTimeNum, 690);
+        if (mornEnd > mornStart) {
+          workingMinutesPassed += (mornEnd - mornStart);
+        }
+
+        const aftStart = Math.max(timeNum, 810);
+        const aftEnd = Math.min(endTimeNum, 1050);
+        if (aftEnd > aftStart) {
+          workingMinutesPassed += (aftEnd - aftStart);
+        }
+      }
+
+      curr.setDate(curr.getDate() + 1);
+      curr.setHours(7, 30, 0, 0);
+    }
+  }
+
+  const elapsedHours = Number((workingMinutesPassed / 60).toFixed(1));
+  const remainingMinutes = totalAllowedMinutes - workingMinutesPassed;
+  const remainingHours = Math.max(0, Number((remainingMinutes / 60).toFixed(1)));
+  const percent = Math.min(100, Math.round((workingMinutesPassed / totalAllowedMinutes) * 100));
+
+  if (remainingMinutes >= 0) {
+    const rh = Math.floor(remainingMinutes / 60);
+    const rm = remainingMinutes % 60;
+    const remainingLabel = rh > 0 ? (rm > 0 ? `${rh}h ${rm}p` : `${rh}h`) : `${rm} phút`;
+    const isApproaching = remainingMinutes <= totalAllowedMinutes * 0.2 || remainingMinutes <= 120;
+
+    return {
+      elapsedHours,
+      remainingHours,
+      status: isApproaching ? 'warning' : 'ontime',
+      isOverdue: false,
+      isPaused: false,
+      percent,
+      overdueHours: 0,
+      remainingLabel,
+      overdueLabel: '0 giờ',
+      stepHeaderText: `Định mức: ${currentStep.durationLabel || `${durationHours}h`} (Còn lại ${remainingLabel})`
+    };
+  } else {
+    const overdueMins = Math.abs(remainingMinutes);
+    const oh = Math.floor(overdueMins / 60);
+    const om = overdueMins % 60;
+    const overdueLabel = oh > 0 ? (om > 0 ? `${oh}h ${om}p` : `${oh}h`) : `${om} phút`;
+
+    return {
+      elapsedHours,
+      remainingHours: 0,
+      status: 'overdue',
+      isOverdue: true,
+      isPaused: false,
+      percent: 100,
+      overdueHours: Number((overdueMins / 60).toFixed(1)),
+      remainingLabel: '0 giờ',
+      overdueLabel,
+      stepHeaderText: `Trễ hạn bước: ${overdueLabel}`
+    };
+  }
+};
 
 export interface WorkflowStep {
   id?: string;
@@ -153,29 +289,32 @@ export const getRegistrationWorkflowCategory = (type: string | undefined | null)
     return 'unclassified';
   }
 
-  if (code.includes('3.1.1') || code.includes('Chuyển quyền') || code.includes('Chuyển nhượng') || code.includes('Tặng cho') || code.includes('Thừa kế')) return 'tax_transfer';
+  // Nhóm 1: Thủ tục có thuế (10 bước): 3.1.1, 3.1.2, 3.1.3, 3.4.2, 3.2.2
+  if (code.includes('3.1.1') || code.includes('Chuyển quyền') || code.includes('Chuyển nhượng') || code.includes('Tặng cho') || code.includes('Thừa kế') || code.includes('Góp vốn')) return 'tax_transfer';
   if (code.includes('3.1.2') || code.includes('Phân chia quyền')) return 'tax_transfer';
-  if (code.includes('3.1.3') || code.includes('Bản án')) return 'tax_transfer';
-  if (code.includes('3.2.2') || (code.includes('Cấp đổi') && code.includes('thuế'))) return 'tax_transfer';
-  
-  if (code.includes('3.2.1') || code.includes('Cấp đổi')) return 'fast_track';
+  if (code.includes('3.1.3') || code.includes('Bản án') || code.includes('Tòa án') || code.includes('Thi hành án')) return 'tax_transfer';
+  if (code.includes('3.4.2') || (code.includes('Tách') && (code.includes('thay đổi') || code.includes('chuyển quyền')))) return 'tax_transfer';
+  if (code.includes('3.2.2') || (code.includes('Cấp đổi') && (code.includes('thuế') || code.includes('đo đạc')))) return 'tax_transfer';
+
+  // Nhóm 2: Thủ tục 3.7.1, 3.7.2 (Đính chính / Đổi thông tin)
+  if (code.includes('3.7.1') || code.includes('3.7.2') || code.includes('Đính chính') || code.includes('Đổi thông tin') || code.includes('đổi tên')) return 'correction';
+
+  // Các nhóm khác
+  if (code.includes('3.2.1') || code.includes('Cấp đổi')) return 'fast_track_exchange';
   if (code.includes('3.3.1') || code.includes('Cấp lại do mất') || code.includes('Cấp lại')) {
     if (code.includes('thuế')) return 'lost_cert_tax';
     return 'lost_cert';
   }
   if (code.includes('3.3.2')) return 'lost_cert_tax';
 
-  if (code.includes('3.4.1') || code.includes('3.4.2') || code.includes('Tách') || code.includes('Hợp thửa')) return 'split_plot';
-
+  if (code.includes('3.4.1') || code.includes('Tách') || code.includes('Hợp thửa')) return 'split_plot';
   if (code.includes('3.5.1') || code.includes('Gia hạn')) return 'fast_track';
   if (code.includes('3.6.1') || code.includes('Chuyển mục đích')) return 'fast_track';
-  if (code.includes('3.7.1') || code.includes('Đính chính')) return 'fast_track';
-  if (code.includes('3.7.2') || code.includes('Đổi thông tin')) return 'fast_track';
 
   if (code.includes('3.8.1') || code.includes('Đăng ký GDBD') || code.includes('Thế chấp')) return 'gdbd_register';
   if (code.includes('3.8.2') || code.includes('Xóa ĐK GDBD') || code.includes('Giải chấp') || code.includes('Xóa thế chấp')) return 'gdbd_release';
 
-  if (code.startsWith('3.')) return 'fast_track';
+  if (code.startsWith('3.')) return 'tax_transfer';
 
   return 'unclassified';
 };
@@ -195,61 +334,242 @@ export const getRegistrationWorkflow = (recordType?: string | null): Registratio
   const category = getRegistrationWorkflowCategory(recordType);
   const code = (recordType || '').trim();
 
+  // ----------------------------------------------------
+  // NHÓM 1: THỦ TỤC CÓ THUẾ (3.1.1, 3.1.2, 3.1.3, 3.4.2, 3.2.2)
+  // Gồm đúng 10 bước chuẩn theo yêu cầu:
+  // Bước 1 tiếp nhận (1 ngày)
+  // Bước 2 thẩm định (1 ngày)
+  // Bước 3 phiếu chuyển thuế (2 ngày)
+  // Bước 4 Thuế Khu vực 7 (5 ngày không tính vào tổng quy trình)
+  // Bước 5 Thông báo thuế (tạm dừng)
+  // Bước 6 In Giấy chứng nhận (5 ngày)
+  // Bước 7 Trình kiểm tra (1 ngày)
+  // Bước 8 trình ký duyệt (1 ngày)
+  // Bước 9 Hoàn thành (1 ngày)
+  // Bước 10 Trả kết quả (tạm dừng)
+  // Tổng SLA VPĐKĐĐ = 13 ngày làm việc (104 giờ)
+  // ----------------------------------------------------
+  if (category === 'tax_transfer' || code.includes('3.1.1') || code.includes('3.1.2') || code.includes('3.1.3') || code.includes('3.4.2') || code.includes('3.2.2')) {
+    const steps: WorkflowStep[] = [
+      {
+        key: RecordStatus.RECEIVED,
+        label: 'Tiếp nhận',
+        shortLabel: 'Tiếp nhận',
+        description: 'Bộ phận Tiếp nhận và Trả kết quả',
+        badgeColor: 'bg-gray-100 text-gray-800',
+        durationHours: 8,
+        durationDays: 1,
+        durationLabel: '1 ngày (8h)',
+      },
+      {
+        key: RecordStatus.APPRAISAL,
+        label: 'Thẩm định',
+        shortLabel: 'Thẩm định',
+        description: 'Cán bộ thụ lý thẩm định hồ sơ',
+        badgeColor: 'bg-blue-100 text-blue-800',
+        durationHours: 8,
+        durationDays: 1,
+        durationLabel: '1 ngày (8h)',
+      },
+      {
+        key: RecordStatus.TAX_TRANSFER,
+        label: 'Phiếu chuyển thuế',
+        shortLabel: 'Phiếu chuyển thuế',
+        description: 'Lập phiếu chuyển thông tin nghĩa vụ tài chính',
+        badgeColor: 'bg-indigo-100 text-indigo-800',
+        durationHours: 16,
+        durationDays: 2,
+        durationLabel: '2 ngày (16h)',
+        isTaxPhase: true,
+      },
+      {
+        key: RecordStatus.PENDING_TAX_KV7,
+        label: 'Thuế Khu vực 7',
+        shortLabel: 'Thuế KV7',
+        description: 'Cơ quan Thuế xác định nghĩa vụ tài chính (5 ngày - Ngoài SLA)',
+        badgeColor: 'bg-violet-100 text-violet-800',
+        durationHours: 40,
+        durationDays: 5,
+        durationLabel: '5 ngày (Ngoài SLA)',
+        isTaxPhase: true,
+      },
+      {
+        key: RecordStatus.PENDING_TAX_PAYMENT,
+        label: 'Thông báo thuế',
+        shortLabel: 'Thông báo thuế',
+        description: 'Chờ người dân nộp thuế vào NSNN (Tạm dừng đếm giờ)',
+        badgeColor: 'bg-amber-100 text-amber-800',
+        durationHours: 0,
+        durationDays: 0,
+        durationLabel: 'Tạm dừng (Ngoài SLA)',
+        isTaxPhase: true,
+      },
+      {
+        key: RecordStatus.PENDING_PRINT_CERT,
+        label: 'In Giấy chứng nhận',
+        shortLabel: 'In GCN',
+        description: 'In phôi Giấy chứng nhận mới',
+        badgeColor: 'bg-teal-100 text-teal-800',
+        durationHours: 40,
+        durationDays: 5,
+        durationLabel: '5 ngày (40h)',
+      },
+      {
+        key: RecordStatus.PENDING_CHECK,
+        label: 'Trình kiểm tra',
+        shortLabel: 'Trình kiểm tra',
+        description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra',
+        badgeColor: 'bg-orange-100 text-orange-800',
+        durationHours: 8,
+        durationDays: 1,
+        durationLabel: '1 ngày (8h)',
+      },
+      {
+        key: RecordStatus.PENDING_SIGN,
+        label: 'Trình ký duyệt',
+        shortLabel: 'Trình ký duyệt',
+        description: 'Trình Lãnh đạo Chi nhánh ký duyệt',
+        badgeColor: 'bg-purple-100 text-purple-800',
+        durationHours: 8,
+        durationDays: 1,
+        durationLabel: '1 ngày (8h)',
+      },
+      {
+        key: RecordStatus.PENDING_HANDOVER,
+        label: 'Hoàn thành',
+        shortLabel: 'Hoàn thành',
+        description: 'Vào sổ cấp GCN và chuyển Bộ phận Một cửa',
+        badgeColor: 'bg-cyan-100 text-cyan-800',
+        durationHours: 8,
+        durationDays: 1,
+        durationLabel: '1 ngày (8h)',
+      },
+      {
+        key: RecordStatus.RETURNED,
+        label: 'Trả kết quả',
+        shortLabel: 'Trả kết quả',
+        description: 'Đã bàn giao và trả kết quả cho người dân (Tạm dừng / Hoàn thành)',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        durationHours: 0,
+        durationDays: 0,
+        durationLabel: 'Tạm dừng (Hoàn tất)',
+      }
+    ];
+
+    return {
+      category: 'tax_transfer',
+      title: code || 'Thủ tục Cấp giấy có thuế',
+      subtitle: `Mã thủ tục: ${code} (13 ngày làm việc - 10 bước)`,
+      standardDays: 13,
+      steps,
+    };
+  }
+
+  // ----------------------------------------------------
+  // NHÓM 2: THỦ TỤC 3.7.1, 3.7.2 (ĐÍNH CHÍNH / ĐỔI THÔNG TIN)
+  // Bước 1 tiếp nhận (1 ngày)
+  // Bước 6 In Giấy chứng nhận (4 ngày)
+  // Bước 7 Trình kiểm tra (1 ngày)
+  // Bước 8 trình ký duyệt (0.5 ngày)
+  // Bước 9 Hoàn thành (0.5 ngày)
+  // Bước 10 Trả kết quả (tạm dừng)
+  // Tổng SLA VPĐKĐĐ = 7 ngày làm việc (56 giờ)
+  // ----------------------------------------------------
+  if (category === 'correction' || code.includes('3.7.1') || code.includes('3.7.2') || code.includes('Đính chính') || code.includes('Đổi thông tin')) {
+    const steps: WorkflowStep[] = [
+      {
+        key: RecordStatus.RECEIVED,
+        label: 'Tiếp nhận',
+        shortLabel: 'Tiếp nhận',
+        description: 'Bộ phận Tiếp nhận và Trả kết quả',
+        badgeColor: 'bg-gray-100 text-gray-800',
+        durationHours: 8,
+        durationDays: 1,
+        durationLabel: '1 ngày (8h)',
+      },
+      {
+        key: RecordStatus.PENDING_PRINT_CERT,
+        label: 'In Giấy chứng nhận',
+        shortLabel: 'In GCN',
+        description: 'In phôi / đính chính thông tin Giấy chứng nhận',
+        badgeColor: 'bg-teal-100 text-teal-800',
+        durationHours: 32,
+        durationDays: 4,
+        durationLabel: '4 ngày (32h)',
+      },
+      {
+        key: RecordStatus.PENDING_CHECK,
+        label: 'Trình kiểm tra',
+        shortLabel: 'Trình kiểm tra',
+        description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra',
+        badgeColor: 'bg-orange-100 text-orange-800',
+        durationHours: 8,
+        durationDays: 1,
+        durationLabel: '1 ngày (8h)',
+      },
+      {
+        key: RecordStatus.PENDING_SIGN,
+        label: 'Trình ký duyệt',
+        shortLabel: 'Trình ký duyệt',
+        description: 'Trình Lãnh đạo Chi nhánh ký duyệt',
+        badgeColor: 'bg-purple-100 text-purple-800',
+        durationHours: 4,
+        durationDays: 0.5,
+        durationLabel: '0.5 ngày (4h)',
+      },
+      {
+        key: RecordStatus.PENDING_HANDOVER,
+        label: 'Hoàn thành',
+        shortLabel: 'Hoàn thành',
+        description: 'Cập nhật CSDL địa chính và chuyển Bộ phận Một cửa',
+        badgeColor: 'bg-cyan-100 text-cyan-800',
+        durationHours: 4,
+        durationDays: 0.5,
+        durationLabel: '0.5 ngày (4h)',
+      },
+      {
+        key: RecordStatus.RETURNED,
+        label: 'Trả kết quả',
+        shortLabel: 'Trả kết quả',
+        description: 'Đã trả kết quả cho người dân (Tạm dừng / Hoàn thành)',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        durationHours: 0,
+        durationDays: 0,
+        durationLabel: 'Tạm dừng (Hoàn tất)',
+      }
+    ];
+
+    return {
+      category: 'correction',
+      title: code || 'Thủ tục Đính chính / Đổi thông tin',
+      subtitle: `Mã thủ tục: ${code} (7 ngày làm việc - 6 bước)`,
+      standardDays: 7,
+      steps,
+    };
+  }
+
+  // ----------------------------------------------------
+  // CÁC THỦ TỤC CẤP GIẤY KHÁC
+  // ----------------------------------------------------
   let standardDays = 10;
-  let hasTax = false;
-  let isPosting = false;
-
-  if (category === 'tax_transfer') {
-    hasTax = true;
-    if (code.includes('3.2.2')) standardDays = 15;
-    else standardDays = 13;
-  } else if (category === 'lost_cert') {
-    isPosting = true;
-    standardDays = 10;
-  } else if (category === 'lost_cert_tax') {
-    hasTax = true;
-    isPosting = true;
-    standardDays = 15;
-  } else if (category === 'split_plot') {
-    hasTax = true;
-    standardDays = 17;
-  } else if (category === 'gdbd_register') {
-    standardDays = 3;
-  } else if (category === 'gdbd_release') {
+  if (category === 'gdbd_register' || category === 'gdbd_release') {
     standardDays = 1;
-  } else if (category === 'fast_track') {
-    if (code.includes('3.5.1') || code.includes('Gia hạn')) standardDays = 12;
-    else if (code.includes('3.6.1') || code.includes('3.7.1') || code.includes('3.7.2')) standardDays = 7;
-    else standardDays = 10;
-  } else {
-    standardDays = 0;
+  } else if (category === 'fast_track_exchange') {
+    standardDays = 5;
+  } else if (category === 'split_plot') {
+    standardDays = 12;
   }
-
-  if (standardDays === 0) {
-    return DEFAULT_WORKFLOW;
-  }
-
-  // Phân bổ ngày cho In GCN = StandardDays - (Tiếp nhận + Thẩm định + Phân chuyển thuế + Kiểm tra + Ký duyệt + Vô số/Giao 1C)
-  const tiepNhanDays = standardDays <= 1 ? 0.25 : 1;
-  const thamDinhDays = standardDays <= 1 ? 0.25 : (standardDays <= 3 ? 1 : 1);
-  const phieuChuyenThueDays = hasTax ? (standardDays <= 7 ? 1 : 2) : 0;
-  const kiemTraDays = standardDays <= 1 ? 0.25 : (standardDays <= 3 ? 0.5 : 1);
-  const kyDuyetDays = standardDays <= 1 ? 0.25 : (standardDays <= 3 ? 0.5 : 1);
-  const vaosoGiao1CDays = standardDays <= 1 ? 0.25 : (standardDays <= 3 ? 0.5 : 1);
-
-  const fixedDays = tiepNhanDays + thamDinhDays + phieuChuyenThueDays + kiemTraDays + kyDuyetDays + vaosoGiao1CDays;
-  const inGcnDays = Math.max(0.25, Number((standardDays - fixedDays).toFixed(1)));
 
   const steps: WorkflowStep[] = [
     {
       key: RecordStatus.RECEIVED,
-      label: 'Tiếp nhận hồ sơ',
+      label: 'Tiếp nhận',
       shortLabel: 'Tiếp nhận',
-      description: 'Tiếp nhận hồ sơ tại Bộ phận Một cửa',
+      description: 'Bộ phận Tiếp nhận và Trả kết quả',
       badgeColor: 'bg-gray-100 text-gray-800',
-      durationHours: tiepNhanDays * 8,
-      durationDays: tiepNhanDays,
-      durationLabel: `${tiepNhanDays} ngày`,
+      durationHours: standardDays <= 1 ? 2 : 8,
+      durationDays: standardDays <= 1 ? 0.25 : 1,
+      durationLabel: standardDays <= 1 ? '2h' : '1 ngày',
     },
     {
       key: RecordStatus.APPRAISAL,
@@ -257,106 +577,61 @@ export const getRegistrationWorkflow = (recordType?: string | null): Registratio
       shortLabel: 'Thẩm định',
       description: 'Cán bộ thụ lý thẩm định hồ sơ',
       badgeColor: 'bg-blue-100 text-blue-800',
-      durationHours: thamDinhDays * 8,
-      durationDays: thamDinhDays,
-      durationLabel: `${thamDinhDays} ngày`,
+      durationHours: standardDays <= 1 ? 2 : Math.max(8, (standardDays - 4) * 8),
+      durationDays: standardDays <= 1 ? 0.25 : Math.max(1, standardDays - 4),
+      durationLabel: `${standardDays <= 1 ? 0.25 : Math.max(1, standardDays - 4)} ngày`,
     },
-  ];
-
-  if (isPosting) {
-    steps.push({
-      key: RecordStatus.PENDING_POSTING,
-      label: 'Niêm yết tại xã',
-      shortLabel: 'Niêm yết',
-      description: 'Niêm yết công khai tại UBND xã (30 ngày lịch)',
-      badgeColor: 'bg-amber-100 text-amber-800',
-      durationHours: 0,
-      durationDays: 30,
-      durationLabel: '30 ngày lịch (Ngoài SLA)',
-      isPostingPhase: true,
-    });
-  }
-
-  if (hasTax) {
-    steps.push(
-      {
-        key: RecordStatus.TAX_TRANSFER,
-        label: 'Phiếu chuyển Thuế',
-        shortLabel: 'Lập phiếu thuế',
-        description: 'Lập phiếu chuyển thông tin nghĩa vụ tài chính',
-        badgeColor: 'bg-indigo-100 text-indigo-800',
-        durationHours: phieuChuyenThueDays * 8,
-        durationDays: phieuChuyenThueDays,
-        durationLabel: `${phieuChuyenThueDays} ngày`,
-        isTaxPhase: true,
-      },
-      {
-        key: RecordStatus.PENDING_TAX_KV7,
-        label: 'Thuế Khu vực 7',
-        shortLabel: 'Thuế KV7',
-        description: 'Cơ quan Thuế xác định nghĩa vụ tài chính',
-        badgeColor: 'bg-violet-100 text-violet-800',
-        durationHours: 0,
-        durationDays: 0,
-        durationLabel: 'Ngoài SLA',
-        isTaxPhase: true,
-      },
-      {
-        key: RecordStatus.PENDING_TAX_PAYMENT,
-        label: 'Thông báo Thuế',
-        shortLabel: 'Thông báo thuế',
-        description: 'Chờ người dân nộp thuế vào NSNN',
-        badgeColor: 'bg-amber-100 text-amber-800',
-        durationHours: 0,
-        durationDays: 0,
-        durationLabel: 'Ngoài SLA',
-        isTaxPhase: true,
-      }
-    );
-  }
-
-  steps.push(
     {
       key: RecordStatus.PENDING_PRINT_CERT,
-      label: 'In GCN',
+      label: 'In Giấy chứng nhận',
       shortLabel: 'In GCN',
       description: 'In phôi Giấy chứng nhận mới',
       badgeColor: 'bg-teal-100 text-teal-800',
-      durationHours: inGcnDays * 8,
-      durationDays: inGcnDays,
-      durationLabel: `${inGcnDays} ngày`,
+      durationHours: standardDays <= 1 ? 2 : 16,
+      durationDays: standardDays <= 1 ? 0.25 : 2,
+      durationLabel: `${standardDays <= 1 ? 0.25 : 2} ngày`,
     },
     {
       key: RecordStatus.PENDING_CHECK,
-      label: 'Kiểm tra',
-      shortLabel: 'Kiểm tra',
+      label: 'Trình kiểm tra',
+      shortLabel: 'Trình kiểm tra',
       description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra',
       badgeColor: 'bg-orange-100 text-orange-800',
-      durationHours: kiemTraDays * 8,
-      durationDays: kiemTraDays,
-      durationLabel: `${kiemTraDays} ngày`,
+      durationHours: standardDays <= 1 ? 1 : 8,
+      durationDays: standardDays <= 1 ? 0.125 : 1,
+      durationLabel: `${standardDays <= 1 ? 0.125 : 1} ngày`,
     },
     {
       key: RecordStatus.PENDING_SIGN,
-      label: 'Ký duyệt',
-      shortLabel: 'Ký duyệt',
+      label: 'Trình ký duyệt',
+      shortLabel: 'Trình ký duyệt',
       description: 'Trình Lãnh đạo Chi nhánh ký duyệt',
       badgeColor: 'bg-purple-100 text-purple-800',
-      durationHours: kyDuyetDays * 8,
-      durationDays: kyDuyetDays,
-      durationLabel: `${kyDuyetDays} ngày`,
+      durationHours: standardDays <= 1 ? 1 : 8,
+      durationDays: standardDays <= 1 ? 0.125 : 1,
+      durationLabel: `${standardDays <= 1 ? 0.125 : 1} ngày`,
     },
     {
       key: RecordStatus.PENDING_HANDOVER,
-      label: 'Vô số GCN / Giao 1 Cửa',
-      shortLabel: 'Vô số & Giao 1C',
-      description: 'Cấp số vào sổ GCN và bàn giao Một cửa',
+      label: 'Hoàn thành',
+      shortLabel: 'Hoàn thành',
+      description: 'Vào sổ cấp GCN và chuyển Bộ phận Một cửa',
       badgeColor: 'bg-cyan-100 text-cyan-800',
-      durationHours: vaosoGiao1CDays * 8,
-      durationDays: vaosoGiao1CDays,
-      durationLabel: `${vaosoGiao1CDays} ngày`,
+      durationHours: standardDays <= 1 ? 0 : 8,
+      durationDays: standardDays <= 1 ? 0 : 1,
+      durationLabel: `${standardDays <= 1 ? 0 : 1} ngày`,
+    },
+    {
+      key: RecordStatus.RETURNED,
+      label: 'Trả kết quả',
+      shortLabel: 'Trả kết quả',
+      description: 'Đã trả kết quả cho người dân (Tạm dừng / Hoàn thành)',
+      badgeColor: 'bg-emerald-100 text-emerald-800',
+      durationHours: 0,
+      durationDays: 0,
+      durationLabel: 'Tạm dừng',
     }
-  );
+  ];
 
   return {
     category,
@@ -521,14 +796,15 @@ export const calculateRegistrationDeadline = (
 };
 
 export const getAppointmentInfo = (record: Partial<RecordFile>): AppointmentInfo => {
-  const d = record.deadline || record.receivedDate || '—';
+  const calc = calculateRegistrationDeadline(record);
+  const d = record.deadline || calc.deadline || record.receivedDate || '—';
   return {
     phase: 'final_result',
     label: 'Hẹn trả kết quả',
     shortLabel: 'Hẹn trả GCN',
     appointmentDate: d,
-    formattedAppointmentDate: d ? d.split('-').reverse().join('/') : '—',
-    description: 'Thời hạn giải quyết theo quy trình',
+    formattedAppointmentDate: d && d !== '—' ? d.split('-').reverse().join('/') : '—',
+    description: `Thời hạn giải quyết theo quy trình (${calc.standardDays || 13} ngày làm việc)`,
   };
 };
 
@@ -569,23 +845,22 @@ export const getStepSlaInfo = (
   const currentStepName = stepKey || record.status || workflow.steps[0].label;
   const currentStep = workflow.steps.find(s => s.key === currentStepName || s.label === currentStepName) || workflow.steps[0];
 
-  const durationHours = currentStep.durationHours || 8;
-  const durationDays = currentStep.durationDays || 1;
+  const sla = calculateRecordStepSla(record, currentStep.key as RecordStatus, record.recordType || '');
 
   return {
     step: currentStep,
-    durationHours,
-    durationDays,
-    durationLabel: `${durationDays} ngày (${durationHours}h)`,
-    elapsedHours: 0,
-    elapsedLabel: '0 giờ',
-    remainingHours: durationHours,
-    remainingLabel: `${durationHours} giờ`,
-    status: 'ontime',
-    isOverdue: false,
-    overdueHours: 0,
-    overdueLabel: '0 giờ',
-    percent: 0,
+    durationHours: currentStep.durationHours,
+    durationDays: currentStep.durationDays,
+    durationLabel: currentStep.durationLabel,
+    elapsedHours: sla.elapsedHours,
+    elapsedLabel: `${sla.elapsedHours}h`,
+    remainingHours: sla.remainingHours,
+    remainingLabel: sla.remainingLabel,
+    status: sla.status as any,
+    isOverdue: sla.isOverdue,
+    overdueHours: sla.overdueHours,
+    overdueLabel: sla.overdueLabel,
+    percent: sla.percent,
     startTime: record.updatedAt || record.receivedDate || null,
   };
 };

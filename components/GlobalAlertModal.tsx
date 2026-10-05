@@ -42,27 +42,29 @@ const GlobalAlertModal = () => {
         setIsOpen(false);
     };
 
+    const isError = title.toUpperCase().includes('LỖI') || title.toUpperCase().includes('CẢNH BÁO') || title.toUpperCase().includes('ERROR') || title.toUpperCase().includes('WARNING');
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-fade-in-up">
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-blue-700 font-bold">
-                        <AlertCircle size={18} className="text-blue-500" />
-                        {title}
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up border border-slate-200">
+                <div className={`px-5 py-4 border-b flex justify-between items-center ${isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200 text-blue-800'}`}>
+                    <div className="flex items-center gap-2.5 font-black text-base">
+                        <AlertCircle size={22} className={isError ? 'text-red-600 animate-pulse' : 'text-blue-600'} />
+                        <span>{title}</span>
                     </div>
-                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
-                        <X size={18} />
+                    <button onClick={handleClose} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition-colors cursor-pointer">
+                        <X size={20} />
                     </button>
                 </div>
-                <div className="p-4 text-gray-600 text-sm whitespace-pre-line">
+                <div className="p-5 text-slate-700 text-sm font-medium leading-relaxed whitespace-pre-line max-h-[60vh] overflow-y-auto">
                     {message}
                 </div>
-                <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+                <div className="bg-slate-50 px-5 py-3.5 border-t border-slate-200 flex justify-end gap-2">
                     <button 
                         onClick={handleClose} 
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm"
+                        className={`px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-md cursor-pointer transition-all active:scale-95 ${isError ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'}`}
                     >
-                        Đóng
+                        Đã hiểu & Đóng
                     </button>
                 </div>
             </div>

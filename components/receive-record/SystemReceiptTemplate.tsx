@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { RecordFile, Employee, User, Contract } from '../../types';
-import { getNormalizedWard, getShortRecordType, getFullRecordType, getWardFullLabel } from '../../constants';
+import { getNormalizedWard, getShortRecordType, getFullRecordType, getWardFullLabel, getPhieuYeuCauTitle, cleanDocumentName, getDefaultAttachedDocsForType } from '../../constants';
 import { getReceiptReceiverName } from '../../utils/appHelpers';
 import { fetchContracts } from '../../services/apiContracts';
 import { Printer, FileSignature } from 'lucide-react';
@@ -349,8 +349,8 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         let hasPhieuYeuCau = false;
 
         validParsedDocs.forEach(doc => {
-            const docName = doc.name.trim();
-            const lowerName = docName.toLowerCase();
+            const cleanedName = cleanDocumentName(doc.name, data.recordType || data.content);
+            const lowerName = cleanedName.toLowerCase();
 
             // Prevent duplicate "Phiếu yêu cầu..." items
             if (lowerName.includes('phiếu yêu cầu') || lowerName.includes('phieu yeu cau')) {
@@ -358,20 +358,29 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                 hasPhieuYeuCau = true;
             }
 
-            if (!seenNames.has(lowerName)) {
+            if (cleanedName && !seenNames.has(lowerName)) {
                 seenNames.add(lowerName);
                 finalDocs.push({
-                    name: docName,
+                    name: cleanedName,
                     type: doc.type || doc.copyType || 'Bản chính'
                 });
             }
         });
     } else {
         // Fallback default base documents if none attached
-        finalDocs = [
-            { name: `Phiếu yêu cầu ${data.content || 'lập hợp đồng đo đạc dịch vụ; trích lục ; Cung cấp thông tin thửa đất'}`, type: 'Bản chính' },
-            { name: 'Giấy chứng nhận đã cấp.', type: 'Bản sao' }
-        ];
+        const rType = String(data.recordType || data.content || '');
+        const defaultDocs = getDefaultAttachedDocsForType(rType);
+        if (defaultDocs.length > 0) {
+            finalDocs = defaultDocs.map(d => ({
+                name: d.name,
+                type: d.type || 'Bản chính'
+            }));
+        } else {
+            finalDocs = [
+                { name: getPhieuYeuCauTitle(data.recordType || data.content), type: 'Bản chính' },
+                { name: 'Giấy chứng nhận quyền sử dụng đất đã cấp', type: 'Bản sao' }
+            ];
+        }
     }
 
     // We render exactly 4 empty blocks, each consisting of a 1.Giao row and a 2.Nhận row, matching the PDF's clean table structure

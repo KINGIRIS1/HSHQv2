@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Plus, Trash2, Paperclip, Eye, Download, FileText, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { DossierComponentItem, AttachedFileMeta } from '../../types';
 import { preparePendingSingleAttachment, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile, deleteAttachmentBlob, deleteFileFromGoogleDriveScript } from '../../services/attachmentStorage';
+import { DOCUMENT_SCAN_DICTIONARY } from '../../constants';
 
 interface DossierComponentSectionProps {
   recordCode: string;
@@ -50,8 +51,14 @@ export const DossierComponentSection: React.FC<DossierComponentSectionProps> = (
   };
 
   const handleUpdateName = (id: string, name: string) => {
+    let finalName = name;
+    const clean = name.trim();
+    const match = DOCUMENT_SCAN_DICTIONARY.find(d => d.code.toLowerCase() === clean.toLowerCase());
+    if (match) {
+      finalName = match.name;
+    }
     onChange(
-      components.map((c) => (c.id === id ? { ...c, name } : c))
+      components.map((c) => (c.id === id ? { ...c, name: finalName } : c))
     );
   };
 
@@ -196,7 +203,8 @@ export const DossierComponentSection: React.FC<DossierComponentSectionProps> = (
                       ) : (
                         <input
                           type="text"
-                          placeholder="Nhập tên giấy tờ / thành phần (VD: Bản vẽ hiện trạng, Phiếu kiểm tra...)"
+                          list="dossier-scan-dict"
+                          placeholder="Nhập tên giấy tờ (hoặc gõ mã viết tắt: DDKBD, HDCQ, HSKT...)"
                           value={item.name}
                           onChange={(e) => handleUpdateName(item.id, e.target.value)}
                           className="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/50 hover:bg-white transition-colors"
@@ -313,6 +321,13 @@ export const DossierComponentSection: React.FC<DossierComponentSectionProps> = (
           <span> để bổ sung giấy tờ và file đính kèm.</span>
         </div>
       )}
+
+      {/* Datalist gợi ý tự động 97 loại giấy tờ theo Bảng quy chuẩn */}
+      <datalist id="dossier-scan-dict">
+        {DOCUMENT_SCAN_DICTIONARY.map((item) => (
+          <option key={item.code} value={item.name}>{`[${item.code}] ${item.name}`}</option>
+        ))}
+      </datalist>
     </div>
   );
 };

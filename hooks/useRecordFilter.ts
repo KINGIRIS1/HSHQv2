@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecord } from '../constants';
+import { getShortRecordType, isArchiveRecord, isSurveyRecordType, isCertificateRecordType, isArchiveRecordType } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -296,32 +296,37 @@ export const useRecordFilter = (
         });
 
         if (isArchiveMeasurementView) {
+            // Module Lưu trữ: Lọc theo mã thủ tục nhóm 1.x
             result = result.filter(r => isArchiveRecord(r));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
         } else if (isMeasurementView) {
-            // Module Đo đạc chính: Lấy các hồ sơ thuộc land_records (không phải luutru_records và không phải dangky_records)
-            result = result.filter(r => !isArchiveRecord(r) && r.sourceTable !== 'dangky_records');
+            // Module Đo đạc: Phân loại theo mã thủ tục nhóm 2.x (không phụ thuộc vào bảng lưu trữ hay tiền tố mã hồ sơ)
+            result = result.filter(r => isSurveyRecordType(r));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
         } else if (isTestMeasurementView) {
-            // Module Đo đạc (test): Sử dụng CSDL Lưu Trữ Biệt Lập (dangky_records)
-            result = result.filter(r => r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN');
+            // Module Cấp giấy (test_records): Phân loại theo mã thủ tục nhóm 3.x
+            result = result.filter(r => isCertificateRecordType(r));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
         }
 
-        // Search Term (Sử dụng searchTerm đã được tách theo view)
+        // Search Term (Sử dụng searchTerm đã được tách theo view, hỗ trợ tìm đa trường: mã, tên, SĐT, xã, số thửa, tờ BĐ, số biên nhận, CCCD)
         if (searchTerm) {
             const lowerSearch = removeVietnameseTones(searchTerm);
             result = result.filter(r => {
-                if (removeVietnameseTones(r.code).includes(lowerSearch)) return true;
-                if (removeVietnameseTones(r.customerName).includes(lowerSearch)) return true;
+                if (removeVietnameseTones(r.code || '').includes(lowerSearch)) return true;
+                if (removeVietnameseTones(r.customerName || '').includes(lowerSearch)) return true;
                 if (r.phoneNumber && r.phoneNumber.includes(searchTerm)) return true;
                 if (removeVietnameseTones(r.ward || '').includes(lowerSearch)) return true;
+                if (r.landPlot && String(r.landPlot).includes(searchTerm.trim())) return true;
+                if (r.mapSheet && String(r.mapSheet).includes(searchTerm.trim())) return true;
+                if (r.receiptNumber && removeVietnameseTones(r.receiptNumber).includes(lowerSearch)) return true;
+                if ((r as any).cccd && String((r as any).cccd).includes(searchTerm.trim())) return true;
                 return false;
             });
         }

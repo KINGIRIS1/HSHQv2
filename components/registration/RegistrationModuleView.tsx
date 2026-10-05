@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Search,
@@ -13,14 +13,24 @@ import {
   ChevronDown,
   MapPin,
   Users,
+  CreditCard,
+  Printer,
+  Shield,
+  FileCheck,
+  Send,
+  Settings,
+  CheckCircle2,
 } from 'lucide-react';
-import { RecordFile, Employee, User, RecordStatus } from '../../types';
+import { RecordFile, Employee, User, RecordStatus, RecordStatusLog, AttachedFileMeta, DossierComponentItem } from '../../types';
 import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
 import { RegistrationRecordRow } from './RegistrationRecordRow';
 import { RegistrationDetailModal } from './RegistrationDetailModal';
 import { RegistrationAssignModal } from './RegistrationAssignModal';
+import { RegistrationStepHandoverModal, getStepHandoverConfig, StepHandoverConfig } from './RegistrationStepHandoverModal';
+import BulkUpdateModal from '../BulkUpdateModal';
 import DeleteConfirmModal from '../DeleteConfirmModal';
 import { confirmAction } from '../../utils/appHelpers';
+import { calculateRegistrationDeadline } from '../../utils/registrationWorkflows';
 import {
   fetchDangkyRecords,
   updateDangkyRecord,
@@ -29,6 +39,7 @@ import {
   assignDangkyRecordsBatch,
 } from '../../services/apiRegistration';
 import { syncDangKyToVaoSo } from '../../services/apiArchive';
+import { triggerGlobalAlert } from '../GlobalAlertModal';
 
 interface RegistrationModuleViewProps {
   currentUser?: User | null;
@@ -45,14 +56,24 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Danh sách các hồ sơ đang được tích chọn
+  const selectedRecordsList = useMemo(() => {
+    return records.filter((r) => selectedIds.has(r.id));
+  }, [records, selectedIds]);
+
   // Modals state
   const [viewingRecord, setViewingRecord] = useState<RecordFile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
   const [isAssignOpen, setIsAssignOpen] = useState<boolean>(false);
+  const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState<boolean>(false);
   const [recordToDelete, setRecordToDelete] = useState<RecordFile | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null
   );
+
+  // Hộp thoại chuyển bước chuyên nghiệp (Giao chuyển thuế, Giao In GCN, Kiểm tra, Trình ký, Trả KQ)
+  const [handoverModalConfig, setHandoverModalConfig] = useState<StepHandoverConfig | null>(null);
+  const [handoverTargetRecords, setHandoverTargetRecords] = useState<RecordFile[]>([]);
 
   const filterHook = useRegistrationFilter({ records });
 
@@ -122,19 +143,28 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     setIsDetailOpen(true);
   };
 
-  // Lưu cập nhật hồ sơ
+  // Lưu cập nhật hồ sơ với cơ chế kiểm tra CSDL nghiêm ngặt
   const handleSaveRecord = async (updated: RecordFile) => {
-    const saved = await updateDangkyRecord(updated);
-    setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
+    try {
+      const saved = await updateDangkyRecord(updated);
+      setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
 
-    // Tự động đồng bộ sang module Vào sổ GCN khi hồ sơ đạt bước Chờ bàn giao (PENDING_HANDOVER)
-    if (saved.status === RecordStatus.PENDING_HANDOVER) {
-      syncDangKyToVaoSo([saved]).catch((err) => {
-        console.warn('[VaoSo AutoSync Error in RegistrationModuleView]:', err);
-      });
+      // Tự động đồng bộ sang module Vào sổ GCN khi hồ sơ đạt bước Chờ bàn giao (PENDING_HANDOVER)
+      if (saved.status === RecordStatus.PENDING_HANDOVER) {
+        await syncDangKyToVaoSo([saved]);
+      }
+
+      showFeedback('success', `Đã lưu thành công hồ sơ ${saved.code} vào CSDL.`);
+      return saved;
+    } catch (err: any) {
+      console.error(`[Lỗi lưu CSDL hồ sơ ${updated.code}]:`, err);
+      const errMsg = err?.message || 'Lỗi mạng hoặc CSDL từ chối lưu.';
+      triggerGlobalAlert(
+        `⚠️ CẢNH BÁO LỖI BẢO TỒN DỮ LIỆU CSDL:\nKhông thể lưu hồ sơ ${updated.code} vào Cơ sở dữ liệu!\n\nChi tiết lỗi: ${errMsg}\n\n👉 Dữ liệu chưa được lưu. Vui lòng kiểm tra lại kết nối mạng và thử lại.`,
+        'LỖI LƯU CƠ SỞ DỮ LIỆU'
+      );
+      throw err;
     }
-
-    showFeedback('success', `Đã cập nhật thành công hồ sơ ${saved.code}`);
   };
 
   // Xóa 1 hồ sơ
@@ -177,23 +207,161 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     assignedTo: string,
     assignedDate: string
   ) => {
-    await assignDangkyRecordsBatch(recordIds, assignedTo, assignedDate);
-    setRecords((prev) =>
-      prev.map((r) =>
-        recordIds.includes(r.id)
-          ? { ...r, assignedTo, assignedDate, status: RecordStatus.IN_PROGRESS }
-          : r
-      )
-    );
-    setSelectedIds(new Set());
-    showFeedback('success', `Đã phân công ${recordIds.length} hồ sơ cho cán bộ ${assignedTo}`);
+    try {
+      await assignDangkyRecordsBatch(recordIds, assignedTo, assignedDate);
+      setRecords((prev) =>
+        prev.map((r) =>
+          recordIds.includes(r.id)
+            ? {
+                ...r,
+                assignedTo,
+                appraisalStaff: r.appraisalStaff || assignedTo,
+                assignedDate,
+                status: r.status === RecordStatus.RECEIVED ? RecordStatus.APPRAISAL : r.status,
+              }
+            : r
+        )
+      );
+      setSelectedIds(new Set());
+      showFeedback('success', `Đã phân công ${recordIds.length} hồ sơ cho cán bộ ${assignedTo}`);
+    } catch (err: any) {
+      console.error('Lỗi khi phân công hồ sơ vào CSDL:', err);
+      const errMsg = err?.message || 'Lỗi kết nối CSDL Supabase';
+      triggerGlobalAlert(
+        `⚠️ CẢNH BÁO LỖI BẢO TỒN DỮ LIỆU CSDL:\nKhông thể lưu phân công ${recordIds.length} hồ sơ vào Cơ sở dữ liệu!\n\nChi tiết lỗi: ${errMsg}\n\n👉 Dữ liệu CHƯA được lưu. Vui lòng kiểm tra lại kết nối mạng và thử lại.`,
+        'LỖI LƯU CƠ SỞ DỮ LIỆU'
+      );
+      showFeedback('error', errMsg);
+    }
+  };
+
+  // Mở modal chuyển bước nghiệp vụ cho các hồ sơ được chọn (hoặc 1 hồ sơ cụ thể)
+  const handleOpenStepHandover = (targetStatus: RecordStatus, targetRecords?: RecordFile[]) => {
+    const list = targetRecords && targetRecords.length > 0 ? targetRecords : selectedRecordsList;
+    if (list.length === 0) {
+      showFeedback('error', 'Vui lòng chọn ít nhất một hồ sơ để chuyển bước.');
+      return;
+    }
+    setHandoverTargetRecords(list);
+    setHandoverModalConfig(getStepHandoverConfig(targetStatus));
+  };
+
+  // Xác nhận chuyển bước hàng loạt / đơn lẻ từ RegistrationStepHandoverModal
+  const handleConfirmBatchStepHandover = async ({
+    targetStatus,
+    selectedStaff,
+    extraFields,
+    newAttachments,
+    newComponents,
+    note,
+    targetRecords,
+  }: {
+    targetStatus: RecordStatus;
+    selectedStaff: string;
+    extraFields: Partial<RecordFile>;
+    newAttachments?: AttachedFileMeta[];
+    newComponents?: DossierComponentItem[];
+    note?: string;
+    targetRecords?: RecordFile[];
+  }) => {
+    const list = targetRecords && targetRecords.length > 0 ? targetRecords : handoverTargetRecords;
+    if (!list || list.length === 0) return;
+
+    try {
+      const now = new Date().toISOString();
+      const updatedList: RecordFile[] = [];
+      const failedList: { code: string; error: string }[] = [];
+
+      for (const rec of list) {
+        const fixedAppraiser = rec.appraisalStaff || rec.assignedTo || '';
+        const existingLogs = Array.isArray(rec.statusLogs) ? [...rec.statusLogs] : [];
+        const newLog: RecordStatusLog = {
+          id: crypto.randomUUID?.() || `log_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          recordId: rec.id,
+          previousStatus: rec.status,
+          newStatus: targetStatus,
+          changedBy: currentUser?.name || rec.assignedTo || 'Cán bộ Cấp giấy',
+          changedAt: now,
+          note: note || `Chuyển bước sang ${targetStatus} cho cán bộ ${selectedStaff}`,
+        };
+
+        const updatedRecord: RecordFile = {
+          ...rec,
+          status: targetStatus,
+          appraisalStaff: fixedAppraiser || rec.appraisalStaff,
+          statusLogs: [...existingLogs, newLog],
+          ...(extraFields || {}),
+          ...(newAttachments && newAttachments.length > 0
+            ? { attachedFiles: [...(rec.attachedFiles || []), ...newAttachments] }
+            : {}),
+          ...(newComponents && newComponents.length > 0
+            ? { dossierComponents: [...(Array.isArray(rec.dossierComponents) ? (rec.dossierComponents as any[]) : []), ...newComponents] as any }
+            : {}),
+          updatedAt: now,
+        };
+
+        const calc = calculateRegistrationDeadline(updatedRecord);
+        if (calc.deadline) {
+          updatedRecord.deadline = calc.deadline;
+        }
+
+        try {
+          const savedRec = await updateDangkyRecord(updatedRecord);
+          updatedList.push(savedRec || updatedRecord);
+
+          // Tự động đồng bộ vào sổ GCN nếu chuyển sang PENDING_HANDOVER
+          if (targetStatus === RecordStatus.PENDING_HANDOVER || targetStatus === RecordStatus.SIGNED) {
+            await syncDangKyToVaoSo([savedRec || updatedRecord]);
+          }
+        } catch (dbErr: any) {
+          console.error(`[Lỗi CSDL khi chuyển bước hồ sơ ${rec.code}]:`, dbErr);
+          failedList.push({
+            code: rec.code,
+            error: dbErr?.message || 'Lỗi kết nối CSDL Supabase'
+          });
+        }
+      }
+
+      // CƠ CHẾ BÁO LỖI VÀ CẢNH BÁO ĐỎ NẾU CÓ HỒ SƠ KHÔNG LƯU ĐƯỢC
+      if (failedList.length > 0) {
+        const detailLines = failedList.map(f => `• Hồ sơ ${f.code}: ${f.error}`).join('\n');
+        triggerGlobalAlert(
+          `⚠️ CẢNH BÁO LỖI BẢO TỒN DỮ LIỆU CSDL:\nCó ${failedList.length} hồ sơ KHÔNG THỂ LƯU VÀO CƠ SỞ DỮ LIỆU:\n\n${detailLines}\n\n👉 Các hồ sơ này CHƯA ĐƯỢC LƯU thay đổi vào hệ thống. Vui lòng kiểm tra lại kết nối mạng và thực hiện lại.`,
+          'LỖI LƯU CƠ SỞ DỮ LIỆU'
+        );
+      }
+
+      if (updatedList.length > 0) {
+        setRecords((prev) =>
+          prev.map((r) => {
+            const found = updatedList.find((u) => u.id === r.id);
+            return found || r;
+          })
+        );
+        showFeedback(failedList.length > 0 ? 'error' : 'success', `Đã lưu CSDL thành công ${updatedList.length}/${list.length} hồ sơ.`);
+      }
+
+      setSelectedIds(new Set());
+      setHandoverModalConfig(null);
+      setHandoverTargetRecords([]);
+    } catch (err: any) {
+      console.error('Lỗi khi chuyển bước hàng loạt:', err);
+      const errMsg = err?.message || 'Có lỗi xảy ra khi chuyển bước.';
+      triggerGlobalAlert(
+        `⚠️ CẢNH BÁO LỖI BẢO TỒN DỮ LIỆU CSDL:\nKhông thể lưu chuyển bước vào Cơ sở dữ liệu!\n\nChi tiết: ${errMsg}\n\n👉 Vui lòng kiểm tra lại mạng và thử lại.`,
+        'LỖI LƯU CƠ SỞ DỮ LIỆU'
+      );
+      showFeedback('error', errMsg);
+    }
   };
 
   // Lắng nghe phím Esc để thoát các modal / popover
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isDetailOpen) {
+        if (handoverModalConfig) {
+          setHandoverModalConfig(null);
+        } else if (isDetailOpen) {
           setIsDetailOpen(false);
         } else if (isAssignOpen) {
           setIsAssignOpen(false);
@@ -204,10 +372,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDetailOpen, isAssignOpen, filterHook]);
-
-  // Danh sách hồ sơ đang được chọn
-  const selectedRecordsList = records.filter((r) => selectedIds.has(r.id));
+  }, [isDetailOpen, isAssignOpen, handoverModalConfig, filterHook]);
 
   // Thống kê nhanh theo sub-tabs quy trình Cấp giấy
   const stats = {
@@ -482,23 +647,96 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
       <div className="p-6 space-y-4">
         {/* Thanh tác vụ hàng loạt khi có chọn */}
         {selectedIds.size > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 px-4 flex items-center justify-between">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 px-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <span className="text-xs font-bold text-blue-900">
               Đang chọn <strong>{selectedIds.size}</strong> hồ sơ
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
                 onClick={() => setIsAssignOpen(true)}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Phân công cán bộ ban đầu"
               >
                 <UserCheck size={13} />
                 <span>Phân công</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenStepHandover(RecordStatus.TAX_TRANSFER)}
+                className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Giao cán bộ lập phiếu chuyển thông tin nghĩa vụ tài chính"
+              >
+                <CreditCard size={13} />
+                <span>Giao chuyển thuế</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenStepHandover(RecordStatus.PENDING_PRINT_CERT)}
+                className="px-2.5 py-1.5 bg-cyan-700 hover:bg-cyan-800 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Giao cán bộ in phôi GCN"
+              >
+                <Printer size={13} />
+                <span>Giao In GCN</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenStepHandover(RecordStatus.PENDING_CHECK)}
+                className="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Trình Lãnh đạo / Tổ trưởng kiểm tra"
+              >
+                <Shield size={13} />
+                <span>Trình Kiểm tra</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenStepHandover(RecordStatus.PENDING_SIGN)}
+                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Trình Ban Giám đốc ký duyệt"
+              >
+                <FileCheck size={13} />
+                <span>Trình Ký duyệt</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenStepHandover(RecordStatus.SIGNED)}
+                className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Ký duyệt / Chờ bàn giao"
+              >
+                <CheckCircle2 size={13} />
+                <span>Ký duyệt / Chờ giao</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenStepHandover(RecordStatus.HANDOVER)}
+                className="px-2.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Bàn giao hồ sơ cho Bộ phận Một cửa"
+              >
+                <Send size={13} />
+                <span>Giao 1 cửa</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenStepHandover(RecordStatus.RETURNED)}
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Giao Một cửa trả kết quả"
+              >
+                <FileCheck size={13} />
+                <span>Đã trả KQ</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleBulkDelete}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs ml-auto"
+                title="Xóa hồ sơ đã chọn"
               >
                 <Trash2 size={13} />
                 <span>Xóa chọn</span>
@@ -566,6 +804,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
                         setSelectedIds(new Set([record.id]));
                         setIsAssignOpen(true);
                       }}
+                      onStepHandover={(rec, targetStatus) => handleOpenStepHandover(targetStatus, [rec])}
                       employees={employees}
                       users={users}
                     />
@@ -651,7 +890,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         record={viewingRecord}
-        onSave={handleSaveRecord}
+        onSave={async (r) => { await handleSaveRecord(r); }}
         employees={employees}
         currentUser={currentUser}
       />
@@ -663,6 +902,22 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         employees={employees}
         onConfirmAssign={handleConfirmAssign}
       />
+
+      {/* Modal Chuyển bước nghiệp vụ hàng loạt / đơn lẻ (Giao chuyển thuế, Giao In GCN, Kiểm tra, Trình ký, Trả KQ) */}
+      {handoverModalConfig && (
+        <RegistrationStepHandoverModal
+          isOpen={!!handoverModalConfig}
+          onClose={() => {
+            setHandoverModalConfig(null);
+            setHandoverTargetRecords([]);
+          }}
+          records={handoverTargetRecords.length > 0 ? handoverTargetRecords : selectedRecordsList}
+          config={handoverModalConfig}
+          employees={employees}
+          currentUser={currentUser}
+          onConfirm={handleConfirmBatchStepHandover}
+        />
+      )}
 
       {/* Modal xác nhận xóa hồ sơ Cấp giấy */}
       <DeleteConfirmModal

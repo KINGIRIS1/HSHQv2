@@ -121,14 +121,19 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     reminderDate: dbItem.reminderDate || '',
     lastRemindedAt: dbItem.lastRemindedAt || '',
     deadlineReminded: Boolean(dbItem.deadlineReminded),
+    appraisalStaff: dbItem.appraisalStaff || dbItem.data?.appraisalStaff || '',
     appraisalDate: dbItem.appraisalDate || '',
     postingDate: dbItem.postingDate || '',
     postingEndDate: dbItem.postingEndDate || '',
+    taxStaff: dbItem.taxStaff || dbItem.taxTransferStaff || dbItem.data?.taxStaff || '',
+    taxTransferStaff: dbItem.taxTransferStaff || dbItem.taxStaff || dbItem.data?.taxTransferStaff || '',
+    taxTransferAssignedDate: dbItem.taxTransferAssignedDate || dbItem.data?.taxTransferAssignedDate || '',
     taxTransferDate: dbItem.taxTransferDate || '',
     taxKv7Date: dbItem.taxKv7Date || '',
     taxPaymentDate: dbItem.taxPaymentDate || '',
     printCertDate: dbItem.printCertDate || '',
     pendingHandoverDate: dbItem.pendingHandoverDate || '',
+    printStaff: dbItem.printStaff || dbItem.printStaffId || dbItem.data?.printStaff || '',
     printStaffId: dbItem.printStaffId || dbItem.print_staff_id || '',
     print_staff_id: dbItem.printStaffId || dbItem.print_staff_id || '',
     printStaffAssignedAt: dbItem.printStaffAssignedAt || dbItem.print_staff_assigned_at || '',
@@ -230,6 +235,15 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.reminderDate !== undefined) payload.reminderDate = keepOnlyDateTime(record.reminderDate);
   if (record.lastRemindedAt !== undefined) payload.lastRemindedAt = keepOnlyDateTime(record.lastRemindedAt);
   if (record.deadlineReminded !== undefined) payload.deadlineReminded = Boolean(record.deadlineReminded);
+  // Đóng gói các trường nghiệp vụ mở rộng vào JSONB data để tương thích 100% schema DB
+  const dataPayload: Record<string, any> = { ...(record.data || {}) };
+  if (record.appraisalStaff !== undefined) dataPayload.appraisalStaff = record.appraisalStaff;
+  if (record.taxStaff !== undefined) dataPayload.taxStaff = record.taxStaff;
+  if (record.taxTransferStaff !== undefined) dataPayload.taxTransferStaff = record.taxTransferStaff;
+  if (record.taxTransferAssignedDate !== undefined) dataPayload.taxTransferAssignedDate = keepOnlyDate(record.taxTransferAssignedDate);
+  if (record.printStaff !== undefined) dataPayload.printStaff = record.printStaff;
+  payload.data = dataPayload;
+
   if (record.appraisalDate !== undefined) payload.appraisalDate = keepOnlyDate(record.appraisalDate);
   if (record.postingDate !== undefined) {
     payload.postingDate = keepOnlyDate(record.postingDate);
@@ -826,6 +840,10 @@ export const handoverTaxInDb = async (
 
       const updatedRecord: RecordFile = {
         ...record,
+        appraisalStaff: record.appraisalStaff || record.assignedTo,
+        taxStaff: staffId,
+        taxTransferStaff: staffId,
+        taxTransferAssignedDate: todayStr,
         assignedTo: staffId,
         status: RecordStatus.TAX_TRANSFER,
         taxTransferDate: todayStr,

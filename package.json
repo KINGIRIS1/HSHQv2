@@ -67,7 +67,7 @@
     "appId": "vn.info.qlhshq.desktop",
     "productName": "Quan Ly Ho So",
     "directories": {
-      "output": "dist-desktop"
+      "output": "release"
     },
     "files": [
       "dist/**/*",
