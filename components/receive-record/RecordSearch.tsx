@@ -29,7 +29,8 @@ import {
     Clock,
     Printer,
     Trash2,
-    FileCheck
+    FileCheck,
+    Database
 } from 'lucide-react';
 import { DetailModal } from '../DetailModal';
 import { ExtendDeadlineModal } from '../ExtendDeadlineModal';
@@ -582,7 +583,6 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
 
                     {/* Cụm Bộ lọc & Xuất Excel ngoài cùng bên tay phải */}
                     <div className="flex items-center gap-2 shrink-0">
-                        
                         {/* Popover Filter button style copied from "Tất cả hồ sơ" */}
                         <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
                             <button
@@ -859,7 +859,9 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         {paginatedRecords.length === 0 ? (
                             <tr>
                                 <td colSpan={currentColumns.length + 2} className="py-12 text-center text-slate-400 font-medium bg-white">
-                                    Không tìm thấy hồ sơ nào phù hợp với điều kiện tìm kiếm.
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <p>Không tìm thấy hồ sơ nào phù hợp với điều kiện tìm kiếm trên giao diện.</p>
+                                    </div>
                                 </td>
                             </tr>
                         ) : (

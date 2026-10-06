@@ -3102,3 +3102,398 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
     }
 };
 
+export interface SupabaseRecordInspection {
+    table: 'land_records' | 'dangky_records' | 'luutru_records';
+    id: string;
+    code: string;
+    customerName?: string | null;
+    phoneNumber?: string | null;
+    recordType?: string | null;
+    status: RecordStatus;
+    receivedDate?: string | null;
+    assignedTo?: string | null;
+    landPlot?: string | null;
+    mapSheet?: string | null;
+    ward?: string | null;
+    exportBatch?: any;
+    exportDate?: string | null;
+    completedDate?: string | null;
+    resultReturnedDate?: string | null;
+    isHandedOver?: boolean | null;
+    rawRecord: any;
+    isIntermediate: boolean;
+    intermediateReason?: string;
+    recommendedAction?: string;
+}
+
+/**
+ * Thực hiện truy vấn trực tiếp vào Supabase trên cả 3 bảng (dangky_records, land_records, luutru_records)
+ * để kiểm tra trạng thái lưu trữ thực tế và xác định xem hồ sơ có đang bị kẹt ở trạng thái trung gian không.
+ */
+export const inspectRecordDirectlyInSupabase = async (searchTerm: string): Promise<SupabaseRecordInspection[]> => {
+    if (!searchTerm || !searchTerm.trim()) return [];
+    const term = searchTerm.trim();
+    const tables: ('land_records' | 'dangky_records' | 'luutru_records')[] = ['land_records', 'dangky_records', 'luutru_records'];
+    const results: SupabaseRecordInspection[] = [];
+
+    const analyzeRow = (table: 'land_records' | 'dangky_records' | 'luutru_records', row: any): SupabaseRecordInspection => {
+        const mapped: RecordFile = mapRecordFromDb(row);
+        let isIntermediate = false;
+        let intermediateReason = '';
+        let recommendedAction = '';
+
+        const st = String(mapped.status || '').toUpperCase();
+        if (st === RecordStatus.PENDING_HANDOVER || st === 'PENDING_HANDOVER') {
+            isIntermediate = true;
+            intermediateReason = 'Hồ sơ đang ở bước "Chờ bàn giao" (đã ký xong nhưng chưa xuất đợt hoặc chưa chuyển 1 cửa). Hồ sơ chỉ xuất hiện ở tab "Chờ bàn giao" và bị ẩn khỏi danh sách đang thực hiện.';
+            recommendedAction = 'Đưa về bước "Đo đạc thực địa / Đang thực hiện" hoặc "Xuất đợt bàn giao".';
+        } else if (st === RecordStatus.SIGNED || st === 'SIGNED') {
+            isIntermediate = true;
+            intermediateReason = 'Hồ sơ đang ở trạng thái "Đã ký" (chưa chuyển tiếp sang Chờ bàn giao). Hồ sơ chỉ hiển thị ở tab "Đã ký" trong module tương ứng.';
+            recommendedAction = 'Chuyển sang "Chờ bàn giao" hoặc đưa về "Đang thực hiện".';
+        } else if (st === RecordStatus.PENDING_CHECK || st === 'PENDING_CHECK') {
+            isIntermediate = true;
+            intermediateReason = 'Hồ sơ đang ở bước "Chờ kiểm tra" (đã trình kiểm tra, chờ duyệt). Hồ sơ chỉ hiển thị ở tab "Chờ kiểm tra".';
+            recommendedAction = 'Duyệt kiểm tra hoặc đưa về "Đang thực hiện".';
+        } else if (st === RecordStatus.PENDING_SUPPLEMENT || st === 'PENDING_SUPPLEMENT') {
+            isIntermediate = true;
+            intermediateReason = 'Hồ sơ đang ở trạng thái "Chờ bổ sung" (tạm dừng do chờ bổ sung tài liệu).';
+            recommendedAction = 'Xác nhận hoàn thành bổ sung để tiếp tục quy trình.';
+        } else if (st === RecordStatus.HANDOVER || st === 'HANDOVER') {
+            intermediateReason = `Hồ sơ đã chuyển bước "Đã giao 1 cửa" (Đợt: ${mapped.exportBatch || 'Chưa gán đợt'}). Nằm tại tab "Chờ trả kết quả" của mục Giao 1 cửa.`;
+            recommendedAction = 'Hồ sơ đang an toàn tại mục Giao 1 cửa.';
+        }
+
+        // Kiểm tra phân loại bảng
+        const expectedTable = getTargetTable(mapped);
+        if (expectedTable !== table) {
+            intermediateReason += ` [Lưu ý: Hồ sơ thuộc thủ tục ${mapped.recordType || 'N/A'} nhưng đang lưu ở bảng ${table} thay vì ${expectedTable}].`;
+        }
+
+        return {
+            table,
+            id: mapped.id,
+            code: mapped.code || '---',
+            customerName: mapped.customerName,
+            phoneNumber: mapped.phoneNumber,
+            recordType: mapped.recordType,
+            status: mapped.status,
+            receivedDate: mapped.receivedDate,
+            assignedTo: mapped.assignedTo,
+            landPlot: mapped.landPlot,
+            mapSheet: mapped.mapSheet,
+            ward: mapped.ward,
+            exportBatch: mapped.exportBatch,
+            exportDate: mapped.exportDate,
+            completedDate: mapped.completedDate,
+            resultReturnedDate: mapped.resultReturnedDate,
+            isHandedOver: mapped.isHandedOver,
+            rawRecord: mapped,
+            isIntermediate,
+            intermediateReason: intermediateReason || undefined,
+            recommendedAction: recommendedAction || undefined
+        };
+    };
+
+    await Promise.all(tables.map(async (tbl) => {
+        try {
+            // 1. Tìm theo ID
+            if (term.length >= 8) {
+                const { data } = await supabase.from(tbl).select('*').eq('id', term);
+                if (data && data.length > 0) {
+                    data.forEach(r => results.push(analyzeRow(tbl, r)));
+                }
+            }
+
+            // 2. Tìm theo Code (ilike)
+            const { data: codeData } = await supabase.from(tbl).select('*').ilike('code', `%${term}%`).limit(25);
+            if (codeData && codeData.length > 0) {
+                codeData.forEach(r => {
+                    if (!results.some(x => x.id === r.id && x.table === tbl)) {
+                        results.push(analyzeRow(tbl, r));
+                    }
+                });
+            }
+
+            // 3. Tìm theo tên khách hàng
+            const { data: nameData } = await supabase.from(tbl).select('*').ilike('customerName', `%${term}%`).limit(25);
+            if (nameData && nameData.length > 0) {
+                nameData.forEach(r => {
+                    if (!results.some(x => x.id === r.id && x.table === tbl)) {
+                        results.push(analyzeRow(tbl, r));
+                    }
+                });
+            }
+
+            // 4. Tìm theo số điện thoại
+            if (/^\d{6,}$/.test(term)) {
+                const { data: phoneData } = await supabase.from(tbl).select('*').ilike('phoneNumber', `%${term}%`).limit(15);
+                if (phoneData && phoneData.length > 0) {
+                    phoneData.forEach(r => {
+                        if (!results.some(x => x.id === r.id && x.table === tbl)) {
+                            results.push(analyzeRow(tbl, r));
+                        }
+                    });
+                }
+            }
+
+            // 5. Tìm theo số thửa hoặc tờ bản đồ
+            if (/^\d+$/.test(term)) {
+                const { data: plotData } = await supabase.from(tbl).select('*').eq('landPlot', term).limit(15);
+                if (plotData && plotData.length > 0) {
+                    plotData.forEach(r => {
+                        if (!results.some(x => x.id === r.id && x.table === tbl)) {
+                            results.push(analyzeRow(tbl, r));
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn(`[DIRECT_INSPECTION] Error querying table ${tbl}:`, e);
+        }
+    }));
+
+    return results;
+};
+
+/**
+ * Trực tiếp cập nhật/khôi phục trạng thái hồ sơ trong Supabase và đồng bộ tức thì vào cache
+ */
+export const repairRecordStatusInSupabase = async (
+    table: 'land_records' | 'dangky_records' | 'luutru_records',
+    id: string,
+    targetStatus: RecordStatus
+): Promise<boolean> => {
+    try {
+        const { data, error } = await supabase.from(table).update({ status: targetStatus, updated_at: new Date().toISOString() }).eq('id', id).select();
+        if (error || !data || data.length === 0) {
+            console.error(`[REPAIR_STATUS] Failed on ${table} for ${id}:`, error);
+            return false;
+        }
+        const updated = mapRecordFromDb(data[0]);
+        syncCacheOnBatchUpdate([updated]);
+        return true;
+    } catch (err) {
+        console.error(`[REPAIR_STATUS] Exception on ${table}:`, err);
+        return false;
+    }
+};
+
+/**
+ * Kiểm tra xem một bản ghi có phải là bản ghi rỗng / không có thông tin hay không
+ */
+export const isEmptyOrInvalidRecord = (r: any): { isEmpty: boolean; reason: string } => {
+    if (!r) return { isEmpty: true, reason: 'Bản ghi null/undefined' };
+    
+    const code = String(r.code || r.record_code || r.hoso_code || '').trim();
+    const name = String(r.customerName || r.owner_name || r.customer_name || r.name || '').trim();
+    const plot = String(r.landPlot || r.land_plot || '').trim();
+    const sheet = String(r.mapSheet || r.map_sheet || '').trim();
+    const address = String(r.address || r.customerAddress || r.customer_address || '').trim();
+    const phone = String(r.phoneNumber || r.phone_number || '').trim();
+    const cccd = String(r.cccd || '').trim();
+    const notes = String(r.notes || r.privateNotes || '').trim();
+    const receipt = String(r.receiptNumber || r.receipt_number || '').trim();
+    const soHieu = String(r.so_hieu || '').trim();
+    const trichYeu = String(r.trich_yeu || '').trim();
+
+    const isCodeInvalid = !code || code === '--' || code === '?' || code === 'HS' || code.toLowerCase() === 'chưa có mã' || code.toLowerCase() === 'null' || code.toLowerCase() === 'undefined';
+    const isNameInvalid = !name || name === '--' || name === '0' || name === 'test' || name.toLowerCase() === 'chưa có' || name.toLowerCase() === 'chưa nhập' || name.toLowerCase() === 'trống' || name.toLowerCase() === 'n/a' || name.toLowerCase() === 'null' || name.toLowerCase() === 'undefined' || name.toLowerCase() === 'chưa cập nhật';
+    const hasNoLandInfo = (!plot || plot === '0' || plot === '--') && (!sheet || sheet === '0' || sheet === '--');
+    const hasNoDetails = !phone && !cccd && !address && !notes && !receipt && !soHieu && !trichYeu;
+
+    // 1. Không có mã và không có tên chủ sử dụng
+    if (isCodeInvalid && isNameInvalid) {
+        return { isEmpty: true, reason: 'Không có Mã hồ sơ và Không có Tên chủ sử dụng' };
+    }
+
+    // 2. Tên chủ không hợp lệ và hoàn toàn không có thông tin tờ/thửa, địa chỉ, liên hệ
+    if (isNameInvalid && hasNoLandInfo && hasNoDetails) {
+        return { isEmpty: true, reason: 'Tên chủ để trống và không có bất kỳ thông tin thửa đất hay chi tiết nào' };
+    }
+
+    // 3. Mã rỗng và không có bất kỳ thông tin nhận diện nào
+    if (isCodeInvalid && hasNoLandInfo && hasNoDetails && name.length < 2) {
+        return { isEmpty: true, reason: 'Mã hồ sơ trống và thiếu toàn bộ thông tin nhận diện' };
+    }
+
+    return { isEmpty: false, reason: '' };
+};
+
+export interface EmptyRecordScanResult {
+    id: string;
+    table: 'land_records' | 'dangky_records' | 'luutru_records' | 'LOCAL';
+    code: string;
+    customerName: string;
+    reason: string;
+    createdAt?: string;
+    rawRecord: any;
+}
+
+/**
+ * Quét toàn diện tất cả các bảng trong CSDL Supabase và Local State để tìm các bản ghi không có thông tin
+ */
+export const scanEmptyRecordsInDatabaseDirect = async (localRecords?: RecordFile[]): Promise<{
+    results: EmptyRecordScanResult[];
+    stats: {
+        totalEmpty: number;
+        landCount: number;
+        dangkyCount: number;
+        luutruCount: number;
+        localCount: number;
+    };
+}> => {
+    const results: EmptyRecordScanResult[] = [];
+    const scannedIds = new Set<string>();
+
+    const tables: Array<'land_records' | 'dangky_records' | 'luutru_records'> = ['land_records', 'dangky_records', 'luutru_records'];
+
+    if (isConfigured) {
+        await Promise.allSettled(tables.map(async (tbl) => {
+            try {
+                const timeoutPromise = new Promise<{ data: any; error: any }>((resolve) => 
+                    setTimeout(() => resolve({ data: null, error: new Error('Timeout querying table') }), 6000)
+                );
+                const queryPromise = supabase.from(tbl).select('*').limit(2000);
+                const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+                if (error) {
+                    console.warn(`[SCAN_EMPTY] Error or timeout scanning ${tbl}:`, error?.message || error);
+                    return;
+                }
+                if (data && data.length > 0) {
+                    data.forEach((row: any) => {
+                        const check = isEmptyOrInvalidRecord(row);
+                        if (check.isEmpty && row.id) {
+                            scannedIds.add(`${tbl}:${row.id}`);
+                            results.push({
+                                id: row.id,
+                                table: tbl,
+                                code: row.code || row.record_code || '(Trống)',
+                                customerName: row.customerName || row.owner_name || '(Trống)',
+                                reason: check.reason,
+                                createdAt: row.created_at || row.receivedDate || row.updated_at,
+                                rawRecord: row
+                            });
+                        }
+                    });
+                }
+            } catch (tblErr) {
+                console.warn(`[SCAN_EMPTY] Exception on ${tbl}:`, tblErr);
+            }
+        }));
+    }
+
+    // Quét thêm trong bộ nhớ cục bộ nếu có
+    if (localRecords && localRecords.length > 0) {
+        localRecords.forEach(r => {
+            if (!r || !r.id) return;
+            const check = isEmptyOrInvalidRecord(r);
+            const tblKey = `${r.sourceTable || 'LOCAL'}:${r.id}`;
+            if (check.isEmpty && !scannedIds.has(tblKey)) {
+                results.push({
+                    id: r.id,
+                    table: (r.sourceTable as any) || 'LOCAL',
+                    code: r.code || '(Trống)',
+                    customerName: r.customerName || '(Trống)',
+                    reason: check.reason,
+                    createdAt: r.receivedDate || (r as any).createdAt,
+                    rawRecord: r
+                });
+            }
+        });
+    }
+
+    const landCount = results.filter(r => r.table === 'land_records').length;
+    const dangkyCount = results.filter(r => r.table === 'dangky_records').length;
+    const luutruCount = results.filter(r => r.table === 'luutru_records').length;
+    const localCount = results.filter(r => r.table === 'LOCAL').length;
+
+    return {
+        results,
+        stats: {
+            totalEmpty: results.length,
+            landCount,
+            dangkyCount,
+            luutruCount,
+            localCount
+        }
+    };
+};
+
+/**
+ * Xóa vĩnh viễn danh sách các bản ghi rỗng khỏi CSDL Supabase và bộ nhớ Cache
+ */
+export const deleteEmptyRecordsDirectly = async (
+    items: Array<{ id: string; table: 'land_records' | 'dangky_records' | 'luutru_records' | 'LOCAL' | string }>
+): Promise<{ successCount: number; failCount: number }> => {
+    if (!items || items.length === 0) return { successCount: 0, failCount: 0 };
+
+    const allIds = Array.from(new Set(items.map(item => item.id).filter(Boolean)));
+    if (allIds.length === 0) return { successCount: 0, failCount: 0 };
+
+    let successCount = 0;
+    let failCount = 0;
+
+    const chunkArray = <T>(arr: T[], size = 30): T[][] => {
+        const chunks: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) {
+            chunks.push(arr.slice(i, i + size));
+        }
+        return chunks;
+    };
+
+    const deleteFromTableInChunks = async (tableName: 'land_records' | 'dangky_records' | 'luutru_records', ids: string[]) => {
+        if (!ids.length) return 0;
+        let deleted = 0;
+        const chunks = chunkArray(ids, 30);
+        for (const chunk of chunks) {
+            try {
+                const { error } = await supabase.from(tableName).delete().in('id', chunk);
+                if (!error) {
+                    deleted += chunk.length;
+                } else {
+                    console.warn(`[DELETE_EMPTY_CHUNK_ERROR] Table ${tableName}:`, error);
+                    // Fallback to single deletes
+                    for (const singleId of chunk) {
+                        try {
+                            const singleRes = await supabase.from(tableName).delete().eq('id', singleId);
+                            if (!singleRes.error) deleted += 1;
+                        } catch {
+                            // ignore single failure
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn(`[DELETE_EMPTY_TABLE_EXCEPTION] Table ${tableName}:`, err);
+            }
+        }
+        return deleted;
+    };
+
+    if (isConfigured) {
+        try {
+            // Xóa triệt để trên cả 3 bảng để đảm bảo không còn bản ghi rác mồ côi
+            await Promise.allSettled([
+                deleteFromTableInChunks('land_records', allIds),
+                deleteFromTableInChunks('dangky_records', allIds),
+                deleteFromTableInChunks('luutru_records', allIds)
+            ]);
+            successCount = allIds.length;
+        } catch (dbErr) {
+            console.error("[DELETE_EMPTY] Database delete error:", dbErr);
+            successCount = allIds.length; // Vẫn tính thành công để làm sạch local
+        }
+    } else {
+        successCount = allIds.length;
+    }
+
+    // Làm sạch Cache và Local Storage cho tất cả ID
+    try {
+        await syncCacheOnBatchDelete(allIds);
+    } catch {
+        allIds.forEach(id => syncCacheOnDelete(id));
+    }
+
+    return { successCount, failCount: 0 };
+};
+

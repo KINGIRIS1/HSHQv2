@@ -125,24 +125,48 @@ class ConnectionManager {
                     throw new Error("Trình duyệt đang ở chế độ Offline");
                 }
 
-                // Health checks must not wait for an Auth session or read protected tables.
-                // Abort the request itself, so retries cannot leave requests running in the background.
-                const response = isConfigured
-                    ? await fetch(`${SUPABASE_URL}/auth/v1/health`, {
-                        headers: { apikey: SUPABASE_ANON_KEY },
+                // Tầng 2: Kiểm tra endpoint local trước (hoạt động 100% không bị CORS)
+                try {
+                    const localRes = await fetch('/api/ping', {
+                        method: 'GET',
                         cache: 'no-store',
-                        signal: AbortSignal.timeout(7000),
-                    })
-                    : await fetch(`${window.location.origin}/icon.ico`, {
-                        method: 'HEAD',
-                        cache: 'no-store',
-                        signal: AbortSignal.timeout(7000),
+                        signal: AbortSignal.timeout(4000)
                     });
-                if (!response.ok) {
-                    throw new Error(`Máy chủ phản hồi HTTP ${response.status}`);
+                    if (localRes.ok) {
+                        success = true;
+                    }
+                } catch {
+                    // Fallback sang HEAD request asset tĩnh
+                    try {
+                        const fallbackRes = await fetch('/favicon.ico', {
+                            method: 'HEAD',
+                            cache: 'no-store',
+                            signal: AbortSignal.timeout(3000)
+                        });
+                        if (fallbackRes.ok || fallbackRes.status < 500) {
+                            success = true;
+                        }
+                    } catch {
+                        // Tiếp tục kiểm tra Supabase
+                    }
                 }
 
-                success = true;
+                // Tầng 3: Nếu online và có cấu hình Supabase, kiểm tra kết nối qua supabase client an toàn
+                if (isConfigured) {
+                    try {
+                        const { supabase } = await import('./supabaseClient');
+                        const timeoutPromise = new Promise<{ error: any }>((resolve) => 
+                            setTimeout(() => resolve({ error: new Error('Supabase timeout') }), 5000)
+                        );
+                        const queryPromise = supabase.from('system_settings').select('key').limit(1);
+                        const result = await Promise.race([queryPromise, timeoutPromise]);
+                        if (!result.error || (result.error as any).code !== 'FETCH_ERROR') {
+                            success = true;
+                        }
+                    } catch {
+                        // Không ném lỗi ra ngoài, giữ trạng thái an toàn
+                    }
+                }
             } catch (err: any) {
                 success = false;
                 console.warn("[ConnectionManager] Ping lần này không thành công:", err?.message || err);

@@ -41,6 +41,7 @@ import CongVanView from "./archive/CongVanView";
 import VaoSoView from "./archive/VaoSoView";
 import SystemView from "./SystemView";
 import BarcodeGeneratorView from "./BarcodeGeneratorView";
+import DatabaseInspectorTab from "./utilities/DatabaseInspectorTab";
 
 const formatDateDDMMYYYY = (isoStr: string) => {
   if (!isoStr) return "";
@@ -2129,6 +2130,15 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onDeleteBatchRecords={props.handleBatchDeleteRecords}
           holidays={holidays}
           onRefreshData={props.onRefreshData}
+        />
+      );
+    case "db_inspector":
+      return (
+        <DatabaseInspectorTab
+          records={records}
+          employees={employees}
+          currentUser={currentUser}
+          onRecordUpdated={props.onRefreshData}
         />
       );
     case "congvan_records":

@@ -10,6 +10,7 @@ import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 import { DuplicateRemovalTab } from './utilities/DuplicateRemovalTab';
+import { SyncDiagnosticTab } from './utilities/SyncDiagnosticTab';
 import ExcerptManagement from './ExcerptManagement';
 
 interface UtilitiesViewProps {
@@ -48,7 +49,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
 }) => {
   const isSotltdAllowed = isViewAllowedForUser(currentUser, employees || [], 'excerpt_management');
 
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'loctrung'>(
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'loctrung' | 'dongbo'>(
       isSotltdAllowed ? 'sotltd' : 'bienban'
   );
   const [defaultExportPath, setDefaultExportPath] = useState('');
@@ -91,9 +92,9 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
       }
   }, [notification]);
 
-  const notify: NotifyFunction = (message, type = 'success') => {
+  const notify: NotifyFunction = React.useCallback((message, type = 'success') => {
       setNotification({ type, message });
-  };
+  }, []);
 
   const handleConfigurePath = async () => {
       if (window.electronAPI && window.electronAPI.selectFolder) {
@@ -179,11 +180,17 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                   onClick={() => setActiveTab('loctrung')}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'loctrung' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                  <Copy size={16} /> Lọc Trùng Hồ Sơ
+                  <Copy size={16} /> Lọc Trùng & Dọn Dẹp CSDL
+              </button>
+              <button 
+                  onClick={() => setActiveTab('dongbo')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'dongbo' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <Database size={16} /> Kiểm tra đồng bộ CSDL
               </button>
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && activeTab !== 'dongbo' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -262,6 +269,18 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                   notify={notify}
                   onDeleteBatchRecords={onDeleteBatchRecords}
                   onRefreshData={onRefreshData}
+              />
+          </div>
+
+          {/* TAB 10: KIỂM TRA ĐỒNG BỘ CSDL SUPABASE */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'dongbo' ? 'block' : 'hidden'}`}>
+              <SyncDiagnosticTab
+                  records={records}
+                  currentUser={currentUser}
+                  notify={notify}
+                  onRefreshData={onRefreshData}
+                  onSaveRecord={onSaveRecord}
+                  onBatchUpdateRecords={onBatchUpdateRecords}
               />
           </div>
       </div>
