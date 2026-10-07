@@ -592,7 +592,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             ) : (
                                 <div className="flex items-center gap-3 text-green-600 py-4 bg-green-50 rounded-lg justify-center border border-green-100">
                                     <CheckCircle2 size={24} />
-                                    <span className="font-bold text-sm">Tuyệt vời! Không có hồ sơ nào trễ hạn.</span>
+                                    <span className="font-bold text-sm">Tuyệt vời! Không có hồ sơ nào quá hạn.</span>
                                 </div>
                             )}
                         </div>
@@ -601,7 +601,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
                             <div className="p-3 bg-gray-50 border-b border-gray-200 shrink-0">
                                 <h4 className="font-bold text-gray-700 text-xs uppercase flex items-center gap-2">
-                                    <ListFilter size={14} /> Danh sách trễ hạn nguy cấp ({'>'}10 ngày)
+                                    <ListFilter size={14} /> Danh sách quá hạn nguy cấp ({'>'}10 ngày)
                                 </h4>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">

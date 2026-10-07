@@ -16,10 +16,11 @@ import {
   Shield,
   FileCheck,
   Send,
+  Pause,
 } from 'lucide-react';
 import { RecordFile, Employee, User as AppUser, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
-import { getRegistrationWorkflowCategory, getStepSlaInfo, getAppointmentInfo, calculateExactSla } from '../../utils/registrationWorkflows';
+import { getRegistrationWorkflowCategory, getStepSlaInfo, getAppointmentInfo, calculateExactSla, calculateRecordStepSla } from '../../utils/registrationWorkflows';
 import { resolveEmployeeName } from '../../utils/appHelpers';
 import { isCertificateRecordType } from '../../constants';
 
@@ -33,6 +34,7 @@ interface RegistrationRecordRowProps {
   onDelete?: (record: RecordFile) => void;
   onAssign?: (record: RecordFile) => void;
   onStepHandover?: (record: RecordFile, targetStatus: RecordStatus) => void;
+  onTogglePauseSla?: (record: RecordFile) => void;
   employees?: Employee[];
   users?: AppUser[];
 }
@@ -47,6 +49,7 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
   onDelete,
   onAssign,
   onStepHandover,
+  onTogglePauseSla,
   employees = [],
   users = [],
 }) => {
@@ -119,6 +122,31 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
       <td className="py-2.5 px-3 font-semibold text-slate-800">
         <div className="flex flex-col">
           <span className="text-slate-900 font-bold">{record.customerName || '—'}</span>
+          {isCertificateRecordType(record) && (() => {
+            const stepSla = calculateRecordStepSla(record);
+            if (stepSla.isPaused) {
+              return (
+                <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1 mt-0.5">
+                  <Pause size={11} className="text-amber-600" />
+                  <span>{stepSla.remainingLabel}</span>
+                </span>
+              );
+            }
+            if (stepSla.isOverdue) {
+              return (
+                <span className="text-[11px] font-black text-rose-600 flex items-center gap-1 mt-0.5">
+                  <AlertTriangle size={11} className="text-rose-500 shrink-0" />
+                  <span>{stepSla.overdueLabel}</span>
+                </span>
+              );
+            }
+            return (
+              <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 mt-0.5">
+                <Clock size={11} className="text-emerald-600 shrink-0" />
+                <span>{stepSla.remainingLabel}</span>
+              </span>
+            );
+          })()}
           {record.phoneNumber && (
             <span className="text-[11px] text-slate-500 font-normal">{record.phoneNumber}</span>
           )}
@@ -423,6 +451,21 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
             }
             return null;
           })()}
+
+          {onTogglePauseSla && (
+            <button
+              type="button"
+              onClick={() => onTogglePauseSla(record)}
+              title={record.isSlaPaused ? "Đang tạm dừng SLA. Bấm để tiếp tục tính SLA" : "Bấm để tạm dừng tính SLA hồ sơ"}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                record.isSlaPaused
+                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 ring-1 ring-amber-300 font-bold'
+                  : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+              }`}
+            >
+              <Pause size={14} className={record.isSlaPaused ? "text-amber-700 animate-pulse" : ""} />
+            </button>
+          )}
 
           <button
             type="button"

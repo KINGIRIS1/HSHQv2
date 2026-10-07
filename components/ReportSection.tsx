@@ -661,7 +661,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         } else if (activeTab === 'revenue') {
             title += " - BÁO CÁO DOANH THU";
         } else if (activeTab === 'overdue') {
-            title += " - BÁO CÁO HỒ SƠ TRỄ HẠN";
+            title += " - BÁO CÁO HỒ SƠ QUÁ HẠN";
         }
 
         if (reportType === 'today') title += " HÔM NAY";
@@ -1069,7 +1069,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             <span className="font-bold text-amber-600">({generalStats.processing})</span>
                         </button>
 
-                        {/* Trễ hạn chưa xong */}
+                        {/* Quá hạn chưa xong */}
                         <button
                             type="button"
                             onClick={() => {
@@ -1082,7 +1082,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                     : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                            <span>Trễ hạn chưa xong</span>
+                            <span>Quá hạn chưa xong</span>
                             <span className="font-bold text-red-600">({generalStats.overduePending})</span>
                         </button>
                     </div>

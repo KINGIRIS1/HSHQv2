@@ -107,6 +107,123 @@ export const DEFAULT_VISIBLE_COLUMNS = {
 };
 
 // --- CÁC HÀM CHECK LOGIC ---
+export interface RecordSlaDetails {
+  status: 'ontime' | 'approaching' | 'overdue' | 'paused' | 'completed';
+  text: string;
+  shortText: string;
+  isOverdue: boolean;
+  isApproaching: boolean;
+  isPaused: boolean;
+  hours: number;
+  minutes: number;
+  colorClass: string;
+}
+
+export const getRecordSlaDetails = (record: RecordFile): RecordSlaDetails => {
+  const completedStatuses = [
+    RecordStatus.HANDOVER,
+    RecordStatus.RETURNED,
+    RecordStatus.WITHDRAWN,
+    RecordStatus.REJECTED,
+    RecordStatus.SIGNED
+  ];
+
+  if (completedStatuses.includes(record.status) || record.exportDate || record.exportBatch || record.resultReturnedDate) {
+    return {
+      status: 'completed',
+      text: 'Đã hoàn thành',
+      shortText: 'Đã xong',
+      isOverdue: false,
+      isApproaching: false,
+      isPaused: false,
+      hours: 0,
+      minutes: 0,
+      colorClass: 'text-slate-500 font-semibold'
+    };
+  }
+
+  if (record.isSlaPaused) {
+    return {
+      status: 'paused',
+      text: 'Tạm dừng SLA',
+      shortText: 'Tạm dừng',
+      isOverdue: false,
+      isApproaching: false,
+      isPaused: true,
+      hours: 0,
+      minutes: 0,
+      colorClass: 'text-slate-500 font-semibold'
+    };
+  }
+
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline || isNaN(deadline.getTime())) {
+    return {
+      status: 'ontime',
+      text: 'Trong hạn',
+      shortText: 'Trong hạn',
+      isOverdue: false,
+      isApproaching: false,
+      isPaused: false,
+      hours: 0,
+      minutes: 0,
+      colorClass: 'text-emerald-600 font-semibold'
+    };
+  }
+
+  // End of working hours on deadline day if hours are 00:00
+  if (deadline.getHours() === 0 && deadline.getMinutes() === 0) {
+    deadline.setHours(17, 30, 0, 0);
+  }
+
+  const now = new Date();
+  const diffMs = deadline.getTime() - now.getTime();
+
+  if (diffMs < 0) {
+    const overdueMs = Math.abs(diffMs);
+    const totalMinutes = Math.floor(overdueMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const text = hours >= 1
+      ? `Quá hạn ${hours} giờ ${minutes > 0 ? `${minutes} phút` : ''}`.trim()
+      : `Quá hạn ${minutes} phút`;
+    const shortText = hours >= 1 ? `Quá hạn ${hours}h${minutes > 0 ? `${minutes}p` : ''}` : `Quá hạn ${minutes}p`;
+
+    return {
+      status: 'overdue',
+      text,
+      shortText,
+      isOverdue: true,
+      isApproaching: false,
+      isPaused: false,
+      hours,
+      minutes,
+      colorClass: 'text-red-600 font-bold'
+    };
+  } else {
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const isApproaching = totalMinutes <= 24 * 60;
+    const text = isApproaching
+      ? `Sắp tới hạn (còn ${hours} giờ ${minutes > 0 ? `${minutes} phút` : ''})`.trim()
+      : `Còn ${hours} giờ ${minutes > 0 ? `${minutes} phút` : ''}`.trim();
+    const shortText = `Còn ${hours}h${minutes > 0 ? `${minutes}p` : ''}`;
+
+    return {
+      status: isApproaching ? 'approaching' : 'ontime',
+      text,
+      shortText,
+      isOverdue: false,
+      isApproaching,
+      isPaused: false,
+      hours,
+      minutes,
+      colorClass: isApproaching ? 'text-amber-500 font-bold' : 'text-emerald-600 font-bold'
+    };
+  }
+};
+
 export const isRecordOverdue = (record: RecordFile): boolean => {
   // 1. Kiểm tra trạng thái "Đã xong"
   const completedStatuses = [

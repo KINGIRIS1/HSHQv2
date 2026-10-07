@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType, isCertificateRecordType, formatDisplayCode } from '../constants';
-import { isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus, resolveEmployeeName } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, getOverdueDays, getRecordSlaDetails, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus, resolveEmployeeName } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -110,10 +110,15 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 </div>
                 {hasActiveReminder && <div className="flex items-center gap-1 text-xs text-pink-600 font-bold bg-pink-100 px-1.5 py-0.5 rounded"><Bell size={12} className="fill-pink-600" /> Nhắc hẹn</div>}
             </div>
-            {isOverdue && (() => {
-              const days = getOverdueDays(record);
-              const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
-              return <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">{text}</span>;
+            {(() => {
+              const sla = getRecordSlaDetails(record);
+              if (sla.isOverdue) {
+                return <span className="text-[11px] font-bold text-red-600 block text-center w-full mt-1">{sla.text}</span>;
+              }
+              if (sla.isApproaching) {
+                return <span className="text-[11px] font-bold text-amber-500 block text-center w-full mt-1">{sla.text}</span>;
+              }
+              return null;
             })()}
           </td>
         );
@@ -136,20 +141,20 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'deadline':
         return (
           <td key="deadline" className={cellClass}>
-            <div className="flex flex-col w-full bg-white/50 rounded border border-gray-100 overflow-hidden shadow-sm">
+            <div className="flex flex-col w-full bg-white rounded border border-gray-100 overflow-hidden shadow-sm">
                <div className="flex items-center justify-between px-2.5 py-1.5 bg-gray-50/80 border-b border-gray-100" title="Ngày tiếp nhận">
                   <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight mr-3">Nhận</span>
                   <span className="text-sm font-semibold text-slate-600 font-mono whitespace-nowrap">{formatDate(record.receivedDate)}</span>
                </div>
                
-               <div className={`flex items-center justify-between px-2.5 py-1.5 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
-                  <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-3 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
+               <div className="flex items-center justify-between px-2.5 py-1.5 bg-white" title="Hẹn trả kết quả">
+                  <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-3 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-amber-500' : 'text-blue-500'}`}>Trả</span>
                   <div className="flex items-center gap-1.5">
-                      <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
+                      <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-amber-500' : 'text-blue-700'}`}>
                           {formatDate(record.deadline)}
                       </span>
                       {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
-                      {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
+                      {isApproaching && <Clock size={13} className="text-amber-500 shrink-0" />}
                   </div>
                </div>
             </div>

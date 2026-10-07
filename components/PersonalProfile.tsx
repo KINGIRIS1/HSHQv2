@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, STATUS_LABELS, formatDisplayCode, isCertificateRecordType } from "../constants";
-import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays, toTitleCase, matchEmployeeId } from "../utils/appHelpers";
+import { confirmAction, cleanSyncNotes, isFieldWorkProcedure, parseSafeDate, isRecordOverdue, isRecordApproaching, getOverdueDays, getRecordSlaDetails, toTitleCase, matchEmployeeId } from "../utils/appHelpers";
 import { calculateExactSla } from "../utils/registrationWorkflows";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import { enqueueRecordForBackgroundDriveSync, hasPendingRecordAttachments } from "../services/attachmentStorage";
@@ -492,7 +492,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   }, [isChecker]);
 
   // Chi tiết thời gian quá hạn chính xác theo quy tắc mới
-  function getOverdueDetails(record: RecordFile): { isOverdue: boolean; totalDays: number; text: string } | null {
+  function getOverdueDetails(record: RecordFile): { isOverdue: boolean; totalDays: number; totalHours?: number; totalMinutes?: number; text: string } | null {
     if (
       record.status === RecordStatus.HANDOVER ||
       record.status === RecordStatus.RETURNED ||
@@ -511,25 +511,27 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const deadline = parseSafeDate(record.deadline);
     if (!deadline || isNaN(deadline.getTime())) return null;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    deadline.setHours(0, 0, 0, 0);
-
-    const diffTime = today.getTime() - deadline.getTime();
-    if (diffTime <= 0) return null;
-
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    let text = "";
-    if (diffDays === 0) {
-      text = "Trễ hạn hôm nay";
-    } else {
-      text = `Trễ hạn ${diffDays} ngày`;
+    if (deadline.getHours() === 0 && deadline.getMinutes() === 0) {
+      deadline.setHours(17, 30, 0, 0);
     }
+
+    const now = new Date();
+    const diffMs = deadline.getTime() - now.getTime();
+    if (diffMs >= 0) return null;
+
+    const overdueMs = Math.abs(diffMs);
+    const totalMinutes = Math.floor(overdueMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const text = hours >= 1
+      ? `Quá hạn ${hours} giờ ${minutes > 0 ? `${minutes} phút` : ''}`.trim()
+      : `Quá hạn ${minutes} phút`;
 
     return {
       isOverdue: true,
-      totalDays: diffDays,
+      totalDays: Math.floor(totalMinutes / (60 * 24)),
+      totalHours: hours,
+      totalMinutes: minutes,
       text,
     };
   }
@@ -1525,7 +1527,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   };
 
   const getDeadlineStatus = (record: RecordFile) => {
-    // 1. Kiểm tra nếu đã hoàn thành/xuất hồ sơ thì KHÔNG tính trễ hạn
+    // 1. Kiểm tra nếu đã hoàn thành/xuất hồ sơ thì KHÔNG tính quá hạn
     // Nếu có exportBatch hoặc exportDate hoặc status là HANDOVER/RETURNED/SIGNED -> Coi như xong
     if (
       record.status === RecordStatus.HANDOVER ||
@@ -1693,7 +1695,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
         {/* SEARCH & ACTIONS */}
         <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-2.5 shrink-0 w-full flex-wrap">
-          {/* Cụm nút cảnh báo Trễ hạn / Tới hạn ở bên trái */}
+          {/* Cụm nút cảnh báo Quá hạn / Tới hạn ở bên trái */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() =>
@@ -1985,14 +1987,19 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             {isCertificateRecordType(r) ? (() => {
                               const exactSla = calculateExactSla(r);
                               return (
-                                <span className={`inline-block px-1.5 py-0.5 text-xs rounded border font-bold mt-1 block text-center w-full ${exactSla.isOverdue ? 'bg-red-50 text-red-600 border-red-200' : exactSla.isApproaching ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
+                                <span className={`text-[11px] font-bold mt-1 block text-center w-full ${exactSla.colorClass}`}>
                                   ⏱️ {exactSla.text}
                                 </span>
                               );
-                            })() : isRecordOverdue(r) && (() => {
-                              const days = getOverdueDays(r);
-                              const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
-                              return <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded border border-red-200 font-bold mt-1 block text-center w-full">{text}</span>;
+                            })() : (() => {
+                              const sla = getRecordSlaDetails(r);
+                              if (sla.isOverdue) {
+                                return <span className="text-[11px] font-bold text-red-600 mt-1 block text-center w-full">{sla.text}</span>;
+                              }
+                              if (sla.isApproaching) {
+                                return <span className="text-[11px] font-bold text-amber-500 mt-1 block text-center w-full">{sla.text}</span>;
+                              }
+                              return null;
                             })()}
                           </td>
                           <td className="p-3 font-medium text-gray-800 align-middle text-center">

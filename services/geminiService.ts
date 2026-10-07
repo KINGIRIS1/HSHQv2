@@ -56,9 +56,9 @@ export const generateReport = async (
     let completedCount = 0;
     let processingCount = 0;
     
-    // Tách biến trễ hạn
-    let overduePendingCount = 0;   // Trễ hạn chưa xong
-    let overdueCompletedCount = 0; // Trễ hạn đã xong (làm xong trễ ngày hẹn)
+    // Tách biến quá hạn
+    let overduePendingCount = 0;   // Quá hạn chưa xong
+    let overdueCompletedCount = 0; // Quá hạn đã xong (làm xong quá ngày hẹn)
     
     let pendingSignCount = 0;
     let withdrawnCount = 0;
@@ -80,7 +80,7 @@ export const generateReport = async (
         else if (r.status === RecordStatus.WITHDRAWN) withdrawnCount++;
         else processingCount++;
         
-        // Logic tính trễ hạn mới
+        // Logic tính quá hạn mới
         if (r.deadline) {
             const deadlineDate = new Date(r.deadline);
             deadlineDate.setHours(0,0,0,0);
@@ -156,8 +156,8 @@ export const generateReport = async (
          - Tổng HS
          - Đã xong
          - Đang xử lý
-         - Trễ hạn (Chưa xong): ${overduePendingCount}
-         - Trễ hạn (Đã xong): ${overdueCompletedCount}
+         - Quá hạn (Chưa xong): ${overduePendingCount}
+         - Quá hạn (Đã xong): ${overdueCompletedCount}
       
       5. THỐNG KÊ THEO ĐỊA BÀN (Tóm tắt): Tạo 1 bảng HTML (Border đen mỏng 1px) các cột: STT, Địa bàn, Tổng số, Đã xong, Tỷ lệ %.
 
@@ -167,7 +167,7 @@ export const generateReport = async (
          - Cột 2: Chi tiết số lượng từng loại (Ví dụ: Trích lục: 5, Đo đạc: 2, Cắm mốc: 1...). Hãy liệt kê rõ ràng trong ô.
          - Dữ liệu lấy từ 'wardTypeDetails'.
 
-      7. NHẬN XÉT (Tối đa 3 câu): Nhận xét ngắn gọn về tiến độ. Đặc biệt lưu ý tách biệt việc tồn đọng hồ sơ trễ hạn (chưa xong) và việc hoàn thành nhưng bị trễ (đã xong).
+      7. NHẬN XÉT (Tối đa 3 câu): Nhận xét ngắn gọn về tiến độ. Đặc biệt lưu ý tách biệt việc tồn đọng hồ sơ quá hạn (chưa xong) và việc hoàn thành nhưng bị trễ (đã xong).
       8. CHỮ KÝ: 
          - Tạo một bảng 2 cột không viền (border="0").
          - Cột trái: "NGƯỜI LẬP BIỂU" (In đậm), dòng dưới "(Ký, họ tên)" (In nghiêng).
@@ -197,7 +197,7 @@ export const generateReport = async (
 export const generateEmployeeEvaluation = async (
     employeeName: string,
     stats: any,
-    badRecords: any[], // Danh sách các hồ sơ trễ hạn lâu
+    badRecords: any[], // Danh sách các hồ sơ quá hạn lâu
     timeLabel: string
 ): Promise<string> => {
     try {
@@ -215,16 +215,16 @@ export const generateEmployeeEvaluation = async (
             - Tổng hồ sơ được giao: ${stats.total}
             - Hoàn thành đúng hạn: ${stats.onTime}
             - Sắp tới hạn (Cần lưu ý): ${stats.approaching}
-            - Trễ hạn (Chưa xong): ${stats.overdue}
+            - Quá hạn (Chưa xong): ${stats.overdue}
             - Tỷ lệ hoàn thành đúng hạn: ${stats.onTimeRate}%
 
-            DANH SÁCH HỒ SƠ TRỄ HẠN QUÁ LÂU (>7 ngày):
+            DANH SÁCH HỒ SƠ QUÁ HẠN QUÁ LÂU (>7 ngày):
             ${JSON.stringify(badRecords)}
 
             YÊU CẦU ĐẦU RA (HTML):
             Viết một báo cáo ngắn (khoảng 200-300 chữ) bằng thẻ HTML (không dùng thẻ html, body, head), style chuyên nghiệp, font Times New Roman gồm các phần:
             1. **Đánh giá chung**: Nhận xét về khối lượng công việc và mức độ hoàn thành. Dùng giọng văn khích lệ nếu tốt, nghiêm khắc nhắc nhở nếu tệ.
-            2. **Phân tích tồn tại**: Nếu có hồ sơ trễ hạn, hãy chỉ ra cụ thể mã hồ sơ nào trễ lâu nhất và cần ưu tiên xử lý. Nếu không có trễ hạn, hãy khen ngợi.
+            2. **Phân tích tồn tại**: Nếu có hồ sơ quá hạn, hãy chỉ ra cụ thể mã hồ sơ nào trễ lâu nhất và cần ưu tiên xử lý. Nếu không có quá hạn, hãy khen ngợi.
             3. **Đề xuất/Kiến nghị**: Đưa ra lời khuyên cụ thể để nhân viên cải thiện hoặc duy trì phong độ.
 
             Lưu ý: 

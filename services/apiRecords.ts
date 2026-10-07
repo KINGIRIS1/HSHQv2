@@ -77,8 +77,9 @@ export const DANGKY_RECORDS_DB_COLUMNS = [
     'returnBatch', 'returnBatchDate', 'returnHandoverDept',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'attachedFiles', 'dossierComponents', 'certificateOwners',
-    'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
+    'appraisalDate', 'appraisalStaff', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'taxNoticeDate', 'printCertDate', 'printStaffId', 'printStaffAssignedAt', 'printDeadlineStartAt', 'pendingHandoverDate',
     'previousStatus', 'supplementReturnStatus', 'supplementReason', 'supplementRequestedBy', 'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedBy', 'supplementCompletedAt', 'supplementRequestDate', 'supplementReturnedDate',
+    'procedureCode', 'stepTimestamps', 'stepDurations',
     'updated_at'
 ];
 

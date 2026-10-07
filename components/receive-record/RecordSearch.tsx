@@ -36,6 +36,23 @@ import { DetailModal } from '../DetailModal';
 import { ExtendDeadlineModal } from '../ExtendDeadlineModal';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, getBatchDisplayParts, formatDateTimeVN, getVietnamNowISO } from '../../utils/appHelpers';
 import { hasRecordActionPermission } from '../../utils/permissionUtils';
+import { calculateRecordStepSla } from '../../utils/registrationWorkflows';
+import { FileText, Paperclip, Pause } from 'lucide-react';
+
+const getShortCodeDisplay = (code?: string | null): string => {
+  if (!code) return '—';
+  const trimmed = code.trim();
+  const match = trimmed.match(/(\d{6}-\d{3,5})/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  const parts = trimmed.split('-');
+  if (parts.length >= 2) {
+    const lastTwo = parts.slice(-2).join('-');
+    if (/^\d{6}/.test(lastTwo)) return lastTwo;
+  }
+  return trimmed;
+};
 
 interface RecordSearchProps {
     records: RecordFile[];
@@ -119,9 +136,9 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
     const currentColumns = useMemo(() => {
         if (isExtendView) {
             return [
-              { key: 'code', label: 'MÃ HỒ SƠ', className: 'w-[100px] text-center' },
+              { key: 'code', label: 'MÃ HỒ SƠ', className: 'w-[130px] text-center whitespace-nowrap' },
               { key: 'customer', label: 'KHÁCH HÀNG', className: 'w-[180px] text-center' }, 
-              { key: 'type', label: 'LOẠI HỒ SƠ', className: 'w-[100px] text-center' },
+              { key: 'type', label: 'LOẠI HỒ SƠ', className: 'w-[110px] text-center' },
               { key: 'ward', label: 'XÃ PHƯỜNG', className: 'w-[100px] text-center' },
               { key: 'deadlineOld', label: 'THỜI HẠN CŨ', className: 'w-[110px] text-center' },
               { key: 'deadlineNew', label: 'THỜI HẠN MỚI', className: 'w-[110px] text-center' },
@@ -134,7 +151,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
             ];
         }
         return [
-          { key: 'code', label: 'MÃ HỒ SƠ', className: 'w-[120px] text-center' },
+          { key: 'code', label: 'MÃ HỒ SƠ', className: 'w-[130px] text-center whitespace-nowrap' },
           { key: 'customer', label: 'THÔNG TIN CHỦ SỬ DỤNG', className: 'w-64 text-center' }, 
           { key: 'type', label: 'LOẠI HỒ SƠ', className: 'w-[115px] text-center' },
           { key: 'ward', label: 'XÃ PHƯỜNG', className: 'w-32 text-center' },
@@ -886,44 +903,94 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                             if (!visibleColumns[colKey]) return null;
                                             
                                             switch (colKey) {
-                                                case 'code':
+                                                case 'code': {
+                                                    const shortCode = getShortCodeDisplay(r.code);
+                                                    const hasFiles = Boolean((r as any).attachmentUrl || (r as any).attachments?.length || (r as any).filePath || (r as any).dossier_files?.length || (r as any).files?.length);
+                                                    const stepSla = calculateRecordStepSla(r);
+                                                    const overdueDays = isOverdue ? getOverdueDays(r) : 0;
+
                                                     return (
-                                                        <td key="code" className="p-3 align-middle font-bold text-blue-600 cursor-pointer text-center" onClick={() => setSelectedDetailRecord(r)}>
-                                                            <div className="flex flex-col items-center gap-0.5">
-                                                                <span className="text-sm font-bold">{r.code}</span>
-                                                                {isOverdue && (() => {
-                                                                     const days = getOverdueDays(r);
-                                                                     const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
-                                                                     return <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded border border-red-200 font-bold">{text}</span>;
-                                                                 })()}
+                                                        <td key="code" className="p-3 align-middle text-center whitespace-nowrap">
+                                                            <div className="flex flex-col items-center justify-center gap-1">
+                                                                <div className="inline-flex items-center justify-center gap-1 whitespace-nowrap">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setSelectedDetailRecord(r)}
+                                                                        className="font-bold text-sm text-slate-900 hover:text-blue-700 hover:underline cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
+                                                                        title={`Mã hồ sơ gốc: ${r.code || ''}`}
+                                                                    >
+                                                                        <span>{shortCode}</span>
+                                                                    </button>
+                                                                    {hasFiles && (
+                                                                        <span title="Có tệp đính kèm" className="text-emerald-600">
+                                                                            <Paperclip size={12} />
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {/* Badge SLA dưới mã hồ sơ chuẩn theo chuyên môn */}
+                                                                {(() => {
+                                                                    if (stepSla.isPaused) {
+                                                                        return (
+                                                                            <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] rounded border border-amber-200 font-bold whitespace-nowrap">
+                                                                                Tạm dừng SLA
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    if (isOverdue || stepSla.isOverdue) {
+                                                                        const labelText = overdueDays > 0 ? `Trễ hạn ${overdueDays} ngày` : (stepSla.overdueLabel || "Trễ hạn hôm nay");
+                                                                        return (
+                                                                            <span className="inline-block px-2 py-0.5 bg-red-100 text-red-600 text-[11px] rounded border border-red-200 font-bold whitespace-nowrap">
+                                                                                {labelText}
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    if (isApproaching) {
+                                                                        return (
+                                                                            <span className="inline-block px-2 py-0.5 bg-orange-50 text-orange-600 text-[11px] rounded border border-orange-200 font-semibold whitespace-nowrap">
+                                                                                {stepSla.remainingLabel}
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
                                                             </div>
                                                         </td>
                                                     );
-                                                case 'customer':
+                                                }
+                                                case 'customer': {
                                                     return (
                                                         <td key="customer" className="p-3 align-middle text-center">
-                                                            <div className="flex flex-col gap-1 items-center">
-                                                                <div className="text-sm font-semibold text-gray-900 leading-normal">
+                                                            <div className="flex flex-col gap-1 items-center text-center">
+                                                                <span className="text-sm font-bold text-gray-900 leading-normal" title={r.customerName}>
                                                                     {toTitleCase(r.customerName || '')}
-                                                                </div>
+                                                                </span>
                                                                 {r.phoneNumber && (
-                                                                    <div className="flex items-center gap-1 text-xs text-gray-500 font-mono">
-                                                                        <Phone size={12} />
+                                                                    <div className="flex items-center justify-center gap-1 text-sm text-gray-600 font-mono">
+                                                                        <Phone size={13} className="text-slate-400 shrink-0" />
                                                                         <span>{r.phoneNumber}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         </td>
                                                     );
-                                                case 'type':
+                                                }
+                                                case 'type': {
+                                                    const fullType = r.recordType || '—';
+                                                    const shortType = getShortRecordType(r.recordType || undefined);
                                                     return (
-                                                        <td key="type" className="p-3 align-middle text-center font-semibold text-gray-700">
-                                                            {getShortRecordType(r.recordType || undefined)}
+                                                        <td key="type" className="p-3 align-middle text-center font-semibold text-gray-700 text-sm">
+                                                            <span 
+                                                                className="truncate max-w-[130px] md:max-w-[150px] inline-block align-middle"
+                                                                title={fullType}
+                                                            >
+                                                                {shortType || fullType}
+                                                            </span>
                                                         </td>
                                                     );
+                                                }
                                                 case 'ward':
                                                     return (
-                                                        <td key="ward" className="p-3 align-middle text-center font-medium text-gray-600">
+                                                        <td key="ward" className="p-3 align-middle text-center font-medium text-gray-700 text-sm">
                                                             {getNormalizedWard(r.ward || undefined)}
                                                         </td>
                                                     );
@@ -931,16 +998,16 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                     return (
                                                         <td key="deadline" className="p-3 align-middle text-center">
                                                             <div className="flex flex-col w-full bg-white/50 rounded border border-gray-100 overflow-hidden shadow-xs">
-                                                                <div className="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-100 text-[11px]">
-                                                                    <span className="text-[9px] font-extrabold text-slate-400 uppercase">Nhận</span>
-                                                                    <span className="font-semibold text-slate-600 font-mono">{formatDate(r.receivedDate)}</span>
+                                                                <div className="flex items-center justify-between px-2.5 py-1.5 bg-gray-50/80 border-b border-gray-100 text-xs">
+                                                                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight">Nhận</span>
+                                                                    <span className="font-semibold text-slate-600 font-mono whitespace-nowrap">{formatDate(r.receivedDate)}</span>
                                                                 </div>
-                                                                <div className={`flex items-center justify-between px-2 py-1 text-[11px] ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`}>
-                                                                    <span className={`text-[9px] font-extrabold uppercase ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className={`font-bold font-mono ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>{formatDate(r.deadline)}</span>
-                                                                        {isOverdue && <AlertCircle size={12} className="text-red-500 animate-pulse" />}
-                                                                        {isApproaching && <Clock size={12} className="text-orange-500" />}
+                                                                <div className={`flex items-center justify-between px-2.5 py-1.5 text-xs ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`}>
+                                                                    <span className={`text-[10px] font-extrabold uppercase tracking-tight ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className={`font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>{formatDate(r.deadline)}</span>
+                                                                        {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
+                                                                        {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -949,7 +1016,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                 case 'deadlineOld': {
                                                     const { oldDeadline } = getExtensionDates(r);
                                                     return (
-                                                        <td key="deadlineOld" className="p-3 align-middle text-center font-bold text-gray-400 font-mono line-through">
+                                                        <td key="deadlineOld" className="p-3 align-middle text-center font-bold text-gray-400 font-mono text-sm line-through">
                                                             {oldDeadline}
                                                         </td>
                                                     );
@@ -957,20 +1024,20 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                 case 'deadlineNew': {
                                                     const { newDeadline } = getExtensionDates(r);
                                                     return (
-                                                        <td key="deadlineNew" className="p-3 align-middle text-center font-bold text-blue-700 font-mono">
+                                                        <td key="deadlineNew" className="p-3 align-middle text-center font-bold text-blue-700 font-mono text-sm">
                                                             <span>{newDeadline}</span>
                                                         </td>
                                                     );
                                                 }
                                                 case 'mapSheet':
                                                     return (
-                                                        <td key="mapSheet" className="p-3 align-middle text-center font-medium text-gray-700">
+                                                        <td key="mapSheet" className="p-3 align-middle text-center font-mono text-sm font-bold text-slate-700">
                                                             {r.mapSheet || '--'}
                                                         </td>
                                                     );
                                                 case 'landPlot':
                                                     return (
-                                                        <td key="landPlot" className="p-3 align-middle text-center font-medium text-gray-700">
+                                                        <td key="landPlot" className="p-3 align-middle text-center font-mono text-sm font-bold text-slate-700">
                                                             {r.landPlot || '--'}
                                                         </td>
                                                     );
@@ -978,9 +1045,13 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                     return (
                                                         <td key="assigned" className="p-3 align-middle text-center">
                                                             {assignedEmp ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className="text-[10px] text-gray-400">{formatDate(r.assignedDate)}</span>
-                                                                    <span className="font-bold text-blue-600 text-xs">{assignedEmp.name}</span>
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    {r.assignedDate && (
+                                                                        <span className="text-xs text-gray-500 font-mono">{formatDate(r.assignedDate)}</span>
+                                                                    )}
+                                                                    <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={assignedEmp.name}>
+                                                                        {assignedEmp.name}
+                                                                    </span>
                                                                 </div>
                                                             ) : (
                                                                 <span className="text-gray-300">--</span>
@@ -1057,7 +1128,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col items-center justify-center gap-1 py-0.5">
-                                                    {/* Hàng trên: Xem chi tiết & Gia hạn hẹn trả / Trả kết quả */}
+                                                    {/* Hàng trên: Xem chi tiết & In ấn */}
                                                     <div className="flex items-center gap-1">
                                                         <button
                                                             onClick={() => setSelectedDetailRecord(r)}
@@ -1066,26 +1137,16 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                         >
                                                             <Eye size={15} />
                                                         </button>
-                                                        {onReturnResult && r.status === 'HANDOVER' && !r.resultReturnedDate ? (
-                                                            <button
-                                                                onClick={() => onReturnResult(r)}
-                                                                className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50 cursor-pointer animate-pulse shadow-xs"
-                                                                title="Trả kết quả"
-                                                            >
-                                                                <FileCheck size={15} />
-                                                            </button>
-                                                        ) : hasRecordActionPermission('extend', r, currentUser, employees) ? (
-                                                            <button
-                                                                onClick={() => setSelectedExtendRecord(r)}
-                                                                className="p-1 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
-                                                                title="Gia hạn hẹn trả"
-                                                            >
-                                                                <CalendarClock size={15} />
-                                                            </button>
-                                                        ) : null}
+                                                        <button
+                                                            onClick={() => onPrint(r)}
+                                                            className="p-1 text-purple-600 hover:bg-purple-100 rounded transition-colors border border-purple-200 bg-purple-50/70 cursor-pointer shadow-xs"
+                                                            title="In phiếu / Biên nhận"
+                                                        >
+                                                            <Printer size={15} />
+                                                        </button>
                                                     </div>
 
-                                                    {/* Hàng dưới: Chỉnh sửa & Xóa */}
+                                                    {/* Hàng dưới: Chỉnh sửa & Gia hạn / Trả kết quả */}
                                                     <div className="flex items-center gap-1">
                                                         <button
                                                             onClick={() => onEdit(r)}
@@ -1094,15 +1155,35 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                         >
                                                             <Pencil size={15} />
                                                         </button>
-                                                        {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER') && (
-                                                            <button
-                                                                onClick={() => onDelete(r)}
-                                                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50 cursor-pointer shadow-xs"
-                                                                title="Xóa hồ sơ"
-                                                            >
-                                                                <Trash2 size={15} />
-                                                            </button>
-                                                        )}
+                                                        {(() => {
+                                                            const isAtReturnStage = r.status === RecordStatus.HANDOVER ||
+                                                                r.status === RecordStatus.PENDING_HANDOVER ||
+                                                                r.status === RecordStatus.SIGNED ||
+                                                                r.status === RecordStatus.RETURNED ||
+                                                                Boolean(r.resultReturnedDate);
+
+                                                            if (isAtReturnStage) {
+                                                                return (
+                                                                    <button
+                                                                        onClick={() => onReturnResult ? onReturnResult(r) : setSelectedDetailRecord(r)}
+                                                                        className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50 cursor-pointer shadow-xs"
+                                                                        title="Trả kết quả"
+                                                                    >
+                                                                        <FileCheck size={15} />
+                                                                    </button>
+                                                                );
+                                                            }
+
+                                                            return (
+                                                                <button
+                                                                    onClick={() => setSelectedExtendRecord(r)}
+                                                                    className="p-1 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
+                                                                    title="Gia hạn hẹn trả"
+                                                                >
+                                                                    <CalendarClock size={15} />
+                                                                </button>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
                                             )}

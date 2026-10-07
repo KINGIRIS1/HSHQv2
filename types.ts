@@ -331,6 +331,12 @@ export interface RecordFile {
   paymentReceiptDate?: string | null;
   payment_receipt_date?: string | null;
 
+  // Cơ chế Tạm dừng SLA cho hồ sơ Cấp giấy
+  isSlaPaused?: boolean | null;
+  slaPausedReason?: string | null;
+  slaPausedAt?: string | null;
+  slaResumeAt?: string | null;
+
   updated_at?: string | null;
   updatedAt?: string | null;
   

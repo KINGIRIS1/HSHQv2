@@ -3,7 +3,8 @@ import { User, Employee, UserRole, RecordFile } from '../types';
 import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
-import { Shield, Users, Settings2, ShieldCheck } from 'lucide-react';
+import { RegistrationWorkflowSettingsTab } from './registration/RegistrationWorkflowSettingsTab';
+import { Shield, Users, Settings2, ShieldCheck, Sliders } from 'lucide-react';
 
 interface SystemViewProps {
     currentUser: User;
@@ -39,12 +40,14 @@ const SystemView: React.FC<SystemViewProps> = ({
     onOpenCloudInspector
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
-    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'permissions' | 'settings'>('employees');
+    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'permissions' | 'settings' | 'workflow'>('employees');
 
     useEffect(() => {
         const handleOpenSettings = (e: any) => {
             if (e?.detail?.tab === 'permissions') {
                 setActiveTab('permissions');
+            } else if (e?.detail?.tab === 'workflow') {
+                setActiveTab('workflow');
             } else {
                 setActiveTab('settings');
             }
@@ -52,11 +55,16 @@ const SystemView: React.FC<SystemViewProps> = ({
         const handleOpenPermissions = () => {
             setActiveTab('permissions');
         };
+        const handleOpenWorkflow = () => {
+            setActiveTab('workflow');
+        };
         window.addEventListener('open_system_settings', handleOpenSettings);
         window.addEventListener('open_system_permissions', handleOpenPermissions);
+        window.addEventListener('open_workflow_settings', handleOpenWorkflow);
         return () => {
             window.removeEventListener('open_system_settings', handleOpenSettings);
             window.removeEventListener('open_system_permissions', handleOpenPermissions);
+            window.removeEventListener('open_workflow_settings', handleOpenWorkflow);
         };
     }, []);
 
@@ -92,6 +100,14 @@ const SystemView: React.FC<SystemViewProps> = ({
                         className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <Settings2 size={16}/> Cấu hình
+                    </button>
+                )}
+                {isAdmin && (
+                    <button 
+                        onClick={() => setActiveTab('workflow')}
+                        className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'workflow' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Sliders size={16}/> Thiết lập Quy trình & SLA
                     </button>
                 )}
             </div>
@@ -136,6 +152,11 @@ const SystemView: React.FC<SystemViewProps> = ({
                         records={records}
                         onOpenCloudInspector={onOpenCloudInspector}
                         onRecordsUpdated={onRecordsUpdated || onHolidaysChanged}
+                    />
+                )}
+                {activeTab === 'workflow' && isAdmin && (
+                    <RegistrationWorkflowSettingsTab 
+                        onSaved={onRecordsUpdated || onHolidaysChanged}
                     />
                 )}
             </div>

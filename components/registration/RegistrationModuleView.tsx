@@ -20,6 +20,7 @@ import {
   Send,
   Settings,
   CheckCircle2,
+  Pause,
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus, RecordStatusLog, AttachedFileMeta, DossierComponentItem } from '../../types';
 import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
@@ -352,6 +353,79 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         'LỖI LƯU CƠ SỞ DỮ LIỆU'
       );
       showFeedback('error', errMsg);
+    }
+  };
+
+  // Tạm dừng / Tiếp tục tính SLA cho một hồ sơ
+  const handleTogglePauseSlaRecord = async (rec: RecordFile) => {
+    const nextPaused = !rec.isSlaPaused;
+    const nowIso = new Date().toISOString();
+    const updatePayload: Partial<RecordFile> = {
+      isSlaPaused: nextPaused,
+      slaPausedAt: nextPaused ? nowIso : rec.slaPausedAt,
+      slaResumeAt: nextPaused ? null : nowIso,
+      slaPausedReason: nextPaused ? (rec.slaPausedReason || 'Tạm dừng SLA theo yêu cầu') : rec.slaPausedReason,
+    };
+
+    try {
+      await updateDangkyRecord({ ...rec, ...updatePayload });
+      setRecords((prev) =>
+        prev.map((r) => (r.id === rec.id ? { ...r, ...updatePayload } : r))
+      );
+      showFeedback('success', nextPaused ? `Đã tạm dừng SLA hồ sơ ${rec.code}.` : `Đã tiếp tục tính SLA hồ sơ ${rec.code}.`);
+    } catch (err: any) {
+      console.error('Lỗi cập nhật tạm dừng SLA:', err);
+      showFeedback('error', `Không thể cập nhật trạng thái SLA: ${err?.message || ''}`);
+    }
+  };
+
+  // Tạm dừng / Tiếp tục tính SLA hàng loạt
+  const handleBulkTogglePauseSla = async () => {
+    if (selectedRecordsList.length === 0) return;
+    const allPaused = selectedRecordsList.every((r) => Boolean(r.isSlaPaused));
+    const nextPaused = !allPaused;
+    const nowIso = new Date().toISOString();
+
+    const ok = await confirmAction(
+      `Bạn có chắc chắn muốn ${nextPaused ? 'TẠM DỪNG' : 'TIẾP TỤC'} tính SLA cho ${selectedRecordsList.length} hồ sơ đã chọn không?`,
+      'Xác nhận thay đổi SLA hàng loạt'
+    );
+    if (!ok) return;
+
+    try {
+      let successCount = 0;
+      for (const rec of selectedRecordsList) {
+        const payload: Partial<RecordFile> = {
+          isSlaPaused: nextPaused,
+          slaPausedAt: nextPaused ? nowIso : rec.slaPausedAt,
+          slaResumeAt: nextPaused ? null : nowIso,
+          slaPausedReason: nextPaused ? (rec.slaPausedReason || 'Tạm dừng SLA theo yêu cầu') : rec.slaPausedReason,
+        };
+        try {
+          await updateDangkyRecord({ ...rec, ...payload });
+          successCount++;
+        } catch (e) {
+          console.error(`Lỗi cập nhật SLA hồ sơ ${rec.code}:`, e);
+        }
+      }
+
+      setRecords((prev) =>
+        prev.map((r) =>
+          selectedIds.has(r.id)
+            ? {
+                ...r,
+                isSlaPaused: nextPaused,
+                slaPausedAt: nextPaused ? nowIso : r.slaPausedAt,
+                slaResumeAt: nextPaused ? null : nowIso,
+                slaPausedReason: nextPaused ? (r.slaPausedReason || 'Tạm dừng SLA theo yêu cầu') : r.slaPausedReason,
+              }
+            : r
+        )
+      );
+      showFeedback('success', `Đã ${nextPaused ? 'tạm dừng' : 'tiếp tục'} tính SLA cho ${successCount}/${selectedRecordsList.length} hồ sơ.`);
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      showFeedback('error', `Lỗi cập nhật hàng loạt: ${err?.message || ''}`);
     }
   };
 
@@ -732,6 +806,17 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
                 <span>Đã trả KQ</span>
               </button>
 
+              {/* Nút tích chọn Tạm dừng SLA hàng loạt */}
+              <button
+                type="button"
+                onClick={handleBulkTogglePauseSla}
+                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="Tạm dừng hoặc tiếp tục tính SLA cho các hồ sơ đã chọn"
+              >
+                <Pause size={13} />
+                <span>{selectedRecordsList.every((r) => Boolean(r.isSlaPaused)) ? 'Tiếp tục SLA' : 'Tạm dừng SLA'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleBulkDelete}
@@ -805,6 +890,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
                         setIsAssignOpen(true);
                       }}
                       onStepHandover={(rec, targetStatus) => handleOpenStepHandover(targetStatus, [rec])}
+                      onTogglePauseSla={handleTogglePauseSlaRecord}
                       employees={employees}
                       users={users}
                     />

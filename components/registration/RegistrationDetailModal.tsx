@@ -12,10 +12,12 @@ import {
   DollarSign,
   Printer,
   FileCheck,
+  Pause,
 } from 'lucide-react';
 import { RecordFile, Employee, User as AppUser, RecordStatus, RecordStatusLog, AttachedFileMeta, DossierComponentItem } from '../../types';
 import { RegistrationWorkflowStepper } from './RegistrationWorkflowStepper';
 import { RegistrationStepHandoverModal, getStepHandoverConfig, StepHandoverConfig } from './RegistrationStepHandoverModal';
+import { RegistrationWorkflowConfigModal } from './RegistrationWorkflowConfigModal';
 import { validateCapGiayTransition } from '../../utils/capGiayStateMachine';
 import { triggerGlobalAlert } from '../GlobalAlertModal';
 import {
@@ -50,6 +52,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
 
   // Hộp thoại chuyển giao chuyên nghiệp với thanh tìm kiếm và đính kèm thành phần hồ sơ
   const [handoverConfig, setHandoverConfig] = useState<StepHandoverConfig | null>(null);
+  const [isWorkflowConfigOpen, setIsWorkflowConfigOpen] = useState<boolean>(false);
 
   React.useEffect(() => {
     const next = { ...record };
@@ -263,6 +266,18 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
             record={formData}
             onChangeStatus={handleRequestStatusChange}
             currentUser={currentUser}
+            onOpenWorkflowConfig={() => setIsWorkflowConfigOpen(true)}
+            onTogglePauseSla={(isPaused) => {
+              handleChange('isSlaPaused', isPaused);
+              if (isPaused) {
+                handleChange('slaPausedAt', new Date().toISOString());
+                if (!formData.slaPausedReason) {
+                  handleChange('slaPausedReason', 'Tạm dừng SLA theo yêu cầu');
+                }
+              } else {
+                handleChange('slaResumeAt', new Date().toISOString());
+              }
+            }}
           />
         </div>
 
@@ -326,6 +341,73 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
           {/* TAB 1: TIẾN ĐỘ & PHÂN CÔNG TỪNG KHÂU */}
           {activeTab === 'status' && (
             <div className="space-y-5">
+              {/* KHỐI TÍCH CHỌN TẠM DỪNG TÍNH SLA */}
+              <div className={`p-4 rounded-2xl border transition-all ${formData.isSlaPaused ? 'bg-amber-50/80 border-amber-300 shadow-xs' : 'bg-slate-50/80 border-slate-200'}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <label className="flex items-start sm:items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.isSlaPaused)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        handleChange('isSlaPaused', checked);
+                        if (checked) {
+                          handleChange('slaPausedAt', new Date().toISOString());
+                          if (!formData.slaPausedReason) {
+                            handleChange('slaPausedReason', 'Tạm dừng SLA theo yêu cầu');
+                          }
+                        } else {
+                          handleChange('slaResumeAt', new Date().toISOString());
+                        }
+                      }}
+                      className="w-5 h-5 mt-0.5 sm:mt-0 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <Pause size={15} className={formData.isSlaPaused ? "text-amber-600 animate-pulse shrink-0" : "text-slate-400 shrink-0"} />
+                        <span>Tích chọn Tạm dừng tính SLA cho hồ sơ này</span>
+                      </span>
+                      <span className="text-xs text-slate-500 block">
+                        Khi tích chọn, đồng hồ đếm ngược và kiểm soát hạn SLA của hồ sơ sẽ được đóng băng (không bị tính quá hạn).
+                      </span>
+                    </div>
+                  </label>
+                  {formData.isSlaPaused && (
+                    <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300 shrink-0 flex items-center gap-1">
+                      <Pause size={12} className="animate-pulse" />
+                      <span>ĐANG TẠM DỪNG SLA</span>
+                    </span>
+                  )}
+                </div>
+                {formData.isSlaPaused && (
+                  <div className="mt-3 pt-3 border-t border-amber-200/70 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Lý do tạm dừng SLA:
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.slaPausedReason || ''}
+                        onChange={(e) => handleChange('slaPausedReason', e.target.value)}
+                        placeholder="VD: Chờ bổ sung hồ sơ, chờ giải quyết tranh chấp, ý kiến chuyên môn..."
+                        className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Thời điểm bắt đầu tạm dừng:
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.slaPausedAt ? formData.slaPausedAt.substring(0, 19).replace('T', ' ') : '—'}
+                        readOnly
+                        className="w-full px-3 py-1.5 bg-amber-100/40 border border-amber-200 rounded-lg text-xs font-medium text-slate-600 outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* KHỐI 1: PHÂN CÔNG CÁN BỘ THEO TỪNG BƯỚC NGHIỆP VỤ */}
               <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -1157,6 +1239,13 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
           onConfirm={handleConfirmStepHandover}
         />
       )}
+
+      {/* MODAL CẤU HÌNH QUY TRÌNH & SLA CẤP GIẤY */}
+      <RegistrationWorkflowConfigModal
+        isOpen={isWorkflowConfigOpen}
+        onClose={() => setIsWorkflowConfigOpen(false)}
+        initialProcedureCode={formData.recordType || undefined}
+      />
     </div>
   );
 };

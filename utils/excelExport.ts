@@ -337,16 +337,16 @@ export const exportOverdueStatsToExcel = async (records: any[], employees: Emplo
         return;
     }
 
-    let subtitle = "BÁO CÁO THỐNG KÊ HỒ SƠ TRỄ HẠN";
+    let subtitle = "BÁO CÁO THỐNG KÊ HỒ SƠ QUÁ HẠN";
     if (filterType === 'pending') subtitle += " (CHƯA CÓ KẾT QUẢ)";
     if (filterType === 'completed') subtitle += " (ĐÃ CÓ KẾT QUẢ)";
 
     try {
         const wb = await createRecordsWorkbook(records, employees, subtitle);
-        const fileName = `Danh_Sach_Tre_Han_${filterType}_${new Date().getTime()}.xlsx`;
+        const fileName = `Danh_Sach_Qua_Han_${filterType}_${new Date().getTime()}.xlsx`;
         XLSX.writeFile(wb, fileName);
     } catch (err: any) {
-        alert(err.message || "Lỗi khi xuất file Excel hồ sơ trễ hạn.");
+        alert(err.message || "Lỗi khi xuất file Excel hồ sơ quá hạn.");
     }
 };
 

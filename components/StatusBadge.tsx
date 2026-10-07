@@ -41,7 +41,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, isApproaching, isOver
 
   const label = STATUS_LABELS[normalizedStatus] || String(status || 'Chưa xác định');
   
-  // Đổi màu vàng cảnh báo khi sắp trễ hạn (còn <= 1h làm việc)
+  // Đổi màu vàng cảnh báo khi sắp quá hạn (còn <= 1h làm việc)
   let colorClass = STATUS_COLORS[normalizedStatus] || 'bg-gray-100 text-gray-800';
   let dotClass = dotColors[normalizedStatus] || 'bg-gray-400';
 

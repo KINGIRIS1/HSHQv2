@@ -154,6 +154,10 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     supplementStartedAt: dbItem.supplementStartedAt || dbItem.supplementRequestedAt || '',
     supplementCompletedBy: dbItem.supplementCompletedBy || dbItem.supplementConfirmedBy || '',
     supplementCompletedAt: dbItem.supplementCompletedAt || dbItem.supplementReturnedDate || '',
+    isSlaPaused: Boolean(dbItem.isSlaPaused ?? dbItem.data?.isSlaPaused),
+    slaPausedReason: dbItem.slaPausedReason || dbItem.data?.slaPausedReason || '',
+    slaPausedAt: dbItem.slaPausedAt || dbItem.data?.slaPausedAt || '',
+    slaResumeAt: dbItem.slaResumeAt || dbItem.data?.slaResumeAt || '',
     statusLogs,
     dossierComponents,
     attachedFiles,
@@ -242,6 +246,22 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.taxTransferStaff !== undefined) dataPayload.taxTransferStaff = record.taxTransferStaff;
   if (record.taxTransferAssignedDate !== undefined) dataPayload.taxTransferAssignedDate = keepOnlyDate(record.taxTransferAssignedDate);
   if (record.printStaff !== undefined) dataPayload.printStaff = record.printStaff;
+  if (record.isSlaPaused !== undefined) {
+    dataPayload.isSlaPaused = Boolean(record.isSlaPaused);
+    payload.isSlaPaused = Boolean(record.isSlaPaused);
+  }
+  if (record.slaPausedReason !== undefined) {
+    dataPayload.slaPausedReason = record.slaPausedReason;
+    payload.slaPausedReason = record.slaPausedReason;
+  }
+  if (record.slaPausedAt !== undefined) {
+    dataPayload.slaPausedAt = record.slaPausedAt;
+    payload.slaPausedAt = record.slaPausedAt;
+  }
+  if (record.slaResumeAt !== undefined) {
+    dataPayload.slaResumeAt = record.slaResumeAt;
+    payload.slaResumeAt = record.slaResumeAt;
+  }
   payload.data = dataPayload;
 
   if (record.appraisalDate !== undefined) payload.appraisalDate = keepOnlyDate(record.appraisalDate);

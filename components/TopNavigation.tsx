@@ -114,7 +114,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'db_inspector', label: 'Tra cứu CSDL', icon: Database, visible: true },
         { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
         { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: true },
       ]

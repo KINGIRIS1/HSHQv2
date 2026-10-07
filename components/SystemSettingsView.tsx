@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink, Copy, Code, HelpCircle, Check, Lock, Unlock, Edit3, X, HardDrive } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink, Copy, Code, HelpCircle, Check, Lock, Unlock, Edit3, X, HardDrive, Sliders } from 'lucide-react';
 import { BackupRestoreTab } from './settings/BackupRestoreTab';
+import { RegistrationWorkflowConfigModal } from './registration/RegistrationWorkflowConfigModal';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords } from '../services/apiRecords';
@@ -201,6 +202,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [manualVersion, setManualVersion] = useState('');
   const [manualUrl, setManualUrl] = useState('');
   const [isSavingUpdate, setIsSavingUpdate] = useState(false);
+  const [isWorkflowConfigOpen, setIsWorkflowConfigOpen] = useState(false);
 
   // Google Drive URL Cấu hình lưu trữ hồ sơ tiếp nhận (Đồng bộ Cloud dùng chung toàn bộ tài khoản)
   const [driveUrl, setDriveUrl] = useState<string>(getGoogleDriveIncomingUrl());
@@ -1263,6 +1265,30 @@ function cleanString(str) {
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
 
+                    {/* Cấu hình Quy trình & Các bước thủ tục Cấp giấy (Nhóm 3.x) */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
+                                    <Sliders size={20} className="text-blue-600" />
+                                    <span>Quy trình & Các bước thủ tục Cấp giấy (Nhóm 3.x)</span>
+                                </h3>
+                                <p className="text-xs text-slate-500 font-medium mt-1">
+                                    Cấu hình danh mục thủ tục cấp giấy, thứ tự các bước thực hiện, phân bổ thời gian định mức (SLA) và trạng thái hệ thống. Tự động lưu trữ trên CSDL Supabase. (Đã chuyển thành tab riêng bên phải tab Cấu hình).
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.dispatchEvent(new CustomEvent('open_workflow_settings'));
+                                }}
+                                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer shrink-0"
+                            >
+                                <Sliders size={15} />
+                                <span>Mở tab Thiết lập Quy trình & SLA</span>
+                            </button>
+                        </div>
+                    </div>
 
                     {/* Google Drive Incoming URL Config */}
                     <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-sm space-y-4">
@@ -1940,6 +1966,12 @@ function cleanString(str) {
                 </div>
             )}
         </div>
+
+        {/* Modal Cấu hình Quy trình & SLA Cấp giấy */}
+        <RegistrationWorkflowConfigModal
+            isOpen={isWorkflowConfigOpen}
+            onClose={() => setIsWorkflowConfigOpen(false)}
+        />
     </div>
   );
 };

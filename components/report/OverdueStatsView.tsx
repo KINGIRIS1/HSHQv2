@@ -109,11 +109,11 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees,
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden">
                 <div className="p-4 border-b flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-gray-50/50">
                     <h3 className="font-bold text-gray-700 shrink-0">
-                        {filterType === 'all' ? 'Tất cả hồ sơ trễ hạn' : filterType === 'pending' ? 'Hồ sơ trễ - Chưa có kết quả' : 'Hồ sơ trễ - Đã có kết quả'}
+                        {filterType === 'all' ? 'Tất cả hồ sơ quá hạn' : filterType === 'pending' ? 'Hồ sơ quá hạn - Chưa có kết quả' : 'Hồ sơ quá hạn - Đã có kết quả'}
                     </h3>
                     
                     <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                        {/* Nhóm nút lọc loại trễ hạn thay thế cho các thẻ cồng kềnh */}
+                        {/* Nhóm nút lọc loại quá hạn thay thế cho các thẻ cồng kềnh */}
                         <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg border border-slate-300/60 h-[36px] shrink-0">
                             <button
                                 onClick={() => setFilterType('all')}
@@ -210,7 +210,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees,
                                     </td>
                                 </tr>
                             )}) : (
-                                <tr><td colSpan={10} className="p-8 text-center text-gray-400">Không có dữ liệu trễ hạn trong khoảng thời gian này.</td></tr>
+                                <tr><td colSpan={10} className="p-8 text-center text-gray-400">Không có dữ liệu quá hạn trong khoảng thời gian này.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -277,7 +277,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees,
                             )}
                         </>
                     ) : (
-                        <div className="p-8 text-center text-slate-400 text-sm">Không có dữ liệu trễ hạn.</div>
+                        <div className="p-8 text-center text-slate-400 text-sm">Không có dữ liệu quá hạn.</div>
                     )}
                 </div>
 

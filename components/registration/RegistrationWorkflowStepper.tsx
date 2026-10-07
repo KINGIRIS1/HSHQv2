@@ -23,6 +23,8 @@ import {
   getWorkflowStepIndex,
   formatDurationShort,
   formatMinutesToVietnamese,
+  formatVietnamDateTime,
+  getStepStartTime,
   RegistrationWorkflowConfig,
   StepSlaResult,
   WorkflowStep,
@@ -39,6 +41,7 @@ interface RegistrationWorkflowStepperProps {
   currentUser?: { name?: string } | null;
   readOnly?: boolean;
   onOpenWorkflowConfig?: () => void;
+  onTogglePauseSla?: (isPaused: boolean) => void;
 }
 
 export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperProps> = ({
@@ -46,6 +49,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
   onChangeStatus,
   readOnly = false,
   onOpenWorkflowConfig,
+  onTogglePauseSla,
 }) => {
   const [workflow, setWorkflow] = useState<RegistrationWorkflowConfig>(() =>
     getRegistrationWorkflow(record.recordType)
@@ -83,7 +87,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-sm text-slate-100">
-                Bước {activeIndex + 1}/{steps.length}: {currentStep ? ((currentStep.name || currentStep.label || 'TIẾP NHẬN').toUpperCase()) : 'TIẾP NHẬN'}
+                {currentStep ? ((currentStep.name || currentStep.label || 'TIẾP NHẬN').toUpperCase()) : 'TIẾP NHẬN'}
               </span>
             </div>
           </div>
@@ -91,6 +95,22 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
 
         {/* CHỈ SỐ SLA ĐẾM NGƯỢC / TIẾN TỚI / TẠM DỪNG */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* NÚT TÍCH CHỌN TẠM DỪNG SLA CHO HỒ SƠ */}
+          {!readOnly && onTogglePauseSla && (
+            <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700/80 text-xs text-slate-200 cursor-pointer border border-slate-700 transition-colors select-none shadow-2xs">
+              <input
+                type="checkbox"
+                checked={Boolean(record.isSlaPaused)}
+                onChange={(e) => onTogglePauseSla(e.target.checked)}
+                className="w-3.5 h-3.5 text-amber-500 rounded border-slate-600 focus:ring-amber-400 focus:ring-offset-slate-900 cursor-pointer"
+              />
+              <span className={record.isSlaPaused ? "text-amber-300 font-bold flex items-center gap-1" : "text-slate-300 flex items-center gap-1"}>
+                <Pause size={12} className={record.isSlaPaused ? "text-amber-400 animate-pulse" : "text-slate-400"} />
+                <span>{record.isSlaPaused ? "Đang tạm dừng SLA" : "Tạm dừng SLA"}</span>
+              </span>
+            </label>
+          )}
+
           {slaResult.isPaused ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5 shadow-2xs">
               <Pause size={13} className="shrink-0 animate-pulse" />
@@ -99,12 +119,12 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
           ) : slaResult.isOverdue ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-400/40 flex items-center gap-1.5 shadow-2xs animate-pulse">
               <AlertTriangle size={13} className="shrink-0" />
-              <span>🚨 Trễ hạn {slaResult.overdueLabel}</span>
+              <span>🚨 {slaResult.overdueLabel}</span>
             </span>
           ) : (
             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5 shadow-2xs">
               <Clock size={13} className="shrink-0 text-emerald-400" />
-              <span>Định mức: {currentStep ? (currentStep.durationLabel || `${currentStep.durationHours || 8}h`) : '8h'} {slaResult.remainingLabel && slaResult.remainingLabel !== '0 giờ' ? `(Còn lại ${slaResult.remainingLabel})` : ''}</span>
+              <span>{slaResult.remainingLabel}</span>
             </span>
           )}
 
@@ -128,6 +148,8 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
             const isCompleted = idx < activeIndex;
             const isCurrent = idx === activeIndex;
             const targetStatus = (step.statusKey || step.key || RecordStatus.RECEIVED) as RecordStatus;
+            const recordedTime = (isCompleted || isCurrent) ? getStepStartTime(record, targetStatus) : null;
+            const formattedTime = recordedTime ? formatVietnamDateTime(recordedTime) : null;
 
             return (
               <React.Fragment key={step.id || step.key || idx}>
@@ -146,10 +168,10 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                       ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-semibold hover:bg-emerald-100/70'
                       : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-slate-800'
                   }`}
-                  title={!readOnly ? `Bấm để mở chuyển sang Bước ${idx + 1}: ${step.name || step.label}` : undefined}
+                  title={!readOnly ? `Bấm để mở chuyển sang ${step.name || step.label}` : undefined}
                 >
                   <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       isCurrent
                         ? 'bg-white text-blue-700'
                         : isCompleted
@@ -157,20 +179,22 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                         : 'bg-slate-200 text-slate-600'
                     }`}
                   >
-                    {isCompleted ? <CheckCircle2 size={12} /> : idx + 1}
+                    {isCompleted ? <CheckCircle2 size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
                   </div>
 
                   <div className="flex flex-col">
                     <span className="truncate max-w-[140px]" title={step.name || step.label}>
                       {step.name || step.label}
                     </span>
-                    <span
-                      className={`text-[10px] font-normal ${
-                        isCurrent ? 'text-blue-100' : isCompleted ? 'text-emerald-700' : 'text-slate-400'
-                      }`}
-                    >
-                      {step.durationLabel || (step.durationDays ? `${step.durationDays} ngày` : 'Ngoài SLA')}
-                    </span>
+                    {formattedTime && (
+                      <span
+                        className={`text-[10px] font-medium ${
+                          isCurrent ? 'text-blue-100' : isCompleted ? 'text-emerald-700' : 'text-slate-400'
+                        }`}
+                      >
+                        {formattedTime}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -320,9 +344,9 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                   type="button"
                   onClick={() => onChangeStatus(targetStatus)}
                   className="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
-                  title={`Mở giao việc Bước ${idx + 1}: ${step.name || step.label}`}
+                  title={`Mở giao việc: ${step.name || step.label}`}
                 >
-                  <span>B.{idx + 1}</span>
+                  <span>{step.shortLabel || step.label}</span>
                 </button>
               );
             })}

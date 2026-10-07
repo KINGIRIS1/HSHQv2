@@ -13,6 +13,21 @@ import { fetchContracts } from '../../services/api';
 import { saveRecord, deleteRecordApi, deleteRecordsBatchApi } from '../../services/apiRecords';
 import RecordAttachmentModal from './RecordAttachmentModal';
 
+const getShortCodeDisplay = (code?: string | null): string => {
+  if (!code) return '—';
+  const trimmed = code.trim();
+  const match = trimmed.match(/(\d{6}-\d{3,5})/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  const parts = trimmed.split('-');
+  if (parts.length >= 2) {
+    const lastTwo = parts.slice(-2).join('-');
+    if (/^\d{6}/.test(lastTwo)) return lastTwo;
+  }
+  return trimmed;
+};
+
 interface DailyListProps {
   records: RecordFile[];
   wards: string[];
@@ -722,105 +737,114 @@ const DailyList: React.FC<DailyListProps> = ({
         {/* Records Table */}
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
             <div className="overflow-auto flex-1">
-                <table className="w-full text-left table-fixed min-w-[1150px]">
-                    <thead className="bg-gray-50 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm z-10">
+                <table className="w-full text-left table-fixed min-w-[1100px]">
+                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold sticky top-0 shadow-sm z-10 tracking-wider">
                         <tr> 
-                            <th className="p-3 w-10 text-center">
-                                <button
-                                    onClick={handleSelectAllToggle}
-                                    className="text-gray-400 hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center mx-auto"
-                                    title={isAllSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
-                                >
-                                    {isAllSelected ? (
-                                        <CheckSquare size={16} className="text-blue-600" />
-                                    ) : (
-                                        <Square size={16} />
-                                    )}
-                                </button>
-                            </th>
-                            <th className="p-3 w-12 text-center">STT</th> 
-                            <th className="p-3 w-[140px]">Mã Hồ Sơ</th> 
-                            <th className="p-3 w-[190px]">Chủ Sử Dụng</th> 
-                            <th className="p-3 w-[150px]">Xã / Phường (Đất)</th> 
-                            <th className="p-3 w-[60px] text-center">Tờ</th>
-                            <th className="p-3 w-[60px] text-center">Thửa</th>
-                            <th className="p-3 w-[140px]">Loại Hồ Sơ</th> 
-                            <th className="p-3 text-center w-[140px]">Thời Hạn Xử Lý</th>
-                            <th className="p-3 w-[180px]">Ghi Chú</th>
-                            <th className="p-3 w-[110px] text-center bg-gray-100/50 sticky right-0 shadow-l">Thao Tác</th>
+                            <th className="p-3 w-12 text-center border-b border-gray-200">STT</th> 
+                            <th className="p-3 w-[130px] text-center border-b border-gray-200 whitespace-nowrap">Mã Hồ Sơ</th> 
+                            <th className="p-3 w-[190px] text-center border-b border-gray-200">Chủ Sử Dụng</th> 
+                            <th className="p-3 w-[150px] text-center border-b border-gray-200">Xã / Phường (Đất)</th> 
+                            <th className="p-3 w-[60px] text-center border-b border-gray-200">Tờ</th>
+                            <th className="p-3 w-[60px] text-center border-b border-gray-200">Thửa</th>
+                            <th className="p-3 w-[140px] text-center border-b border-gray-200">Loại Hồ Sơ</th> 
+                            <th className="p-3 text-center w-[140px] border-b border-gray-200">Thời Hạn Xử Lý</th>
+                            <th className="p-3 w-[180px] text-center border-b border-gray-200">Ghi Chú</th>
+                            <th className="p-3 w-[110px] text-center bg-gray-100/50 sticky right-0 shadow-l border-b border-gray-200">Thao Tác</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 text-xs">
+                    <tbody className="divide-y divide-gray-100 text-sm">
                         {paginatedDailyRecords.length > 0 ? (
                             paginatedDailyRecords.map((r, index) => {
-                                const existingContract = getContractForRecord(r);
-                                const is2xRecord = r.recordType && (getShortRecordType(r.recordType).startsWith('2.2') || getShortRecordType(r.recordType).startsWith('2.4') || (r.code || '').startsWith('2.'));
                                 const actualIndex = (currentPage - 1) * recordsPerPage + index + 1;
-                                const isSelected = selectedIds.has(r.id);
+                                const shortCode = getShortCodeDisplay(r.code);
+                                const hasFiles = Boolean(r.attachedFiles?.length || (r as any).attachmentUrl || (r as any).attachments?.length || (r as any).filePath);
 
                                 return (
                                     <tr 
                                         key={r.id} 
-                                        onClick={() => handleRowSelectToggle(r.id)}
-                                        className={`hover:bg-blue-50/50 group cursor-pointer ${isSelected ? 'bg-blue-50/70 font-medium' : ''}`}
+                                        className="hover:bg-slate-50/70 transition-colors duration-150 group"
                                     >
-                                        <td className="p-3 text-center align-middle" onClick={(e) => handleRowSelectToggle(r.id, e)}>
-                                            <button
-                                                type="button"
-                                                className="text-gray-400 hover:text-blue-600 transition-colors flex items-center justify-center mx-auto cursor-pointer"
-                                            >
-                                                {isSelected ? (
-                                                    <CheckSquare size={16} className="text-blue-600" />
-                                                ) : (
-                                                    <Square size={16} />
+                                        <td className="p-3 text-center text-slate-500 font-mono align-middle text-xs">{actualIndex}</td> 
+                                        <td className="p-3 text-center align-middle whitespace-nowrap">
+                                            <div className="inline-flex items-center justify-center gap-1 whitespace-nowrap">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onEdit(r)}
+                                                    className="font-mono font-bold text-sm text-slate-900 hover:text-blue-700 hover:underline cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
+                                                    title={`Mã hồ sơ gốc: ${r.code || ''}`}
+                                                >
+                                                    <span>{shortCode}</span>
+                                                </button>
+                                                {hasFiles && (
+                                                    <span title="Có tệp đính kèm" className="text-emerald-600">
+                                                        <Paperclip size={12} />
+                                                    </span>
                                                 )}
-                                            </button>
-                                        </td>
-                                        <td className="p-3 text-center text-gray-400 font-mono align-middle">{actualIndex}</td> 
-                                        <td className="p-3 font-mono font-bold text-blue-600 truncate align-middle" title={r.code}>
-                                            <span>{r.code}</span>
+                                            </div>
                                         </td> 
-                                        <td className="p-3 font-medium text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
-                                        <td className="p-3 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
+                                        <td className="p-3 text-center align-middle">
+                                            <div className="flex flex-col gap-0.5 items-center text-center">
+                                                <span className="text-sm font-bold text-gray-900 leading-normal" title={r.customerName}>
+                                                    {r.customerName || '—'}
+                                                </span>
+                                                {r.phoneNumber && (
+                                                    <span className="text-xs text-slate-500 font-mono">{r.phoneNumber}</span>
+                                                )}
+                                            </div>
+                                        </td> 
+                                        <td className="p-3 text-center align-middle text-sm font-medium text-gray-700" title={getNormalizedWard(r.ward)}>
                                             {getNormalizedWard(r.ward)}
                                         </td>
-                                        <td className="p-3 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
-                                        <td className="p-3 text-center font-mono align-middle">{r.landPlot || '-'}</td>
-                                        <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
+                                        <td className="p-3 text-center font-mono text-sm font-bold text-slate-700 align-middle">{r.mapSheet || '--'}</td>
+                                        <td className="p-3 text-center font-mono text-sm font-bold text-slate-700 align-middle">{r.landPlot || '--'}</td>
+                                        <td className="p-3 text-center align-middle text-sm font-semibold text-gray-700">
+                                            <span className="truncate max-w-[140px] inline-block align-middle" title={r.recordType || ''}>
+                                                {getShortRecordType(r.recordType)}
+                                            </span>
+                                        </td> 
                                         <td className="p-2.5 text-center text-xs font-mono align-middle">
                                             <div className="flex flex-col items-center justify-center gap-0.5">
-                                                <span className="text-gray-600 font-medium">
+                                                <span className="text-gray-600 font-medium whitespace-nowrap">
                                                     <span className="text-[10px] text-gray-400 font-sans mr-1">Nhận:</span>
                                                     {r.receivedDate ? new Date(r.receivedDate).toLocaleDateString('vi-VN') : '-'}
                                                 </span>
-                                                <span className="font-bold text-blue-700 bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-100/60">
+                                                <span className="font-bold text-blue-700 bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-100/60 whitespace-nowrap">
                                                     <span className="text-[10px] text-blue-500 font-sans mr-1">Trả:</span>
                                                     {r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
-                                        <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l" onClick={(e) => e.stopPropagation()}>
+                                        <td className="p-3 text-center text-xs text-gray-500 italic truncate align-middle max-w-[150px]" title={r.content || ''}>
+                                            {r.content || '—'}
+                                        </td>
+                                        <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-slate-50 shadow-l" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex flex-col items-center justify-center gap-1">
-                                                {/* Hàng 1: Sửa hồ sơ */}
+                                                {/* Hàng 1: Sửa & In */}
                                                 <div className="flex items-center justify-center gap-1">
                                                     <button 
                                                         onClick={() => onEdit(r)} 
-                                                        className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200/80 transition-all cursor-pointer shadow-2xs" 
+                                                        className="p-1 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-all cursor-pointer shadow-2xs" 
                                                         title="Sửa hồ sơ"
                                                     >
                                                         <Pencil size={13} />
                                                     </button>
+                                                    <button 
+                                                        onClick={() => onPrint(r)} 
+                                                        className="p-1 text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-all cursor-pointer shadow-2xs" 
+                                                        title="In biên nhận"
+                                                    >
+                                                        <Printer size={13} />
+                                                    </button>
                                                 </div>
 
-                                                {/* Hàng 2: Đính kèm tệp, In biên nhận & Xóa */}
+                                                {/* Hàng 2: Đính kèm tệp & Xóa */}
                                                 <div className="flex items-center justify-center gap-1">
                                                     <button 
                                                         onClick={() => setAttachmentRecord(r)} 
-                                                        className={`p-1.5 rounded border transition-all cursor-pointer shadow-2xs relative ${
+                                                        className={`p-1 rounded border transition-all cursor-pointer shadow-2xs relative ${
                                                             r.attachedFiles && r.attachedFiles.length > 0 
-                                                                ? 'text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border-indigo-200/80 font-bold' 
-                                                                : 'text-slate-500 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 border-slate-200/80'
+                                                                ? 'text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border-indigo-200 font-bold' 
+                                                                : 'text-slate-500 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 border-slate-200'
                                                         }`}
                                                         title={r.attachedFiles && r.attachedFiles.length > 0 ? `Xem/Tải ${r.attachedFiles.length} tệp đính kèm` : 'Đính kèm tệp hồ sơ'}
                                                     >
@@ -832,15 +856,8 @@ const DailyList: React.FC<DailyListProps> = ({
                                                         )}
                                                     </button>
                                                     <button 
-                                                        onClick={() => onPrint(r)} 
-                                                        className="p-1.5 text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200/80 transition-all cursor-pointer shadow-2xs" 
-                                                        title="In biên nhận"
-                                                    >
-                                                        <Printer size={13} />
-                                                    </button>
-                                                    <button 
                                                         onClick={() => onDelete(r)} 
-                                                        className="p-1.5 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded border border-red-200/80 transition-all cursor-pointer shadow-2xs" 
+                                                        className="p-1 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-all cursor-pointer shadow-2xs" 
                                                         title="Xóa hồ sơ"
                                                     >
                                                         <Trash2 size={13} />
@@ -853,7 +870,7 @@ const DailyList: React.FC<DailyListProps> = ({
                             })
                         ) : ( 
                             <tr>
-                                <td colSpan={11} className="p-12 text-center text-gray-400 italic">
+                                <td colSpan={10} className="p-12 text-center text-gray-400 italic">
                                     Không có hồ sơ tiếp nhận nào phù hợp với bộ lọc đang chọn.
                                 </td>
                             </tr> 
