@@ -45,6 +45,16 @@ export const getStepHandoverConfig = (targetStatus: RecordStatus): StepHandoverC
         icon: <User size={20} className="text-white" />,
         headerBg: 'bg-gradient-to-r from-blue-600 to-indigo-700',
       };
+    case RecordStatus.PENDING_POSTING:
+      return {
+        targetStatus,
+        title: 'Chờ niêm yết',
+        subtitle: 'Bàn giao công văn niêm yết tại UBND cấp xã (30 ngày)',
+        roleTitle: 'Cán bộ theo dõi niêm yết',
+        staffField: 'assignedTo',
+        icon: <User size={20} className="text-white" />,
+        headerBg: 'bg-gradient-to-r from-amber-600 to-yellow-700',
+      };
     case RecordStatus.TAX_TRANSFER:
       return {
         targetStatus,
@@ -78,7 +88,7 @@ export const getStepHandoverConfig = (targetStatus: RecordStatus): StepHandoverC
     case RecordStatus.PENDING_PRINT_CERT:
       return {
         targetStatus,
-        title: 'Giao In Giấy chứng nhận (GCN)',
+        title: 'Giao In GCN',
         subtitle: 'Phân công cán bộ in và hoàn thiện phôi Giấy chứng nhận',
         roleTitle: 'Cán bộ In GCN',
         staffField: 'printStaff',

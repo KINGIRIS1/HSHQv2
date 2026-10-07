@@ -58,6 +58,28 @@ export const CAP_GIAY_FORBIDDEN_STATUSES = [
   RecordStatus.SIGNED
 ];
 
+// Bảng xếp hạng thứ tự bước chuẩn của Module Cấp giấy để kiểm soát luồng và dọn dẹp ngày khi lùi bước
+export const CAP_GIAY_STEP_ORDER: Record<string, number> = {
+  [RecordStatus.RECEIVED]: 1,
+  [RecordStatus.ASSIGNED]: 2,
+  [RecordStatus.APPRAISAL]: 2,
+  [RecordStatus.PENDING_POSTING]: 2.5,
+  [RecordStatus.TAX_TRANSFER]: 3,
+  [RecordStatus.PENDING_TAX_KV7]: 4,
+  [RecordStatus.PENDING_TAX_NOTICE]: 5,
+  [RecordStatus.PENDING_TAX_PAYMENT]: 5,
+  [RecordStatus.PENDING_PRINT_CERT]: 6,
+  [RecordStatus.PENDING_CHECK]: 7,
+  [RecordStatus.PENDING_SIGN]: 8,
+  [RecordStatus.SIGNED]: 8.5,
+  [RecordStatus.PENDING_HANDOVER]: 9,
+  [RecordStatus.HANDOVER]: 10,
+  [RecordStatus.RETURNED]: 11,
+  [RecordStatus.PENDING_SUPPLEMENT]: 12,
+  [RecordStatus.WITHDRAWN]: 13,
+  [RecordStatus.REJECTED]: 14
+};
+
 // Luồng chuyển trạng thái chính tuần tự (Strict Sequential Main Flow)
 export const CAP_GIAY_MAIN_FLOW: CapGiayStatus[] = [
   RecordStatus.RECEIVED,             // Bước 1: Tiếp nhận
@@ -144,25 +166,6 @@ export function validateCapGiayTransition(
 
   return { valid: true, targetStatus: targetStatus as CapGiayStatus };
 }
-
-export const CAP_GIAY_STEP_ORDER: Record<string, number> = {
-  [RecordStatus.RECEIVED]: 1,
-  [RecordStatus.APPRAISAL]: 2,
-  [RecordStatus.PENDING_POSTING]: 2.5,
-  [RecordStatus.TAX_TRANSFER]: 3,
-  [RecordStatus.PENDING_TAX_KV7]: 4,
-  [RecordStatus.PENDING_TAX_NOTICE]: 5,
-  [RecordStatus.PENDING_TAX_PAYMENT]: 5,
-  [RecordStatus.PENDING_PRINT_CERT]: 6,
-  [RecordStatus.PENDING_CHECK]: 7,
-  [RecordStatus.PENDING_SIGN]: 8,
-  [RecordStatus.PENDING_HANDOVER]: 9,
-  [RecordStatus.HANDOVER]: 10,
-  [RecordStatus.RETURNED]: 11,
-  [RecordStatus.PENDING_SUPPLEMENT]: 99,
-  [RecordStatus.WITHDRAWN]: 99,
-  [RecordStatus.REJECTED]: 99
-};
 
 export const getCapGiayNextMainStatus = getNextCapGiayStatus;
 

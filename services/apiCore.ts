@@ -478,7 +478,8 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         'printStaffAssignedAt', 'print_staff_assigned_at', 'printDeadlineStartAt', 'print_deadline_start_at',
         'paymentReceivedAt', 'payment_received_at',
         'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedAt',
-        'supplementRequestDate', 'supplementReturnedDate'
+        'supplementRequestDate', 'supplementReturnedDate',
+        'slaPausedAt', 'slaResumeAt', 'stepTimestamps'
     ];
 
     // Date-only fields: Đảm bảo CHỈ lưu YYYY-MM-DD hợp lệ, loại bỏ hoàn toàn các chuỗi ngày lỗi
@@ -493,9 +494,10 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         'archiveHandoverDate', 'returnBatchDate',
         'ngay_thang', 'date', 'createdDate',
         'appraisalDate', 'postingDate', 'postingEndDate',
-        'taxTransferDate', 'taxKv7Date', 'taxPaymentDate',
+        'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'taxNoticeDate',
         'printCertDate', 'pendingHandoverDate',
-        'paymentReceiptDate', 'payment_receipt_date'
+        'paymentReceiptDate', 'payment_receipt_date',
+        'taxTransferAssignedDate'
     ];
 
     dateTimeFields.forEach(field => {
@@ -507,6 +509,15 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     dateOnlyFields.forEach(field => {
         if (clean[field] !== undefined) {
             clean[field] = keepOnlyDate(clean[field]);
+        }
+    });
+
+    // Quét triệt để tất cả các trường có tên chứa Date, At, Time, ngay, thoi_gian, deadline nếu còn là chuỗi rỗng "" hoặc null/undefined thì ép về null
+    Object.keys(clean).forEach(k => {
+        if (typeof clean[k] === 'string' && (clean[k].trim() === '' || clean[k] === 'null' || clean[k] === 'undefined' || clean[k] === '-' || clean[k] === 'N/A')) {
+            if (/(date|time|at|ngay|thoi_gian|deadline|han_tra|timestamp|duration|batch|number|price|amount|area|rate|count)/i.test(k)) {
+                clean[k] = null;
+            }
         }
     });
 
@@ -563,9 +574,10 @@ export const sanitizePayloadForDateErrors = (payload: any): any => {
         'officeAssignedDate', 'officeCompletedDate',
         'archiveHandoverDate', 'returnBatchDate', 'ngay_thang', 'date', 'createdDate',
         'appraisalDate', 'postingDate', 'postingEndDate',
-        'taxTransferDate', 'taxKv7Date', 'taxPaymentDate',
+        'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'taxNoticeDate',
         'printCertDate', 'pendingHandoverDate',
-        'paymentReceiptDate', 'payment_receipt_date'
+        'paymentReceiptDate', 'payment_receipt_date',
+        'taxTransferAssignedDate'
     ];
     dateFields.forEach(f => {
         if (clean[f] !== undefined) {
@@ -578,11 +590,19 @@ export const sanitizePayloadForDateErrors = (payload: any): any => {
         'printStaffAssignedAt', 'print_staff_assigned_at', 'printDeadlineStartAt', 'print_deadline_start_at',
         'paymentReceivedAt', 'payment_received_at',
         'supplementRequestedAt', 'supplementStartedAt', 'supplementCompletedAt',
-        'supplementRequestDate', 'supplementReturnedDate'
+        'supplementRequestDate', 'supplementReturnedDate',
+        'slaPausedAt', 'slaResumeAt', 'stepTimestamps'
     ];
     dateTimeFields.forEach(f => {
         if (clean[f] !== undefined) {
             clean[f] = keepOnlyDateTime(clean[f]);
+        }
+    });
+
+    // Quét triệt để tất cả các trường: Nếu là chuỗi rỗng "" hoặc không hợp lệ thì chuyển thành null
+    Object.keys(clean).forEach(k => {
+        if (typeof clean[k] === 'string' && (clean[k].trim() === '' || clean[k] === 'null' || clean[k] === 'undefined' || clean[k] === '-' || clean[k] === 'N/A')) {
+            clean[k] = null;
         }
     });
     return clean;

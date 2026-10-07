@@ -248,19 +248,15 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.printStaff !== undefined) dataPayload.printStaff = record.printStaff;
   if (record.isSlaPaused !== undefined) {
     dataPayload.isSlaPaused = Boolean(record.isSlaPaused);
-    payload.isSlaPaused = Boolean(record.isSlaPaused);
   }
   if (record.slaPausedReason !== undefined) {
     dataPayload.slaPausedReason = record.slaPausedReason;
-    payload.slaPausedReason = record.slaPausedReason;
   }
   if (record.slaPausedAt !== undefined) {
     dataPayload.slaPausedAt = record.slaPausedAt;
-    payload.slaPausedAt = record.slaPausedAt;
   }
   if (record.slaResumeAt !== undefined) {
     dataPayload.slaResumeAt = record.slaResumeAt;
-    payload.slaResumeAt = record.slaResumeAt;
   }
   payload.data = dataPayload;
 
@@ -378,6 +374,24 @@ export const getDangkyRecordById = async (id: string): Promise<RecordFile | null
   }
 };
 
+export const sanitizeDangkyPayloadForMissingColumns = (payload: any, error: any): any => {
+  if (!payload || !error) return payload;
+  const msg = String(error.message || '');
+  const match = msg.match(/Could not find the '([^']+)' column of/i) || msg.match(/column "([^"]+)" of relation/i);
+  if (match && match[1]) {
+    const missingCol = match[1];
+    const copy = { ...payload };
+    if (!copy.data) copy.data = {};
+    if (copy[missingCol] !== undefined) {
+      copy.data[missingCol] = copy[missingCol];
+      delete copy[missingCol];
+    }
+    console.warn(`[DangKy API Recovery] Đã chuyển cột '${missingCol}' vào JSONB data và thử lại lưu CSDL.`);
+    return copy;
+  }
+  return payload;
+};
+
 /**
  * Thêm một hồ sơ Đăng ký mới vào bảng dangky_records
  */
@@ -394,6 +408,19 @@ export const addDangkyRecord = async (record: RecordFile): Promise<RecordFile> =
     .single();
 
   if (error) {
+    if (error.code === 'PGRST204' || error.code === '42703' || String(error.message || '').includes('Could not find the')) {
+      payload = sanitizeDangkyPayloadForMissingColumns(payload, error);
+      const retryRes = await supabase
+        .from(TABLE_NAME)
+        .insert([payload])
+        .select()
+        .single();
+      if (!retryRes.error && retryRes.data) {
+        return mapDangkyRecordFromDb(retryRes.data);
+      }
+      error = retryRes.error || error;
+    }
+
     if (
       error.code === '22007' ||
       error.code === '22008' ||
@@ -434,6 +461,20 @@ export const updateDangkyRecord = async (record: RecordFile): Promise<RecordFile
     .single();
 
   if (error) {
+    if (error.code === 'PGRST204' || error.code === '42703' || String(error.message || '').includes('Could not find the')) {
+      payload = sanitizeDangkyPayloadForMissingColumns(payload, error);
+      const retryRes = await supabase
+        .from(TABLE_NAME)
+        .update(payload)
+        .eq('id', record.id)
+        .select()
+        .single();
+      if (!retryRes.error && retryRes.data) {
+        return mapDangkyRecordFromDb(retryRes.data);
+      }
+      error = retryRes.error || error;
+    }
+
     if (
       error.code === '22007' ||
       error.code === '22008' ||
@@ -476,6 +517,18 @@ export const updateDangkyRecordFields = async (
     .eq('id', id);
 
   if (error) {
+    if (error.code === 'PGRST204' || error.code === '42703' || String(error.message || '').includes('Could not find the')) {
+      payload = sanitizeDangkyPayloadForMissingColumns(payload, error);
+      const retryRes = await supabase
+        .from(TABLE_NAME)
+        .update(payload)
+        .eq('id', id);
+      if (!retryRes.error) {
+        return;
+      }
+      error = retryRes.error || error;
+    }
+
     if (
       error.code === '22007' ||
       error.code === '22008' ||

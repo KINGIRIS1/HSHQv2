@@ -61,163 +61,163 @@ export const DEFAULT_REGISTRATION_PROCEDURES: CustomRegistrationProcedure[] = [
   {
     id: 'proc_3_1_1',
     code: '3.1.1',
-    name: '3.1.1 Chuyển quyền (Chuyển nhượng, Tặng cho, Thừa kế - Có thuế)',
+    name: '3.1.1 Chuyển quyền chuyển nhượng, tặng cho, thừa kế',
     standardDays: 13,
     description: 'Quy trình giải quyết hồ sơ chuyển quyền sử dụng đất có phát sinh nghĩa vụ tài chính',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định', shortLabel: 'Thẩm định', description: 'Cán bộ thụ lý thẩm định hồ sơ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển thông tin nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)', isTaxPhase: true },
-      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế xác định nghĩa vụ tài chính (5 ngày - Ngoài SLA)', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ người dân nộp thuế vào NSNN (Tạm dừng đếm giờ)', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (40h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ cấp GCN và chuyển Bộ phận Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã bàn giao và trả kết quả cho người dân (Tạm dừng / Hoàn thành)', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày', isTaxPhase: false },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định', shortLabel: 'Thẩm định', description: 'Cán bộ thụ lý thẩm định hồ sơ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển thông tin nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày', isTaxPhase: true },
+      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế xác định nghĩa vụ tài chính', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ người dân nộp thuế vào NSNN', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ cấp GCN và chuyển Bộ phận Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã bàn giao và trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_1_2',
     code: '3.1.2',
-    name: '3.1.2 Phân chia quyền sử dụng đất (Có thuế)',
+    name: '3.1.2 Phân chia quyền sử dụng đất',
     standardDays: 13,
     description: 'Quy trình phân chia quyền sử dụng đất của vợ chồng hoặc hộ gia đình',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định', shortLabel: 'Thẩm định', description: 'Kiểm tra văn bản phân chia tài sản và hồ sơ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển cơ quan thuế', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)', isTaxPhase: true },
-      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế thụ lý (Ngoài SLA)', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ công dân hoàn thành nghĩa vụ tài chính', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (40h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã bàn giao và trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định', shortLabel: 'Thẩm định', description: 'Kiểm tra văn bản phân chia tài sản và hồ sơ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển cơ quan thuế', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày', isTaxPhase: true },
+      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế thụ lý', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ công dân hoàn thành nghĩa vụ tài chính', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã bàn giao và trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_1_3',
     code: '3.1.3',
-    name: '3.1.3 Theo Bản án / Quyết định của Tòa án / Thi hành án (Có thuế)',
+    name: '3.1.3 Theo Bản án, Quyết định của Tòa án, Thi hành án',
     standardDays: 13,
     description: 'Quy trình đăng ký biến động đất đai theo Bản án, Quyết định giải quyết tranh chấp',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ và bản án/quy định', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Đối chiếu bản án và hồ sơ địa chính gốc', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển thông tin thuế', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)', isTaxPhase: true },
-      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế xác định thuế (Ngoài SLA)', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ nộp tiền vào ngân sách nhà nước', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (40h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Kiểm tra hồ sơ trước khi ký duyệt', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả kết quả hoàn tất cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ và bản án quy định', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Đối chiếu bản án và hồ sơ địa chính gốc', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển thông tin thuế', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày', isTaxPhase: true },
+      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế xác định thuế', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ nộp tiền vào ngân sách nhà nước', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Kiểm tra hồ sơ trước khi ký duyệt', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả kết quả hoàn tất cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_2_1',
     code: '3.2.1',
-    name: '3.2.1 Cấp đổi Giấy chứng nhận (Không thuế)',
+    name: '3.2.1 Cấp đổi Giấy chứng nhận',
     standardDays: 5,
     description: 'Quy trình cấp đổi GCN do rách nát, ố nhòe hoặc đổi phôi mới không đổi ranh giới',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định', shortLabel: 'Thẩm định', description: 'Thẩm định hồ sơ và đối chiếu hồ sơ gốc', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ cấp GCN và trả kết quả cho Một cửa', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã trả kết quả cho người dân (Tạm dừng / Hoàn thành)', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định', shortLabel: 'Thẩm định', description: 'Thẩm định hồ sơ và đối chiếu hồ sơ gốc', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ cấp GCN và trả kết quả cho Một cửa', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_2_2',
     code: '3.2.2',
-    name: '3.2.2 Cấp đổi Giấy chứng nhận (Có thuế / Có đo đạc lại)',
+    name: '3.2.2 Cấp đổi Giấy chứng nhận có đo đạc lại',
     standardDays: 10,
     description: 'Quy trình cấp đổi GCN có phát sinh nghĩa vụ tài chính hoặc xác định lại diện tích',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Thẩm định hồ sơ và kiểm tra ranh giới thửa đất', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)' },
-      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)', isTaxPhase: true },
-      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế xử lý (Ngoài SLA)', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ nộp thuế vào NSNN', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày (24h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký duyệt GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL và bàn giao Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Thẩm định hồ sơ và kiểm tra ranh giới thửa đất', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày' },
+      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày', isTaxPhase: true },
+      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Cơ quan Thuế xử lý', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ nộp thuế vào NSNN', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký duyệt GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL và bàn giao Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_3_1',
     code: '3.3.1',
-    name: '3.3.1 Cấp lại Giấy chứng nhận do bị mất (Không thuế)',
+    name: '3.3.1 Cấp lại Giấy chứng nhận do bị mất',
     standardDays: 10,
     description: 'Quy trình giải quyết cấp lại GCN sau khi đã hoàn thành niêm yết mất GCN',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ đề nghị cấp lại', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định & Kiểm tra', shortLabel: 'Thẩm định', description: 'Kiểm tra hồ sơ niêm yết và tình trạng ngăn chặn', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày (24h)' },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày (24h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký hủy GCN cũ và cấp GCN mới', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật sổ bộ địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả GCN cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ đề nghị cấp lại', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định & Kiểm tra', shortLabel: 'Thẩm định', description: 'Kiểm tra hồ sơ niêm yết và tình trạng ngăn chặn', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày' },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký hủy GCN cũ và cấp GCN mới', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật sổ bộ địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả GCN cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_3_2',
     code: '3.3.2',
-    name: '3.3.2 Cấp lại Giấy chứng nhận (Có thuế)',
+    name: '3.3.2 Cấp lại Giấy chứng nhận có thuế',
     standardDays: 15,
     description: 'Quy trình cấp lại GCN có phát sinh truy thu nghĩa vụ tài chính hoặc tiền sử dụng đất',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Kiểm tra hồ sơ gốc và nguồn gốc pháp lý', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày (24h)' },
-      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển cơ quan thuế', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)', isTaxPhase: true },
-      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Thuế KV7 xác định nghĩa vụ tài chính (Ngoài SLA)', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ nộp tiền vào kho bạc', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (40h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL và bàn giao', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Hoàn tất trả kết quả cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Kiểm tra hồ sơ gốc và nguồn gốc pháp lý', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày' },
+      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển cơ quan thuế', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày', isTaxPhase: true },
+      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Thuế KV7 xác định nghĩa vụ tài chính', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ nộp tiền vào kho bạc', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL và bàn giao', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Hoàn tất trả kết quả cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_4_1',
     code: '3.4.1',
-    name: '3.4.1 Tách - hợp thửa đất (Không chuyển quyền)',
+    name: '3.4.1 Tách hợp thửa đất',
     standardDays: 12,
     description: 'Quy trình thủ tục tách thửa hoặc hợp thửa đất theo nhu cầu của người sử dụng đất',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Kiểm tra điều kiện tách/hợp thửa và đối chiếu bản vẽ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (40h)' },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận cho các thửa mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày (24h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký quyết định / GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật biến động hồ sơ địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Kiểm tra điều kiện tách/hợp thửa và đối chiếu bản vẽ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày' },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận cho các thửa mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo ký quyết định / GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật biến động hồ sơ địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_4_2',
     code: '3.4.2',
-    name: '3.4.2 Tách thửa chuyển quyền (Tách thửa đồng thời chuyển quyền - Có thuế)',
+    name: '3.4.2 Tách thửa chuyển quyền',
     standardDays: 13,
     description: 'Quy trình tách thửa đất đồng thời thực hiện thủ tục chuyển nhượng/tặng cho',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ tách thửa chuyển nhượng', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Thẩm định điều kiện tách thửa và hợp đồng chuyển nhượng', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)', isTaxPhase: true },
-      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Chi cục Thuế tính thuế (Ngoài SLA)', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ người dân nộp thuế', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận cho các thửa mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (40h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký duyệt GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ địa chính và bàn giao Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả kết quả cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ tách thửa chuyển nhượng', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Thẩm định điều kiện tách thửa và hợp đồng chuyển nhượng', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày', isTaxPhase: true },
+      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Chi cục Thuế tính thuế', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ người dân nộp thuế', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận cho các thửa mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký duyệt GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Vào sổ địa chính và bàn giao Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả kết quả cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
@@ -227,31 +227,31 @@ export const DEFAULT_REGISTRATION_PROCEDURES: CustomRegistrationProcedure[] = [
     standardDays: 5,
     description: 'Quy trình xác nhận gia hạn thời hạn sử dụng đất trên Giấy chứng nhận',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận đơn và hồ sơ gia hạn', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Kiểm tra điều kiện gia hạn và đối chiếu quy hoạch', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký xác nhận gia hạn vào trang 4 GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả GCN đã gia hạn cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận đơn và hồ sơ gia hạn', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Kiểm tra điều kiện gia hạn và đối chiếu quy hoạch', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo bộ phận kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký xác nhận gia hạn vào trang 4 GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả GCN đã gia hạn cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_6_1',
     code: '3.6.1',
-    name: '3.6.1 Chuyển mục đích sử dụng đất (Có nghĩa vụ tài chính)',
+    name: '3.6.1 Chuyển mục đích sử dụng đất',
     standardDays: 15,
     description: 'Quy trình đăng ký biến động sau khi có Quyết định cho phép chuyển mục đích sử dụng đất',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận quyết định và hồ sơ xin cấp GCN', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Thẩm định hồ sơ pháp lý và kiểm tra trích lục bản đồ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày (24h)' },
-      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển thông tin nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)', isTaxPhase: true },
-      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Chi cục Thuế xác định tiền sử dụng đất (Ngoài SLA)', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ công dân nộp tiền sử dụng đất vào NSNN', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Ngoài SLA)', isTaxPhase: true, isPaused: true },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày (40h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Kiểm tra đối chiếu chứng từ nộp tiền và GCN', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày (16h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký duyệt cấp GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật biến động hồ sơ địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả kết quả cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận quyết định và hồ sơ xin cấp GCN', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.APPRAISAL, label: 'Thẩm định hồ sơ', shortLabel: 'Thẩm định', description: 'Thẩm định hồ sơ pháp lý và kiểm tra trích lục bản đồ', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 24, durationDays: 3, durationLabel: '3 ngày' },
+      { key: RecordStatus.TAX_TRANSFER, label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', description: 'Lập phiếu chuyển thông tin nghĩa vụ tài chính', badgeColor: 'bg-indigo-100 text-indigo-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày', isTaxPhase: true },
+      { key: RecordStatus.PENDING_TAX_KV7, label: 'Thuế Khu vực 7', shortLabel: 'Thuế KV7', description: 'Chi cục Thuế xác định tiền sử dụng đất', badgeColor: 'bg-violet-100 text-violet-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Thông báo thuế', shortLabel: 'Thông báo thuế', description: 'Chờ công dân nộp tiền sử dụng đất vào NSNN', badgeColor: 'bg-amber-100 text-amber-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng', isTaxPhase: true, isPaused: true },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In phôi Giấy chứng nhận mới', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 40, durationDays: 5, durationLabel: '5 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Kiểm tra đối chiếu chứng từ nộp tiền và GCN', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 16, durationDays: 2, durationLabel: '2 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký duyệt cấp GCN', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật biến động hồ sơ địa chính và chuyển Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã hoàn tất trả kết quả cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
@@ -261,37 +261,37 @@ export const DEFAULT_REGISTRATION_PROCEDURES: CustomRegistrationProcedure[] = [
     standardDays: 7,
     description: 'Quy trình đính chính sai sót thông tin trên GCN đã cấp',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In Giấy chứng nhận', shortLabel: 'In GCN', description: 'In trang đính chính hoặc in lại phôi GCN', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 32, durationDays: 4, durationLabel: '4 ngày (32h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL địa chính và chuyển Bộ phận Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Bộ phận Tiếp nhận và Trả kết quả', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In trang đính chính hoặc in lại phôi GCN', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 32, durationDays: 4, durationLabel: '4 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Tổ trưởng / Lãnh đạo phòng kiểm tra', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Trình Lãnh đạo Chi nhánh ký duyệt', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật CSDL địa chính và chuyển Bộ phận Một cửa', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Đã trả kết quả cho người dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_7_2',
     code: '3.7.2',
-    name: '3.7.2 Đổi thông tin trên Giấy chứng nhận (CCCD, địa chỉ, đổi tên)',
+    name: '3.7.2 Đổi thông tin trên Giấy chứng nhận',
     standardDays: 7,
     description: 'Quy trình cập nhật thay đổi thông tin số CCCD, hộ khẩu hoặc địa chỉ của chủ sử dụng',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận giấy tờ chứng minh thay đổi thông tin', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In nội dung chứng nhận', shortLabel: 'In GCN', description: 'In nội dung thay đổi vào trang 4 GCN', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 32, durationDays: 4, durationLabel: '4 ngày (32h)' },
-      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo kiểm tra thông tin', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày (8h)' },
-      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký duyệt nội dung thay đổi', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật cơ sở dữ liệu địa chính', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày (4h)' },
-      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả GCN đã cập nhật cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Tạm dừng (Hoàn tất)', isPaused: true }
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận giấy tờ chứng minh thay đổi thông tin', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_PRINT_CERT, label: 'In GCN', shortLabel: 'In GCN', description: 'In nội dung thay đổi vào trang 4 GCN', badgeColor: 'bg-teal-100 text-teal-800', durationHours: 32, durationDays: 4, durationLabel: '4 ngày' },
+      { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra', shortLabel: 'Trình kiểm tra', description: 'Lãnh đạo kiểm tra thông tin', badgeColor: 'bg-orange-100 text-orange-800', durationHours: 8, durationDays: 1, durationLabel: '1 ngày' },
+      { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt', shortLabel: 'Trình ký duyệt', description: 'Lãnh đạo ký duyệt nội dung thay đổi', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.PENDING_HANDOVER, label: 'Hoàn thành', shortLabel: 'Hoàn thành', description: 'Cập nhật cơ sở dữ liệu địa chính', badgeColor: 'bg-cyan-100 text-cyan-800', durationHours: 4, durationDays: 0.5, durationLabel: '0.5 ngày' },
+      { key: RecordStatus.RETURNED, label: 'Trả kết quả', shortLabel: 'Trả kết quả', description: 'Trả GCN đã cập nhật cho công dân', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 0, durationDays: 0, durationLabel: 'Hoàn tất', isPaused: true }
     ]
   },
   {
     id: 'proc_3_8_1',
     code: '3.8.1',
-    name: '3.8.1 Đăng ký Giao dịch bảo đảm (Thế chấp)',
+    name: '3.8.1 Đăng ký Giao dịch bảo đảm',
     standardDays: 1,
     description: 'Quy trình đăng ký thế chấp quyền sử dụng đất giải quyết trong ngày làm việc',
     steps: [
-      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ thế chấp từ ngân hàng / công dân', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 2, durationDays: 0.25, durationLabel: '2 giờ' },
+      { key: RecordStatus.RECEIVED, label: 'Tiếp nhận', shortLabel: 'Tiếp nhận', description: 'Tiếp nhận hồ sơ thế chấp từ ngân hàng hoặc công dân', badgeColor: 'bg-gray-100 text-gray-800', durationHours: 2, durationDays: 0.25, durationLabel: '2 giờ' },
       { key: RecordStatus.APPRAISAL, label: 'Kiểm tra & Xác nhận', shortLabel: 'Xác nhận', description: 'Kiểm tra thông tin ngăn chặn và ghi nội dung chứng nhận', badgeColor: 'bg-blue-100 text-blue-800', durationHours: 2, durationDays: 0.25, durationLabel: '2 giờ' },
       { key: RecordStatus.PENDING_SIGN, label: 'Ký duyệt', shortLabel: 'Ký duyệt', description: 'Lãnh đạo ký xác nhận đăng ký thế chấp', badgeColor: 'bg-purple-100 text-purple-800', durationHours: 2, durationDays: 0.25, durationLabel: '2 giờ' },
       { key: RecordStatus.RETURNED, label: 'Hoàn thành & Trả KQ', shortLabel: 'Trả KQ', description: 'Vào sổ địa chính và trả kết quả ngay trong ngày', badgeColor: 'bg-emerald-100 text-emerald-800', durationHours: 2, durationDays: 0.25, durationLabel: '2 giờ' }
@@ -300,7 +300,7 @@ export const DEFAULT_REGISTRATION_PROCEDURES: CustomRegistrationProcedure[] = [
   {
     id: 'proc_3_8_2',
     code: '3.8.2',
-    name: '3.8.2 Xóa Đăng ký Giao dịch bảo đảm (Giải chấp)',
+    name: '3.8.2 Xóa Đăng ký Giao dịch bảo đảm',
     standardDays: 1,
     description: 'Quy trình xóa đăng ký thế chấp quyền sử dụng đất giải quyết trong ngày làm việc',
     steps: [
@@ -577,7 +577,7 @@ export const calculateRecordStepSla = (
       overdueHours: 0,
       remainingLabel: 'Tạm dừng SLA',
       overdueLabel: '0 giờ',
-      stepHeaderText: `Tạm dừng tính SLA (${pauseReason})`
+      stepHeaderText: 'Tạm dừng tính SLA'
     };
   }
 
@@ -646,7 +646,7 @@ export const calculateRecordStepSla = (
       overdueHours: 0,
       remainingLabel,
       overdueLabel: '0 giờ',
-      stepHeaderText: `Định mức: ${currentStep.durationLabel || `${durationHours}h`} (${remainingLabel})`
+      stepHeaderText: `Định mức: ${currentStep.durationLabel || `${durationHours}h`} - ${remainingLabel}`
     };
   } else {
     const overdueMins = Math.abs(remainingMinutes);

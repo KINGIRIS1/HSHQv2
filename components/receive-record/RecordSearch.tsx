@@ -927,27 +927,28 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                {/* Badge SLA dưới mã hồ sơ chuẩn theo chuyên môn */}
+                                                                {/* Badge Trễ hạn dưới mã hồ sơ căn cứ đúng ngày hẹn trả tổng thể */}
                                                                 {(() => {
-                                                                    if (stepSla.isPaused) {
+                                                                    if (r.isSlaPaused) {
                                                                         return (
-                                                                            <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] rounded border border-amber-200 font-bold whitespace-nowrap">
+                                                                            <span className="inline-block px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] rounded border border-amber-200 font-bold whitespace-nowrap">
                                                                                 Tạm dừng SLA
                                                                             </span>
                                                                         );
                                                                     }
-                                                                    if (isOverdue || stepSla.isOverdue) {
-                                                                        const labelText = overdueDays > 0 ? `Trễ hạn ${overdueDays} ngày` : (stepSla.overdueLabel || "Trễ hạn hôm nay");
+                                                                    if (isOverdue) {
+                                                                        const days = getOverdueDays(r);
+                                                                        const text = days === 0 ? "Trễ hạn hôm nay" : `Trễ hạn ${days} ngày`;
                                                                         return (
-                                                                            <span className="inline-block px-2 py-0.5 bg-red-100 text-red-600 text-[11px] rounded border border-red-200 font-bold whitespace-nowrap">
-                                                                                {labelText}
+                                                                            <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[11px] rounded border border-red-200 font-bold whitespace-nowrap">
+                                                                                {text}
                                                                             </span>
                                                                         );
                                                                     }
                                                                     if (isApproaching) {
                                                                         return (
-                                                                            <span className="inline-block px-2 py-0.5 bg-orange-50 text-orange-600 text-[11px] rounded border border-orange-200 font-semibold whitespace-nowrap">
-                                                                                {stepSla.remainingLabel}
+                                                                            <span className="inline-block px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[10px] rounded border border-orange-200 font-semibold whitespace-nowrap">
+                                                                                Sắp đến hạn
                                                                             </span>
                                                                         );
                                                                     }

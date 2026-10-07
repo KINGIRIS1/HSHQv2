@@ -21,9 +21,15 @@ export const supabase = createClient(
 );
 
 export const hasAuthenticatedSession = async (): Promise<boolean> => {
-    if (!isConfigured) return false;
-    const { data: { session }, error } = await supabase.auth.getSession();
-    return !error && Boolean(session);
+    try {
+        if (!isConfigured) return false;
+        const { data, error } = await supabase.auth.getSession();
+        if (error || !data?.session) return false;
+        return Boolean(data.session);
+    } catch (err) {
+        console.warn('Lỗi kiểm tra phiên xác thực:', err);
+        return false;
+    }
 };
 
 // Staff still enter their username; Auth uses an internal deterministic alias.

@@ -250,6 +250,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isManualCode, setIsManualCode] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -736,9 +737,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         'exportDate',
         'resultReturnedDate',
         'appraisalDate',
+        'postingDate',
+        'postingEndDate',
         'taxTransferDate',
+        'taxTransferAssignedDate',
         'taxKv7Date',
         'taxPaymentDate',
+        'taxNoticeDate',
+        'paymentReceiptDate',
         'printCertDate',
         'pendingHandoverDate',
         'supplementRequestDate',
@@ -795,11 +801,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         cleanData.sourceTable = initialData.sourceTable;
     }
 
-    onSubmit(cleanData as any);
-    onClose();
-
-    // Đồng bộ tệp ngầm trong nền lên Google Drive (Background Sync - 0ms delay cho UI)
-    enqueueRecordForBackgroundDriveSync(cleanData as any);
+    try {
+        setIsSaving(true);
+        await Promise.resolve(onSubmit(cleanData as any));
+        onClose();
+        // Đồng bộ tệp ngầm trong nền lên Google Drive (Background Sync - 0ms delay cho UI)
+        enqueueRecordForBackgroundDriveSync(cleanData as any);
+    } catch (err: any) {
+        console.error("Lỗi khi lưu hồ sơ:", err);
+        alert(`Đã cập nhật thất bại vui lòng kiểm tra: ${err?.message || 'Lỗi CSDL'}`);
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const handleChange = (field: keyof RecordFile, value: any) => {
@@ -837,7 +850,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             approvalDate: prev.approvalDate,
             completedDate: prev.completedDate,
             exportDate: prev.exportDate,
-            resultReturnedDate: prev.resultReturnedDate
+            resultReturnedDate: prev.resultReturnedDate,
+            appraisalDate: prev.appraisalDate,
+            postingDate: prev.postingDate,
+            postingEndDate: prev.postingEndDate,
+            taxTransferDate: prev.taxTransferDate,
+            taxTransferAssignedDate: prev.taxTransferAssignedDate,
+            taxKv7Date: prev.taxKv7Date,
+            taxPaymentDate: prev.taxPaymentDate,
+            taxNoticeDate: prev.taxNoticeDate,
+            paymentReceiptDate: prev.paymentReceiptDate,
+            printCertDate: prev.printCertDate,
+            pendingHandoverDate: prev.pendingHandoverDate,
+            supplementRequestDate: prev.supplementRequestDate,
+            supplementReturnedDate: prev.supplementReturnedDate
           }
         });
         updated = { ...updated, ...synced, ...rollbackFields, status: newStatus };
@@ -848,10 +874,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         'resultReturnedDate',
         'completedDate',
         'exportDate',
+        'pendingHandoverDate',
         'approvalDate',
         'submissionDate',
         'checkedDate',
         'pendingCheckDate',
+        'printCertDate',
+        'taxPaymentDate',
+        'paymentReceiptDate',
+        'taxKv7Date',
+        'taxTransferDate',
+        'taxTransferAssignedDate',
+        'postingDate',
+        'appraisalDate',
         'completedWorkDate',
         'officeCompletedDate',
         'officeAssignedDate',
@@ -1114,6 +1149,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 {(() => {
                                     const statusFlow = [
                                         RecordStatus.RECEIVED,
+                                        RecordStatus.APPRAISAL,
+                                        RecordStatus.PENDING_POSTING,
+                                        RecordStatus.TAX_TRANSFER,
+                                        RecordStatus.PENDING_TAX_KV7,
+                                        RecordStatus.PENDING_TAX_NOTICE,
+                                        RecordStatus.PENDING_TAX_PAYMENT,
+                                        RecordStatus.PENDING_PRINT_CERT,
                                         RecordStatus.FIELD_WORK,
                                         RecordStatus.OFFICE_WORK,
                                         RecordStatus.ASSIGNED,
@@ -1128,15 +1170,101 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     const currentIdx = formData.status ? statusFlow.indexOf(formData.status) : -1;
                                     const isFieldWork = isFieldWorkProcedure(formData.recordType);
                                     const isOfficeOnly = isOfficeOnlySurveyProcedure(formData.recordType);
-                                    const hasAssigned = true; // Luôn hiển thị ô Ngày giao NV / Ngày đo đạc / Ngày Biên tập cho tất cả hồ sơ kể cả tiếp nhận mới
+
+                                    // Module Cấp giấy flags
+                                    const showAppraisalDate = isCapGiay || (formData.status === RecordStatus.APPRAISAL || !!formData.appraisalDate);
+                                    const showTaxTransferDate = isCapGiay && (formData.status === RecordStatus.TAX_TRANSFER || currentIdx >= statusFlow.indexOf(RecordStatus.TAX_TRANSFER) || !!formData.taxTransferDate || !!formData.taxTransferAssignedDate);
+                                    const showTaxKv7Date = isCapGiay && (formData.status === RecordStatus.PENDING_TAX_KV7 || currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_TAX_KV7) || !!formData.taxKv7Date);
+                                    const showTaxPaymentDate = isCapGiay && (formData.status === RecordStatus.PENDING_TAX_PAYMENT || formData.status === RecordStatus.PENDING_TAX_NOTICE || currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_TAX_PAYMENT) || !!formData.taxPaymentDate || !!formData.paymentReceiptDate || !!formData.taxNoticeDate);
+                                    const showPrintCertDate = isCapGiay && (formData.status === RecordStatus.PENDING_PRINT_CERT || currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_PRINT_CERT) || !!formData.printCertDate || !!formData.printStaffAssignedAt);
+
+                                    // Đo đạc / Lưu trữ
+                                    const hasAssigned = !isCapGiay;
                                     const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate || !!formData.checkedDate);
                                     const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
-                                    const hasApproval = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || !!formData.approvalDate;
                                     const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED || !!formData.completedDate;
                                     const assignedLabel = isFieldWork ? 'Ngày đo đạc' : isOfficeOnly ? 'Ngày Biên tập' : 'Ngày giao NV';
 
                                     return (
                                         <>
+                                            {/* Cấp giấy: Ngày thẩm định */}
+                                            {showAppraisalDate && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-amber-800 mb-1">Ngày thẩm định</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border border-amber-300 rounded-md px-3 py-2 bg-amber-50/40 text-amber-900" 
+                                                        value={dateVal(formData.appraisalDate || formData.assignedDate)} 
+                                                        onChange={(e) => {
+                                                            handleChange('appraisalDate', e.target.value);
+                                                            if (!formData.assignedDate) {
+                                                                handleChange('assignedDate', e.target.value);
+                                                            }
+                                                        }} 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Cấp giấy: Ngày chuyển thuế */}
+                                            {showTaxTransferDate && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-blue-800 mb-1">Ngày chuyển thuế</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50/40 text-blue-900" 
+                                                        value={dateVal(formData.taxTransferDate || formData.taxTransferAssignedDate)} 
+                                                        onChange={(e) => {
+                                                            handleChange('taxTransferDate', e.target.value);
+                                                            handleChange('taxTransferAssignedDate', e.target.value);
+                                                        }} 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Cấp giấy: Ngày thuế KV7 */}
+                                            {showTaxKv7Date && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-indigo-800 mb-1">Ngày thuế KV7</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50/40 text-indigo-900" 
+                                                        value={dateVal(formData.taxKv7Date)} 
+                                                        onChange={(e) => handleChange('taxKv7Date', e.target.value)} 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Cấp giấy: Ngày giấy nộp tiền */}
+                                            {showTaxPaymentDate && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-emerald-800 mb-1">Ngày giấy nộp tiền</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50/40 text-emerald-900" 
+                                                        value={dateVal(formData.paymentReceiptDate || formData.taxPaymentDate || formData.taxNoticeDate)} 
+                                                        onChange={(e) => {
+                                                            handleChange('paymentReceiptDate', e.target.value);
+                                                            handleChange('taxPaymentDate', e.target.value);
+                                                        }} 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Cấp giấy: Ngày in GCN */}
+                                            {showPrintCertDate && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-purple-800 mb-1">Ngày in GCN</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50/40 text-purple-900" 
+                                                        value={dateVal(formData.printCertDate || formData.printStaffAssignedAt)} 
+                                                        onChange={(e) => {
+                                                            handleChange('printCertDate', e.target.value);
+                                                        }} 
+                                                    />
+                                                </div>
+                                            )}
+
                                             {hasAssigned && (
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-700 mb-1">{assignedLabel}</label>
@@ -1172,11 +1300,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                             {hasPendingCheck && (
                                                 <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày trình kiểm tra</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50/50 text-blue-800" value={dateVal(formData.pendingCheckDate)} onChange={(e) => handleChange('pendingCheckDate', e.target.value)} /></div>
                                             )}
-                                            {hasSubmission && (
+                                             {hasSubmission && (
                                                 <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50/50 text-purple-800" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value)} /></div>
-                                            )}
-                                            {hasApproval && (
-                                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50/50 text-indigo-800" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value)} /></div>
                                             )}
                                             {hasHandover && (
                                                 <div>
@@ -1212,7 +1337,47 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         </div>
                                     </div>
                                 )}
-                                {(formData.assignedDate || formData.fieldAssignedDate) && (
+                                {formData.appraisalDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-amber-700 mb-1">Ngày thẩm định</label>
+                                        <div className="w-full border border-amber-100 rounded-md px-3 py-2 bg-amber-50/50 text-sm font-semibold text-amber-800">
+                                            {formatDate(formData.appraisalDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {(formData.taxTransferDate || formData.taxTransferAssignedDate) && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-blue-700 mb-1">Ngày chuyển thuế</label>
+                                        <div className="w-full border border-blue-100 rounded-md px-3 py-2 bg-blue-50/50 text-sm font-semibold text-blue-800">
+                                            {formatDate(formData.taxTransferDate || formData.taxTransferAssignedDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.taxKv7Date && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày thuế KV7</label>
+                                        <div className="w-full border border-indigo-100 rounded-md px-3 py-2 bg-indigo-50/50 text-sm font-semibold text-indigo-800">
+                                            {formatDate(formData.taxKv7Date)}
+                                        </div>
+                                    </div>
+                                )}
+                                {(formData.paymentReceiptDate || formData.taxPaymentDate || formData.taxNoticeDate) && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày giấy nộp tiền</label>
+                                        <div className="w-full border border-emerald-100 rounded-md px-3 py-2 bg-emerald-50/50 text-sm font-semibold text-emerald-800">
+                                            {formatDate(formData.paymentReceiptDate || formData.taxPaymentDate || formData.taxNoticeDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {(formData.printCertDate || formData.printStaffAssignedAt) && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-purple-700 mb-1">Ngày in GCN</label>
+                                        <div className="w-full border border-purple-100 rounded-md px-3 py-2 bg-purple-50/50 text-sm font-semibold text-purple-800">
+                                            {formatDate(formData.printCertDate || formData.printStaffAssignedAt)}
+                                        </div>
+                                    </div>
+                                )}
+                                {!isCapGiay && (formData.assignedDate || formData.fieldAssignedDate) && (
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 mb-1">
                                             {isFieldWorkProcedure(formData.recordType) ? 'Ngày đo đạc' : isOfficeOnlySurveyProcedure(formData.recordType) ? 'Ngày Biên tập' : 'Ngày giao NV'}
@@ -1243,14 +1408,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         <label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label>
                                         <div className="w-full border border-purple-100 rounded-md px-3 py-2 bg-purple-50/50 text-sm font-semibold text-purple-800">
                                             {formatDate(formData.submissionDate)}
-                                        </div>
-                                    </div>
-                                )}
-                                {formData.approvalDate && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label>
-                                        <div className="w-full border border-indigo-100 rounded-md px-3 py-2 bg-indigo-50/50 text-sm font-semibold text-indigo-800">
-                                            {formatDate(formData.approvalDate)}
                                         </div>
                                     </div>
                                 )}
@@ -1716,6 +1873,52 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                 dateLabel: 'Ngày nhận',
                                                 dateValue: formData.receivedDate
                                             };
+                                        case RecordStatus.APPRAISAL:
+                                            return {
+                                                stageTitle: 'Bước Thẩm định hồ sơ',
+                                                label: 'Cán bộ Thẩm định hồ sơ',
+                                                field: 'appraisalStaff' as const,
+                                                value: formData.appraisalStaff || formData.assignedTo || '',
+                                                dateLabel: 'Ngày giao thẩm định',
+                                                dateValue: formData.appraisalDate || formData.assignedDate
+                                            };
+                                        case RecordStatus.TAX_TRANSFER:
+                                            return {
+                                                stageTitle: 'Bước Chuyển thuế',
+                                                label: 'Cán bộ Lập phiếu chuyển thuế',
+                                                field: 'taxTransferStaff' as const,
+                                                value: formData.taxTransferStaff || formData.taxStaff || formData.assignedTo || '',
+                                                dateLabel: 'Ngày giao chuyển thuế',
+                                                dateValue: formData.taxTransferAssignedDate || formData.taxTransferDate
+                                            };
+                                        case RecordStatus.PENDING_TAX_KV7:
+                                            return {
+                                                stageTitle: 'Bước Thuế khu vực 7',
+                                                label: 'Cán bộ phụ trách Thuế KV7',
+                                                field: 'taxStaff' as const,
+                                                value: formData.taxStaff || formData.taxTransferStaff || formData.assignedTo || '',
+                                                dateLabel: 'Ngày chuyển thuế KV7',
+                                                dateValue: formData.taxKv7Date
+                                            };
+                                        case RecordStatus.PENDING_TAX_PAYMENT:
+                                        case RecordStatus.PENDING_TAX_NOTICE:
+                                            return {
+                                                stageTitle: 'Bước Giấy nộp tiền thuế',
+                                                label: 'Cán bộ theo dõi Thuế & Giấy nộp tiền',
+                                                field: 'taxStaff' as const,
+                                                value: formData.taxStaff || formData.assignedTo || '',
+                                                dateLabel: 'Ngày giấy nộp tiền',
+                                                dateValue: formData.paymentReceiptDate || formData.taxPaymentDate || formData.taxNoticeDate
+                                            };
+                                        case RecordStatus.PENDING_PRINT_CERT:
+                                            return {
+                                                stageTitle: 'Bước In Giấy chứng nhận',
+                                                label: 'Cán bộ In GCN',
+                                                field: 'printStaff' as const,
+                                                value: formData.printStaff || formData.printStaffId || formData.assignedTo || '',
+                                                dateLabel: 'Ngày giao in GCN',
+                                                dateValue: formData.printCertDate || formData.printStaffAssignedAt
+                                            };
                                         case RecordStatus.FIELD_WORK:
                                             return {
                                                 stageTitle: 'Bước Đo đạc thực địa',
@@ -1778,8 +1981,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 const handleStaffSelectChange = (newEmpId: string) => {
                                     const { field } = currentStaffBinding;
                                     handleChange(field, newEmpId);
-                                    if (field === 'surveyorId' || field === 'drafterId' || field === 'assignedTo' || field === 'receivedBy') {
-                                        handleChange('assignedTo', newEmpId);
+                                    handleChange('assignedTo', newEmpId);
+                                    if (field === 'printStaff') {
+                                        handleChange('printStaffId', newEmpId);
+                                    }
+                                    if (field === 'taxTransferStaff') {
+                                        handleChange('taxStaff', newEmpId);
                                     }
                                 };
 
@@ -1958,18 +2165,28 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
         {/* FOOTER */}
         <div className="p-4 md:p-5 border-t bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-none md:rounded-b-xl sticky bottom-0 z-10">
-            <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-200 font-medium transition-colors text-sm">Hủy bỏ</button>
+            <button type="button" onClick={onClose} disabled={isSaving} className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-200 font-medium transition-colors text-sm disabled:opacity-50">Hủy bỏ</button>
             <button 
                 type="submit" 
                 form="record-form" 
-                disabled={!formData.recordType || !formData.recordType.trim()}
+                disabled={isSaving || !formData.recordType || !formData.recordType.trim()}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-lg shadow-md font-bold transition-all text-sm ${
-                    !formData.recordType || !formData.recordType.trim() 
+                    isSaving || !formData.recordType || !formData.recordType.trim() 
                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed opacity-70' 
                         : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
                 }`}
             >
-                <Save size={18} /> {initialData ? 'Cập nhật' : 'Lưu hồ sơ'}
+                {isSaving ? (
+                    <>
+                        <Loader2 className="animate-spin" size={18} />
+                        <span>{initialData ? 'Đang cập nhật...' : 'Đang lưu...'}</span>
+                    </>
+                ) : (
+                    <>
+                        <Save size={18} />
+                        <span>{initialData ? 'Cập nhật' : 'Lưu hồ sơ'}</span>
+                    </>
+                )}
             </button>
         </div>
       </div>

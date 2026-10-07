@@ -114,7 +114,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
           {slaResult.isPaused ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5 shadow-2xs">
               <Pause size={13} className="shrink-0 animate-pulse" />
-              <span>{slaResult.stepHeaderText ? (slaResult.stepHeaderText.split('|')[2] || slaResult.stepHeaderText) : `Tạm dừng tính SLA (${slaResult.pauseReason || 'Theo quy định'})`}</span>
+              <span>{slaResult.stepHeaderText ? (slaResult.stepHeaderText.split('|')[2] || slaResult.stepHeaderText.replace(/\s*\([^)]*\)/g, '')) : 'Tạm dừng tính SLA'}</span>
             </span>
           ) : slaResult.isOverdue ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-400/40 flex items-center gap-1.5 shadow-2xs animate-pulse">
@@ -245,7 +245,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                   onClick={() => onChangeStatus(RecordStatus.PENDING_PRINT_CERT)}
                   className="px-3 py-1.5 bg-cyan-700 hover:bg-cyan-800 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  <span>Chuyển In GCN (Không thuế)</span>
+                  <span>Chuyển In GCN</span>
                 </button>
               </>
             )}
@@ -268,7 +268,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                 onClick={() => onChangeStatus(RecordStatus.PENDING_TAX_PAYMENT)}
                 className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Nhận Thông báo thuế (GNT)</span>
+                <span>Nhận Thông báo thuế</span>
               </button>
             )}
 
@@ -280,7 +280,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                 className="px-3.5 py-1.5 bg-gradient-to-r from-blue-700 to-cyan-800 hover:from-blue-800 hover:to-cyan-900 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer size={14} />
-                <span>Giao In Giấy chứng nhận (GCN)</span>
+                <span>Giao In GCN</span>
               </button>
             )}
 
@@ -327,7 +327,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                 onClick={() => onChangeStatus(RecordStatus.RETURNED)}
                 className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Bàn giao Trả kết quả (Một cửa)</span>
+                <span>Bàn giao Trả kết quả</span>
               </button>
             )}
           </div>

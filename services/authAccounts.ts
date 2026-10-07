@@ -9,27 +9,42 @@ const cleanProfile = (row: any): User => {
     return profile;
 };
 export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
-    if (!(await hasAuthenticatedSession())) return [];
-    const { data, error } = await supabase.from('users').select(profileFields);
-    if (error) throw error;
-    const profiles = await enrichUsersList((data || []).map(cleanProfile));
-    saveToCache(CACHE_KEYS.USERS, profiles);
-    return profiles;
+    try {
+        if (!(await hasAuthenticatedSession())) return [];
+        const { data, error } = await supabase.from('users').select(profileFields);
+        if (error) throw error;
+        const profiles = await enrichUsersList((data || []).map(cleanProfile));
+        saveToCache(CACHE_KEYS.USERS, profiles);
+        return profiles;
+    } catch (err) {
+        console.warn('Lỗi khi tải danh sách người dùng từ DB:', err);
+        return [];
+    }
 };
 export const fetchUsers = fetchUsersDirectFromDb;
 export const findUserInDbDirectly = async (username: string): Promise<User | null> => {
-    if (!(await hasAuthenticatedSession())) return null;
-    const { data, error } = await supabase.from('users').select(profileFields).eq('username', username).maybeSingle();
-    if (error || !data) return null;
-    return enrichUserWithEmployees(cleanProfile(data));
+    try {
+        if (!(await hasAuthenticatedSession())) return null;
+        const { data, error } = await supabase.from('users').select(profileFields).eq('username', username).maybeSingle();
+        if (error || !data) return null;
+        return enrichUserWithEmployees(cleanProfile(data));
+    } catch (err) {
+        console.warn(`Lỗi tìm người dùng "${username}":`, err);
+        return null;
+    }
 };
 export const getAuthenticatedAppUser = async (): Promise<User | null> => {
-    if (!(await hasAuthenticatedSession())) return null;
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return null;
-    const { data, error: profileError } = await supabase.from('users').select(profileFields).eq('auth_id', user.id).maybeSingle();
-    if (profileError || !data || data.active === false) return null;
-    return enrichUserWithEmployees(cleanProfile(data));
+    try {
+        if (!(await hasAuthenticatedSession())) return null;
+        const { data, error } = await supabase.auth.getUser();
+        if (error || !data?.user) return null;
+        const { data: profile, error: profileError } = await supabase.from('users').select(profileFields).eq('auth_id', data.user.id).maybeSingle();
+        if (profileError || !profile || profile.active === false) return null;
+        return enrichUserWithEmployees(cleanProfile(profile));
+    } catch (err) {
+        console.warn('Lỗi lấy thông tin người dùng xác thực:', err);
+        return null;
+    }
 };
 export interface CloudAuthResult {
     status: 'SUCCESS' | 'INVALID_CREDENTIALS' | 'ACCOUNT_DISABLED' | 'NETWORK_ERROR' | 'DB_ERROR';
@@ -43,17 +58,31 @@ export const authenticateUserCloud = async (usernameInput: string, passwordInput
     const password = passwordInput.normalize('NFC').trim();
     if (!username || !password) return { status: 'INVALID_CREDENTIALS', message: 'Vui lòng nhập tên đăng nhập và mật khẩu.' };
     try {
-        const { error } = await supabase.auth.signInWithPassword({ email: await usernameToAuthEmail(username), password });
-        if (error) return { status: error.status && error.status < 500 ? 'INVALID_CREDENTIALS' : 'NETWORK_ERROR',
-            message: error.status && error.status < 500 ? 'Tên đăng nhập hoặc mật khẩu không đúng, hoặc tài khoản đã bị khóa.' : 'Không kết nối được máy chủ. Vui lòng thử lại.' };
+        const authEmail = await usernameToAuthEmail(username);
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password });
+        if (error) {
+            console.warn('[Supabase Auth Error]:', error);
+            return {
+                status: error.status && error.status < 500 ? 'INVALID_CREDENTIALS' : 'NETWORK_ERROR',
+                message: error.status && error.status < 500
+                    ? 'Tên đăng nhập hoặc mật khẩu không đúng, hoặc tài khoản đã bị khóa.'
+                    : `Không kết nối được máy chủ (${error.message || 'Lỗi mạng'}). Vui lòng thử lại.`,
+                errorDetails: error
+            };
+        }
         const user = await getAuthenticatedAppUser();
         if (!user) {
-            await supabase.auth.signOut();
+            await supabase.auth.signOut().catch(() => {});
             return { status: 'ACCOUNT_DISABLED', message: 'Tài khoản chưa được cấp quyền hoặc đã bị khóa.' };
         }
         return { status: 'SUCCESS', user };
-    } catch {
-        return { status: 'NETWORK_ERROR', message: 'Không kết nối được máy chủ. Vui lòng thử lại.' };
+    } catch (err: any) {
+        console.error('[Supabase Auth Exception]:', err);
+        return {
+            status: 'NETWORK_ERROR',
+            message: 'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra lại đường truyền mạng hoặc cấu hình máy chủ.',
+            errorDetails: err?.message || err
+        };
     }
 };
 async function manageAccount(body: Record<string, unknown>) {

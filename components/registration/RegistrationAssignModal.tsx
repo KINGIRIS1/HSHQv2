@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   X,
   UserCheck,
@@ -7,8 +7,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Search,
+  Check,
 } from 'lucide-react';
 import { RecordFile, Employee } from '../../types';
+import { removeVietnameseTones } from '../../utils/appHelpers';
 
 interface RegistrationAssignModalProps {
   isOpen: boolean;
@@ -26,6 +29,7 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
   onConfirmAssign,
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [assignedDate, setAssignedDate] = useState<string>(
     new Date().toISOString().substring(0, 10)
   );
@@ -38,6 +42,8 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
       setIsSubmitting(false);
       isSubmittingRef.current = false;
       setErrorMsg('');
+      setSearchTerm('');
+      setSelectedEmployee('');
     }
   }, [isOpen]);
 
@@ -51,13 +57,24 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // Lọc danh sách nhân viên thuộc Tổ Đăng ký / Cấp giấy
+  const dangkyEmployees = useMemo(() => {
+    const term = removeVietnameseTones(searchTerm.trim().toLowerCase());
+    const baseList = employees.filter(
+      (e) => !e.department || e.department.toLowerCase().includes('đăng ký') || e.department.toLowerCase().includes('cấp giấy') || e.department.toLowerCase().includes('giấy')
+    );
+    const list = baseList.length > 0 ? baseList : employees;
 
-  // Lọc danh sách nhân viên thuộc Tổ Đăng ký / Cấp giấy hoặc tất cả
-  const dangkyEmployees = employees.filter(
-    (e) => !e.department || e.department.toLowerCase().includes('đăng ký') || e.department.toLowerCase().includes('cấp giấy')
-  );
-  const displayEmployees = dangkyEmployees.length > 0 ? dangkyEmployees : employees;
+    if (!term) return list;
+    return list.filter((emp) => {
+      const name = removeVietnameseTones((emp.name || '').toLowerCase());
+      const pos = removeVietnameseTones((emp.position || '').toLowerCase());
+      const dept = removeVietnameseTones((emp.department || '').toLowerCase());
+      return name.includes(term) || pos.includes(term) || dept.includes(term);
+    });
+  }, [employees, searchTerm]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,26 +148,84 @@ export const RegistrationAssignModal: React.FC<RegistrationAssignModalProps> = (
             ))}
           </div>
 
-          {/* Chọn cán bộ */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Cán bộ phụ trách thụ lý <span className="text-red-500">*</span>
-            </label>
+          {/* Chọn cán bộ với Thanh tìm kiếm và Thẻ nhân sự trực quan */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <label className="font-bold text-slate-700 flex items-center gap-1.5">
+                <User size={15} className="text-blue-600" />
+                <span>Cán bộ phụ trách thụ lý: <span className="text-red-500">*</span></span>
+              </label>
+              <span className="text-slate-400 font-medium">
+                {dangkyEmployees.length} nhân sự
+              </span>
+            </div>
+
+            {/* Ô tìm kiếm nhanh nhân sự */}
             <div className="relative">
-              <User size={16} className="absolute left-3.5 top-3 text-slate-400" />
-              <select
-                value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
-                required
-              >
-                <option value="">-- Chọn cán bộ tiếp nhận hồ sơ --</option>
-                {displayEmployees.map((emp) => (
-                  <option key={emp.id} value={emp.name}>
-                    {emp.name} {emp.department ? `(${emp.department})` : ''}
-                  </option>
-                ))}
-              </select>
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm nhanh tên cán bộ, chức vụ, bộ phận..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              />
+            </div>
+
+            {/* Danh sách thẻ nhân sự có nút tròn Radio */}
+            <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+              {dangkyEmployees.length > 0 ? (
+                dangkyEmployees.map((emp) => {
+                  const isSelected = selectedEmployee === emp.name;
+                  return (
+                    <div
+                      key={emp.id}
+                      onClick={() => setSelectedEmployee(emp.name)}
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50/80 shadow-xs ring-1 ring-blue-400'
+                          : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {/* Nút radio tròn */}
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                            isSelected
+                              ? 'border-blue-600 bg-blue-600 text-white'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900">{emp.name}</span>
+                            <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                              {emp.department || 'Cấp giấy'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-500 block mt-0.5">
+                            {emp.position || 'Nhân viên'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isSelected && (
+                        <span className="text-[11px] font-bold text-blue-700 flex items-center gap-1">
+                          <Check size={14} />
+                          <span>Đã chọn</span>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-400">
+                  Không tìm thấy nhân sự phù hợp với từ khóa "{searchTerm}".
+                </div>
+              )}
             </div>
           </div>
 

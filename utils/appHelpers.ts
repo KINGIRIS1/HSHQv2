@@ -4,7 +4,7 @@ import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificat
 import { CAP_GIAY_STEP_ORDER, getCapGiayWorkflowStage } from './capGiayStateMachine';
 import { getDodacWorkflowStage } from './dodacStateMachine';
 import { getLuuTruWorkflowStage } from './luuTruStateMachine';
-import { calculateRegistrationDeadline, getRegistrationWorkflowCategory } from './registrationWorkflows';
+import { calculateRegistrationDeadline, getRegistrationWorkflowCategory, calculateRecordStepSla } from './registrationWorkflows';
 
 /**
  * Unified Workflow Stage Resolver for Dashboard, Report, Filter, KPI, SLA
@@ -107,123 +107,6 @@ export const DEFAULT_VISIBLE_COLUMNS = {
 };
 
 // --- CÁC HÀM CHECK LOGIC ---
-export interface RecordSlaDetails {
-  status: 'ontime' | 'approaching' | 'overdue' | 'paused' | 'completed';
-  text: string;
-  shortText: string;
-  isOverdue: boolean;
-  isApproaching: boolean;
-  isPaused: boolean;
-  hours: number;
-  minutes: number;
-  colorClass: string;
-}
-
-export const getRecordSlaDetails = (record: RecordFile): RecordSlaDetails => {
-  const completedStatuses = [
-    RecordStatus.HANDOVER,
-    RecordStatus.RETURNED,
-    RecordStatus.WITHDRAWN,
-    RecordStatus.REJECTED,
-    RecordStatus.SIGNED
-  ];
-
-  if (completedStatuses.includes(record.status) || record.exportDate || record.exportBatch || record.resultReturnedDate) {
-    return {
-      status: 'completed',
-      text: 'Đã hoàn thành',
-      shortText: 'Đã xong',
-      isOverdue: false,
-      isApproaching: false,
-      isPaused: false,
-      hours: 0,
-      minutes: 0,
-      colorClass: 'text-slate-500 font-semibold'
-    };
-  }
-
-  if (record.isSlaPaused) {
-    return {
-      status: 'paused',
-      text: 'Tạm dừng SLA',
-      shortText: 'Tạm dừng',
-      isOverdue: false,
-      isApproaching: false,
-      isPaused: true,
-      hours: 0,
-      minutes: 0,
-      colorClass: 'text-slate-500 font-semibold'
-    };
-  }
-
-  const deadline = parseSafeDate(record.deadline);
-  if (!deadline || isNaN(deadline.getTime())) {
-    return {
-      status: 'ontime',
-      text: 'Trong hạn',
-      shortText: 'Trong hạn',
-      isOverdue: false,
-      isApproaching: false,
-      isPaused: false,
-      hours: 0,
-      minutes: 0,
-      colorClass: 'text-emerald-600 font-semibold'
-    };
-  }
-
-  // End of working hours on deadline day if hours are 00:00
-  if (deadline.getHours() === 0 && deadline.getMinutes() === 0) {
-    deadline.setHours(17, 30, 0, 0);
-  }
-
-  const now = new Date();
-  const diffMs = deadline.getTime() - now.getTime();
-
-  if (diffMs < 0) {
-    const overdueMs = Math.abs(diffMs);
-    const totalMinutes = Math.floor(overdueMs / (1000 * 60));
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    const text = hours >= 1
-      ? `Quá hạn ${hours} giờ ${minutes > 0 ? `${minutes} phút` : ''}`.trim()
-      : `Quá hạn ${minutes} phút`;
-    const shortText = hours >= 1 ? `Quá hạn ${hours}h${minutes > 0 ? `${minutes}p` : ''}` : `Quá hạn ${minutes}p`;
-
-    return {
-      status: 'overdue',
-      text,
-      shortText,
-      isOverdue: true,
-      isApproaching: false,
-      isPaused: false,
-      hours,
-      minutes,
-      colorClass: 'text-red-600 font-bold'
-    };
-  } else {
-    const totalMinutes = Math.floor(diffMs / (1000 * 60));
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    const isApproaching = totalMinutes <= 24 * 60;
-    const text = isApproaching
-      ? `Sắp tới hạn (còn ${hours} giờ ${minutes > 0 ? `${minutes} phút` : ''})`.trim()
-      : `Còn ${hours} giờ ${minutes > 0 ? `${minutes} phút` : ''}`.trim();
-    const shortText = `Còn ${hours}h${minutes > 0 ? `${minutes}p` : ''}`;
-
-    return {
-      status: isApproaching ? 'approaching' : 'ontime',
-      text,
-      shortText,
-      isOverdue: false,
-      isApproaching,
-      isPaused: false,
-      hours,
-      minutes,
-      colorClass: isApproaching ? 'text-amber-500 font-bold' : 'text-emerald-600 font-bold'
-    };
-  }
-};
-
 export const isRecordOverdue = (record: RecordFile): boolean => {
   // 1. Kiểm tra trạng thái "Đã xong"
   const completedStatuses = [
@@ -237,8 +120,8 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
   if (completedStatuses.includes(record.status)) return false;
   
   // 2. [QUAN TRỌNG] Kiểm tra dữ liệu thực tế (Fix lỗi trạng thái chưa cập nhật)
-  // Nếu đã có ngày xuất (đã giao 1 cửa) hoặc đã có ngày trả kết quả -> Coi như đã xong -> Không quá hạn
-  if (record.exportDate || record.exportBatch || record.resultReturnedDate) {
+  // Nếu đã có ngày hoàn thành, ngày xuất (đã giao 1 cửa) hoặc đã có ngày trả kết quả -> Coi như đã xong -> Không quá hạn
+  if (record.completedDate || record.exportDate || record.exportBatch || record.resultReturnedDate) {
       return false;
   }
   
@@ -289,6 +172,10 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
   const diffTime = deadline.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays >= 0 && diffDays <= 3;
+};
+
+export const getRecordSlaDetails = (record: Partial<RecordFile>) => {
+  return calculateRecordStepSla(record);
 };
 
 // Chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -1522,10 +1409,16 @@ export interface StatusTransitionOptions {
         exportDate?: string | null;
         resultReturnedDate?: string | null;
         appraisalDate?: string | null;
+        postingDate?: string | null;
+        postingEndDate?: string | null;
         taxTransferDate?: string | null;
+        taxTransferAssignedDate?: string | null;
         taxKv7Date?: string | null;
         taxPaymentDate?: string | null;
+        taxNoticeDate?: string | null;
+        paymentReceiptDate?: string | null;
         printCertDate?: string | null;
+        printStaffAssignedAt?: string | null;
         pendingHandoverDate?: string | null;
         supplementRequestDate?: string | null;
         supplementReturnedDate?: string | null;
@@ -1652,7 +1545,7 @@ export function cleanFutureMilestoneDates(
         record.group === '3. Đăng ký đất đai, cấp GCN';
 
     if (isCapGiay) {
-        const cgRank = CAP_GIAY_STEP_ORDER[targetStatus] ?? 0;
+        const cgRank = CAP_GIAY_STEP_ORDER[targetStatus] ?? 1;
         if (targetStatus === RecordStatus.WITHDRAWN || targetStatus === RecordStatus.REJECTED) {
             cleaned.resultReturnedDate = null as any;
             cleaned.receiverName = null as any;
@@ -1660,49 +1553,93 @@ export function cleanFutureMilestoneDates(
             cleaned.returnedPrice = null as any;
             return cleaned;
         }
+
+        // Rank 11: RETURNED (Đã trả kết quả)
         if (cgRank < 11) {
             cleaned.resultReturnedDate = null as any;
             cleaned.receiverName = null as any;
             cleaned.receiptNumber = null as any;
             cleaned.returnedPrice = null as any;
+            cleaned.returnBatch = null as any;
+            cleaned.returnBatchDate = null as any;
+            cleaned.returnHandoverDept = null as any;
         }
+
+        // Rank 10: HANDOVER (Đã giao 1 cửa)
         if (cgRank < 10) {
             cleaned.completedDate = null as any;
             cleaned.exportDate = null as any;
             cleaned.exportBatch = null as any;
             cleaned.is_handover = false;
+            cleaned.isHandedOver = false;
             cleaned.handover_date = null as any;
             cleaned.handoverWard = null as any;
         }
+
+        // Rank 9: SIGNED / PENDING_HANDOVER (Đã ký duyệt / Chờ bàn giao)
         if (cgRank < 9) {
             cleaned.pendingHandoverDate = null as any;
+            cleaned.approvalDate = null as any;
         }
+
+        // Rank 8: PENDING_SIGN (Chờ ký duyệt / Trình ký)
         if (cgRank < 8) {
             cleaned.submissionDate = null as any;
             cleaned.submittedTo = null as any;
-            cleaned.approvalDate = null as any;
         }
+
+        // Rank 7: PENDING_CHECK (Chờ kiểm tra / Trình kiểm tra)
         if (cgRank < 7) {
             cleaned.pendingCheckDate = null as any;
             cleaned.checkedBy = null as any;
             cleaned.checkedDate = null as any;
         }
+
+        // Rank 6: PENDING_PRINT_CERT (Chờ In GCN)
         if (cgRank < 6) {
             cleaned.printCertDate = null as any;
+            cleaned.printStaff = null as any;
+            cleaned.printStaffId = null as any;
+            cleaned.printStaffAssignedAt = null as any;
+            cleaned.printDeadlineStartAt = null as any;
+            cleaned.printAssignmentStatus = null as any;
         }
+
+        // Rank 5: PENDING_TAX_PAYMENT / PENDING_TAX_NOTICE (Chờ Giấy nộp tiền / Thông báo thuế)
         if (cgRank < 5) {
             cleaned.taxPaymentDate = null as any;
+            cleaned.paymentReceiptDate = null as any;
+            cleaned.paymentReceivedAt = null as any;
+            cleaned.taxNoticeDate = null as any;
         }
+
+        // Rank 4: PENDING_TAX_KV7 (Chờ thuế khu vực 7)
         if (cgRank < 4) {
             cleaned.taxKv7Date = null as any;
         }
+
+        // Rank 3: TAX_TRANSFER (Chờ chuyển thuế)
         if (cgRank < 3) {
             cleaned.taxTransferDate = null as any;
+            cleaned.taxTransferAssignedDate = null as any;
+            cleaned.taxTransferStaff = null as any;
+            cleaned.taxStaff = null as any;
         }
+
+        // Rank 2.5: PENDING_POSTING (Chờ niêm yết)
+        if (cgRank < 2.5) {
+            cleaned.postingDate = null as any;
+            cleaned.postingEndDate = null as any;
+        }
+
+        // Rank 2: APPRAISAL (Chờ thẩm định)
         if (cgRank < 2) {
             cleaned.appraisalDate = null as any;
+            cleaned.appraisalStaff = null as any;
+            cleaned.assignedDate = null as any;
             cleaned.assignedTo = null as any;
         }
+
         return cleaned;
     }
 
@@ -1791,6 +1728,10 @@ export function syncRecordStatusTransition(
     const targetDate = options?.targetDate || new Date().toISOString();
     const updates: Partial<RecordFile> = { status: newStatus };
 
+    const isCapGiay = isCertificateRecordType(currentRecord.recordType || '') || 
+        (currentRecord as any).sourceTable === 'dangky_records' || 
+        currentRecord.group === '3. Đăng ký đất đai, cấp GCN';
+
     // Cập nhật người thực hiện nếu có truyền vào
     if (options?.assignedTo) updates.assignedTo = options.assignedTo;
     if (options?.checkedBy) updates.checkedBy = options.checkedBy;
@@ -1798,8 +1739,9 @@ export function syncRecordStatusTransition(
     if (options?.receivedBy) updates.receivedBy = options.receivedBy;
     if (options?.handoverWard) updates.handoverWard = options.handoverWard;
 
-    const newRank = STATUS_RANK[newStatus] ?? 0;
-    const prevRank = currentRecord.status ? (STATUS_RANK[currentRecord.status] ?? 0) : 0;
+    const rankTable = isCapGiay ? CAP_GIAY_STEP_ORDER : STATUS_RANK;
+    const newRank = rankTable[newStatus] ?? 0;
+    const prevRank = currentRecord.status ? (rankTable[currentRecord.status] ?? 0) : 0;
     const isRollback = prevRank > newRank;
     const isActuallyChangingStatus = prevStatus !== newStatus;
 
@@ -1851,12 +1793,15 @@ export function syncRecordStatusTransition(
             if (options?.assignedTo) updates.assignedTo = options.assignedTo;
         } else if (newStatus === RecordStatus.TAX_TRANSFER) {
             updates.taxTransferDate = options?.customDates?.taxTransferDate || currentRecord.taxTransferDate || effectiveTargetDate;
+            updates.taxTransferAssignedDate = options?.customDates?.taxTransferAssignedDate || currentRecord.taxTransferAssignedDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_TAX_KV7) {
             updates.taxKv7Date = options?.customDates?.taxKv7Date || currentRecord.taxKv7Date || effectiveTargetDate;
-        } else if (newStatus === RecordStatus.PENDING_TAX_PAYMENT) {
+        } else if (newStatus === RecordStatus.PENDING_TAX_PAYMENT || newStatus === RecordStatus.PENDING_TAX_NOTICE) {
             updates.taxPaymentDate = options?.customDates?.taxPaymentDate || currentRecord.taxPaymentDate || effectiveTargetDate;
+            updates.paymentReceiptDate = options?.customDates?.paymentReceiptDate || currentRecord.paymentReceiptDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_PRINT_CERT) {
             updates.printCertDate = options?.customDates?.printCertDate || currentRecord.printCertDate || effectiveTargetDate;
+            updates.printStaffAssignedAt = options?.customDates?.printStaffAssignedAt || currentRecord.printStaffAssignedAt || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_HANDOVER) {
             updates.pendingHandoverDate = options?.customDates?.pendingHandoverDate || currentRecord.pendingHandoverDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_SUPPLEMENT) {
@@ -1869,17 +1814,19 @@ export function syncRecordStatusTransition(
                 updates.checkedBy = options.checkedBy;
             }
             // Backfill survey tracking if missing
-            if (!currentRecord.surveyorId && (currentRecord.assignedTo || updates.assignedTo)) {
-                updates.surveyorId = currentRecord.assignedTo || updates.assignedTo;
-            }
-            if (!currentRecord.drafterId && (currentRecord.assignedTo || updates.assignedTo)) {
-                updates.drafterId = currentRecord.assignedTo || updates.assignedTo;
-            }
-            if (!currentRecord.fieldAssignedDate && (currentRecord.assignedDate || updates.assignedDate)) {
-                updates.fieldAssignedDate = currentRecord.assignedDate || updates.assignedDate;
-            }
-            if (!currentRecord.officeAssignedDate && (currentRecord.assignedDate || updates.assignedDate)) {
-                updates.officeAssignedDate = currentRecord.fieldCompletedDate || currentRecord.assignedDate || updates.assignedDate;
+            if (!isCapGiay) {
+                if (!currentRecord.surveyorId && (currentRecord.assignedTo || updates.assignedTo)) {
+                    updates.surveyorId = currentRecord.assignedTo || updates.assignedTo;
+                }
+                if (!currentRecord.drafterId && (currentRecord.assignedTo || updates.assignedTo)) {
+                    updates.drafterId = currentRecord.assignedTo || updates.assignedTo;
+                }
+                if (!currentRecord.fieldAssignedDate && (currentRecord.assignedDate || updates.assignedDate)) {
+                    updates.fieldAssignedDate = currentRecord.assignedDate || updates.assignedDate;
+                }
+                if (!currentRecord.officeAssignedDate && (currentRecord.assignedDate || updates.assignedDate)) {
+                    updates.officeAssignedDate = currentRecord.fieldCompletedDate || currentRecord.assignedDate || updates.assignedDate;
+                }
             }
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
             updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate || effectiveTargetDate;
@@ -1922,23 +1869,45 @@ export function syncRecordStatusTransition(
             }
             if (newRank >= 2) {
                 if (options.customDates.completedWorkDate) updates.completedWorkDate = options.customDates.completedWorkDate;
+                if (options.customDates.appraisalDate) updates.appraisalDate = options.customDates.appraisalDate;
             }
             if (newRank >= 3) {
-                if (options.customDates.pendingCheckDate) updates.pendingCheckDate = options.customDates.pendingCheckDate;
-                if (options.customDates.checkedDate) updates.checkedDate = options.customDates.checkedDate;
+                if (options.customDates.pendingCheckDate && !isCapGiay) updates.pendingCheckDate = options.customDates.pendingCheckDate;
+                if (options.customDates.checkedDate && !isCapGiay) updates.checkedDate = options.customDates.checkedDate;
+                if (options.customDates.taxTransferDate) updates.taxTransferDate = options.customDates.taxTransferDate;
             }
             if (newRank >= 4) {
-                if (options.customDates.submissionDate) updates.submissionDate = options.customDates.submissionDate;
+                if (options.customDates.submissionDate && !isCapGiay) updates.submissionDate = options.customDates.submissionDate;
+                if (options.customDates.taxKv7Date) updates.taxKv7Date = options.customDates.taxKv7Date;
             }
             if (newRank >= 5) {
-                if (options.customDates.approvalDate) updates.approvalDate = options.customDates.approvalDate;
+                if (options.customDates.approvalDate && !isCapGiay) updates.approvalDate = options.customDates.approvalDate;
+                if (options.customDates.taxPaymentDate) updates.taxPaymentDate = options.customDates.taxPaymentDate;
+                if (options.customDates.paymentReceiptDate) updates.paymentReceiptDate = options.customDates.paymentReceiptDate;
             }
             if (newRank >= 6) {
-                if (options.customDates.completedDate) updates.completedDate = options.customDates.completedDate;
-                if (options.customDates.exportDate) updates.exportDate = options.customDates.exportDate;
+                if (options.customDates.completedDate && !isCapGiay) updates.completedDate = options.customDates.completedDate;
+                if (options.customDates.exportDate && !isCapGiay) updates.exportDate = options.customDates.exportDate;
+                if (options.customDates.printCertDate) updates.printCertDate = options.customDates.printCertDate;
             }
             if (newRank >= 7) {
-                if (options.customDates.resultReturnedDate) updates.resultReturnedDate = options.customDates.resultReturnedDate;
+                if (options.customDates.resultReturnedDate && !isCapGiay) updates.resultReturnedDate = options.customDates.resultReturnedDate;
+                if (options.customDates.pendingCheckDate && isCapGiay) updates.pendingCheckDate = options.customDates.pendingCheckDate;
+                if (options.customDates.checkedDate && isCapGiay) updates.checkedDate = options.customDates.checkedDate;
+            }
+            if (newRank >= 8) {
+                if (options.customDates.submissionDate && isCapGiay) updates.submissionDate = options.customDates.submissionDate;
+            }
+            if (newRank >= 9) {
+                if (options.customDates.approvalDate && isCapGiay) updates.approvalDate = options.customDates.approvalDate;
+                if (options.customDates.pendingHandoverDate) updates.pendingHandoverDate = options.customDates.pendingHandoverDate;
+            }
+            if (newRank >= 10) {
+                if (options.customDates.completedDate && isCapGiay) updates.completedDate = options.customDates.completedDate;
+                if (options.customDates.exportDate && isCapGiay) updates.exportDate = options.customDates.exportDate;
+            }
+            if (newRank >= 11) {
+                if (options.customDates.resultReturnedDate && isCapGiay) updates.resultReturnedDate = options.customDates.resultReturnedDate;
             }
         }
     }

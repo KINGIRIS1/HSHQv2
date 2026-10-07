@@ -20,6 +20,7 @@ import { RegistrationStepHandoverModal, getStepHandoverConfig, StepHandoverConfi
 import { RegistrationWorkflowConfigModal } from './RegistrationWorkflowConfigModal';
 import { validateCapGiayTransition } from '../../utils/capGiayStateMachine';
 import { triggerGlobalAlert } from '../GlobalAlertModal';
+import { cleanFutureMilestoneDates } from '../../utils/appHelpers';
 import {
   getAppointmentInfo,
   calculateRegistrationDeadline,
@@ -149,8 +150,18 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
       autoDates.resultReturnedDate = today;
     }
 
+    // Dọn dẹp triệt để các mốc ngày tháng và phân công của các bước sau khi chuyển về bước trước
+    const cleanedMilestones = cleanFutureMilestoneDates(formData, newStatus);
+    const rollbackClearedFields: Record<string, any> = {};
+    Object.keys(cleanedMilestones).forEach(k => {
+      if ((cleanedMilestones as any)[k] === null || (cleanedMilestones as any)[k] === false) {
+        rollbackClearedFields[k] = (cleanedMilestones as any)[k];
+      }
+    });
+
     const updatedRecordData: RecordFile = {
       ...formData,
+      ...rollbackClearedFields,
       status: newStatus,
       statusLogs: [...(formData.statusLogs || []), newLog],
       ...autoDates,

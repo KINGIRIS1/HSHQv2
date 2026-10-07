@@ -49,24 +49,24 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 
   // Nhãn hiển thị cho Module Cấp giấy
   [RecordStatus.APPRAISAL]: 'Chờ thẩm định',
-  [RecordStatus.PENDING_POSTING]: 'Chờ niêm yết (30 ngày)',
+  [RecordStatus.PENDING_POSTING]: 'Chờ niêm yết',
   [RecordStatus.TAX_TRANSFER]: 'Chờ chuyển thuế',
   [RecordStatus.PENDING_TAX_KV7]: 'Chờ thuế khu vực 7',
   [RecordStatus.PENDING_TAX_NOTICE]: 'Chờ Thông báo thuế',
   [RecordStatus.PENDING_TAX_PAYMENT]: 'Chờ Giấy nộp tiền',
-  [RecordStatus.PENDING_PRINT_CERT]: 'Chờ in giấy chứng nhận',
+  [RecordStatus.PENDING_PRINT_CERT]: 'Chờ in GCN',
   [RecordStatus.PENDING_HANDOVER]: 'Chờ bàn giao',
 };
 
 export const CAP_GIAY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận hồ sơ' },
   { key: RecordStatus.APPRAISAL, label: 'Chờ thẩm định' },
-  { key: RecordStatus.PENDING_POSTING, label: 'Niêm yết tại xã (30 ngày)' },
+  { key: RecordStatus.PENDING_POSTING, label: 'Chờ niêm yết' },
   { key: RecordStatus.TAX_TRANSFER, label: 'Chờ chuyển thuế' },
   { key: RecordStatus.PENDING_TAX_KV7, label: 'Chờ thuế khu vực 7' },
   { key: RecordStatus.PENDING_TAX_NOTICE, label: 'Chờ thông báo thuế' },
   { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Chờ giấy nộp tiền' },
-  { key: RecordStatus.PENDING_PRINT_CERT, label: 'Chờ in giấy chứng nhận' },
+  { key: RecordStatus.PENDING_PRINT_CERT, label: 'Chờ in GCN' },
   { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
   { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
   { key: RecordStatus.PENDING_HANDOVER, label: 'Chờ bàn giao' },
