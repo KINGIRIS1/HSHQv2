@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Database, Copy } from 'lucide-react';
+import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Database, Copy, Upload } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User, UserRole } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
@@ -11,6 +10,7 @@ import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 import { DuplicateRemovalTab } from './utilities/DuplicateRemovalTab';
 import { SyncDiagnosticTab } from './utilities/SyncDiagnosticTab';
+import { BackupSyncTab } from './utilities/BackupSyncTab';
 import ExcerptManagement from './ExcerptManagement';
 
 interface UtilitiesViewProps {
@@ -49,7 +49,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
 }) => {
   const isSotltdAllowed = isViewAllowedForUser(currentUser, employees || [], 'excerpt_management');
 
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'loctrung' | 'dongbo'>(
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'loctrung' | 'dongbo' | 'backupsync'>(
       isSotltdAllowed ? 'sotltd' : 'bienban'
   );
   const [defaultExportPath, setDefaultExportPath] = useState('');
@@ -188,9 +188,15 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               >
                   <Database size={16} /> Kiểm tra đồng bộ CSDL
               </button>
+              <button 
+                  onClick={() => setActiveTab('backupsync')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'backupsync' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                  <Upload size={16} /> Đồng bộ Backup JSON
+              </button>
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && activeTab !== 'dongbo' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && activeTab !== 'dongbo' && activeTab !== 'backupsync' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -281,6 +287,16 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                   onRefreshData={onRefreshData}
                   onSaveRecord={onSaveRecord}
                   onBatchUpdateRecords={onBatchUpdateRecords}
+              />
+          </div>
+
+          {/* TAB 11: ĐỒNG BỘ GIA TĂNG TỪ FILE BACKUP JSON (BackupSynchronizer) */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'backupsync' ? 'block' : 'hidden'}`}>
+              <BackupSyncTab
+                  records={records}
+                  currentUser={currentUser}
+                  notify={notify}
+                  onRefreshData={onRefreshData}
               />
           </div>
       </div>
