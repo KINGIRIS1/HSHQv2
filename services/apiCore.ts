@@ -398,10 +398,42 @@ export const keepOnlyDateTime = (val: any): string | null => {
     return null;
 };
 
+export const getVietnamDateString = (input?: Date | number | string): string => {
+    try {
+        const d = input !== undefined ? new Date(input) : new Date();
+        if (isNaN(d.getTime())) {
+            return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+        }
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(d);
+        const y = parts.find(p => p.type === 'year')?.value;
+        const m = parts.find(p => p.type === 'month')?.value;
+        const day = parts.find(p => p.type === 'day')?.value;
+        if (y && m && day) return `${y}-${m}-${day}`;
+        return new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } catch {
+        return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+    }
+};
+
 export const isBlankRecord = (r: any): boolean => {
     if (!r) return true;
-    const customerName = String(r.customerName || '').trim().toLowerCase();
-    const content = String(r.content || '').trim().toLowerCase();
+    const rawId = String(r.id || '').trim();
+    const rawCode = String(r.code || r.so_hieu || '').trim();
+    const hasValidBusinessCode = Boolean(
+        rawCode &&
+        rawCode !== rawId &&
+        rawCode.toLowerCase() !== 'null' &&
+        rawCode.toLowerCase() !== 'undefined' &&
+        rawCode !== '--'
+    );
+
+    const customerName = String(r.customerName || r.noi_nhan_gui || '').trim().toLowerCase();
+    const content = String(r.content || r.trich_yeu || '').trim().toLowerCase();
     const address = String(r.address || r.customerAddress || '').trim().toLowerCase();
     const phone = String(r.phoneNumber || '').trim();
     const cccd = String(r.cccd || '').trim();
@@ -426,7 +458,11 @@ export const isBlankRecord = (r: any): boolean => {
     const hasNoLandInfo = (!landPlot || landPlot === '0') && (!mapSheet || mapSheet === '0');
     const hasNoDetails = !phone && !cccd && !address && !issueNum && !entryNum && !notes && (!content || content.length < 3) && !receivedBy;
 
-    return isInvalidCustomer && hasNoLandInfo && hasNoDetails;
+    if (hasValidBusinessCode && (!isInvalidCustomer || !hasNoLandInfo || !hasNoDetails || Boolean(r.exportBatch) || Boolean(r.ward))) {
+        return false;
+    }
+
+    return isInvalidCustomer && hasNoLandInfo && hasNoDetails && !hasValidBusinessCode;
 };
 
 export const sanitizeData = (data: any, allowedColumns: string[]) => {

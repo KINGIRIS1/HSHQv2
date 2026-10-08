@@ -255,38 +255,45 @@ export const getExplicitGroup = (record: Partial<RecordFile>): 'dangky_records' 
     const shortType = getShortRecordType(rawType);
     const groupStr = String(record.group || '').trim();
 
-    // 1. ƯU TIÊN TUYỆT ĐỐI 1: Mã thủ tục (recordType hoặc content)
-    if (shortType.startsWith('1.') || isArchiveRecordType(rawType)) {
-        return 'luutru_records';
-    }
-    if (shortType.startsWith('2.') || isSurveyRecordType(rawType)) {
-        return 'land_records';
-    }
-    if (shortType.startsWith('3.') || isCertificateRecordType(rawType)) {
-        return 'dangky_records';
+    // 1. ƯU TIÊN TUYỆT ĐỐI 1: Mã thủ tục (recordType hoặc content) - CHỈ kiểm tra khi rawType không rỗng
+    if (rawType.length > 0) {
+        if (shortType.startsWith('1.') || isArchiveRecordType(rawType)) {
+            return 'luutru_records';
+        }
+        if (shortType.startsWith('2.') || isSurveyRecordType(rawType)) {
+            return 'land_records';
+        }
+        if (shortType.startsWith('3.') || isCertificateRecordType(rawType)) {
+            return 'dangky_records';
+        }
     }
 
     // 2. ƯU TIÊN 2: Nhóm nghiệp vụ (group)
-    if (/^1\./i.test(groupStr) || groupStr.toLowerCase().includes('lưu trữ')) {
-        return 'luutru_records';
-    }
-    if (/^2\./i.test(groupStr) || groupStr.includes('Đo đạc')) {
-        return 'land_records';
-    }
-    if (/^3\./i.test(groupStr) || groupStr.includes('Đăng ký') || groupStr.includes('Cấp GCN') || groupStr.includes('Cấp giấy')) {
-        return 'dangky_records';
+    if (groupStr.length > 0) {
+        if (/^1\./i.test(groupStr) || groupStr.toLowerCase().includes('lưu trữ')) {
+            return 'luutru_records';
+        }
+        if (/^2\./i.test(groupStr) || groupStr.includes('Đo đạc')) {
+            return 'land_records';
+        }
+        if (/^3\./i.test(groupStr) || groupStr.includes('Đăng ký') || groupStr.includes('Cấp GCN') || groupStr.includes('Cấp giấy')) {
+            return 'dangky_records';
+        }
     }
 
     // 3. ƯU TIÊN 3: Tiền tố mã CODE chỉ dùng khi hồ sơ hoàn toàn không có Mã thủ tục
-    const code = String(record.code || '').trim();
-    if (/^1\.\d+/i.test(code) || code.toUpperCase().startsWith('LT-')) {
-        return 'luutru_records';
-    }
-    if (/^2\.\d+/i.test(code) || code.toUpperCase().startsWith('DD-') || code.toUpperCase().startsWith('TK-') || code.toUpperCase().startsWith('TQ-') || code.toUpperCase().startsWith('MD-') || code.toUpperCase().startsWith('TH-')) {
-        return 'land_records';
-    }
-    if (/^3\.\d+/i.test(code) || code.toUpperCase().startsWith('CG-')) {
-        return 'dangky_records';
+    const code = String(record.code || (record as any).so_hieu || '').trim();
+    if (code.length > 0) {
+        const upperCode = code.toUpperCase();
+        if (/^1\.\d+/i.test(code) || upperCode.startsWith('LT-')) {
+            return 'luutru_records';
+        }
+        if (/^2\.\d+/i.test(code) || upperCode.startsWith('DD-') || upperCode.startsWith('TK-') || upperCode.startsWith('TQ-') || upperCode.startsWith('MD-') || upperCode.startsWith('TH-')) {
+            return 'land_records';
+        }
+        if (/^3\.\d+/i.test(code) || upperCode.startsWith('CG-') || upperCode.startsWith('DK-') || upperCode.startsWith('H19.')) {
+            return 'dangky_records';
+        }
     }
 
     return null;
@@ -306,39 +313,44 @@ export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' 
     const shortType = getShortRecordType(rawType);
     const groupStr = String(record.group || '').trim();
 
-    // 1. Nhóm Lưu trữ
-    if (
-        shortType.startsWith('1.') ||
-        isArchiveRecordType(record.recordType) ||
-        isArchiveRecordType(record.content) ||
-        rawType.toLowerCase().includes('sao lục') ||
-        rawType.toLowerCase().includes('công văn')
-    ) {
-        return 'luutru_records';
+    if (rawType.length > 0) {
+        // 1. Nhóm Lưu trữ
+        if (
+            shortType.startsWith('1.') ||
+            (record.recordType && isArchiveRecordType(record.recordType)) ||
+            (record.content && isArchiveRecordType(record.content)) ||
+            rawType.toLowerCase().includes('sao lục') ||
+            rawType.toLowerCase().includes('công văn')
+        ) {
+            return 'luutru_records';
+        }
+
+        // 2. Nhóm Đo đạc (2.x)
+        if (
+            shortType.startsWith('2.') ||
+            (record.recordType && isSurveyRecordType(record.recordType)) ||
+            (record.content && isSurveyRecordType(record.content)) ||
+            rawType.toLowerCase().includes('trích lục') ||
+            rawType.toLowerCase().includes('trích đo') ||
+            rawType.toLowerCase().includes('cắm mốc') ||
+            rawType.toLowerCase().includes('số thửa')
+        ) {
+            return 'land_records';
+        }
+
+        // 3. Nhóm Đăng ký / Cấp giấy (3.x)
+        if (
+            shortType.startsWith('3.') ||
+            isCertificateRecordType(rawType)
+        ) {
+            return 'dangky_records';
+        }
     }
 
-    // 2. Nhóm Đo đạc (2.x)
-    if (
-        shortType.startsWith('2.') ||
-        isSurveyRecordType(record.recordType) ||
-        isSurveyRecordType(record.content) ||
-        groupStr.includes('Đo đạc') ||
-        rawType.toLowerCase().includes('trích lục') ||
-        rawType.toLowerCase().includes('trích đo') ||
-        rawType.toLowerCase().includes('cắm mốc') ||
-        rawType.toLowerCase().includes('số thửa')
-    ) {
+    if (groupStr.includes('Đo đạc')) {
         return 'land_records';
     }
-
-    // 3. Nhóm Đăng ký / Cấp giấy (3.x)
-    if (
-        shortType.startsWith('3.') ||
-        isCertificateRecordType(record) ||
-        groupStr.includes('Đăng ký') ||
-        groupStr.includes('Cấp GCN') ||
-        groupStr.includes('Cấp giấy')
-    ) {
+    if (groupStr.includes('Đăng ký') || groupStr.includes('Cấp GCN') || groupStr.includes('Cấp giấy')) {
         return 'dangky_records';
     }
 
@@ -354,14 +366,21 @@ export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' 
         return 'dangky_records';
     }
 
-    // Tra cứu nhanh từ Cache nếu không có recordType
+    // Tra cứu nhanh từ Cache hoặc MOCK_RECORDS nếu không có recordType trực tiếp
     if (record.id || record.code) {
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
-        const found = cached.find(r => (record.id && r.id === record.id) || (record.code && r.code === record.code));
+        const found = cached.find(r => (record.id && r.id === record.id) || (record.code && r.code === record.code))
+            || MOCK_RECORDS.find(r => (record.id && r.id === record.id) || (record.code && r.code === record.code));
         if (found) {
             if (found.recordType || found.content || found.group) {
                 const inferredFromFound = getInferredTable({ ...found, id: undefined, code: undefined });
                 if (inferredFromFound) return inferredFromFound;
+            }
+            if (found.sourceTable === 'dangky_records' || found.sourceTable === 'land_records' || found.sourceTable === 'luutru_records') {
+                return found.sourceTable;
+            }
+            if ((found.sourceTable as string) === 'archive_records') {
+                return 'luutru_records';
             }
         }
     }
@@ -370,7 +389,11 @@ export const getInferredTable = (record: Partial<RecordFile>): 'dangky_records' 
 };
 
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
-    const normalizeSource = (s?: string) => {
+    if (!record) {
+        throw new Error('RECORD_ROUTING_ERROR: Record is null or undefined');
+    }
+
+    const normalizeSource = (s?: string | null) => {
         if (s === 'archive_records') return 'luutru_records';
         if (s === 'dangky_records' || s === 'land_records' || s === 'luutru_records') return s;
         return null;
@@ -378,7 +401,7 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
 
     const validSource = normalizeSource(record.sourceTable);
 
-    // ƯU TIÊN 1: Phân loại theo Mã thủ tục
+    // ƯU TIÊN 1: Phân loại theo Mã thủ tục / Nhóm nghiệp vụ (1.x -> luutru_records, 2.x -> land_records, 3.x -> dangky_records)
     const explicitGroup = getExplicitGroup(record);
     const inferredGroup = explicitGroup || getInferredTable(record);
 
@@ -391,9 +414,56 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         return validSource;
     }
 
-    // ƯU TIÊN 3: Fallback an toàn về 'land_records' (Đo đạc), ngăn chặn hoàn toàn lỗi chặn lưu hồ sơ
-    console.warn(`[ROUTING_GUARD] Defaulting to land_records for record without clear procedure code:`, record.code || record.id);
-    return 'land_records';
+    // TUYỆT ĐỐI KHÔNG tự ý đoán 'land_records' rồi xóa/ghi đè bản ghi cũ khi mất thông tin định tuyến
+    console.error(`[ROUTING_GUARD][RECORD_ROUTING_ERROR] Cannot determine target table for record:`, {
+        id: record.id,
+        code: record.code,
+        recordType: record.recordType,
+        group: record.group,
+        sourceTable: record.sourceTable
+    });
+    throw new Error(`RECORD_ROUTING_ERROR: Không xác định được bảng dữ liệu đích cho hồ sơ (ID: ${record.id || 'N/A'}, Code: ${record.code || 'N/A'})`);
+};
+
+export interface DeleteGuardOptions {
+    isAuthorizedBusinessDelete?: boolean;
+    user?: string;
+    caller?: string;
+}
+
+/**
+ * Bảo vệ chống xóa nhầm hồ sơ ở trạng thái "Đã giao 1 cửa" (RecordStatus.HANDOVER).
+ * Hồ sơ nghiệp vụ không có ngày hết hạn; mọi thao tác xóa tự động/cleanup/trái phép đều bị chặn.
+ */
+export const assertCanDeleteRecord = (
+    record: any,
+    options?: DeleteGuardOptions
+): void => {
+    if (!record) return;
+    const rawStatus = String(record.status || '').trim();
+    const upperStatus = rawStatus.toUpperCase();
+    const isHandoverStatus =
+        record.status === RecordStatus.HANDOVER ||
+        upperStatus === 'HANDOVER' ||
+        upperStatus === 'COMPLETED' ||
+        upperStatus === 'HANDED_OVER' ||
+        upperStatus === 'GIAO_1_CUA' ||
+        rawStatus === 'Đã giao 1 cửa';
+
+    if (isHandoverStatus && !options?.isAuthorizedBusinessDelete) {
+        const logPayload = {
+            recordId: record.id || null,
+            code: record.code || (record as any).so_hieu || null,
+            recordType: record.recordType || (record as any).type || null,
+            sourceTable: record.sourceTable || null,
+            status: record.status || 'Đã giao 1 cửa',
+            user: options?.user || 'system',
+            timestamp: new Date().toISOString(),
+            caller: options?.caller || 'unknown'
+        };
+        console.error('[CRITICAL_DATA_DELETE_BLOCKED]', logPayload);
+        throw new Error(`PROTECTED_HANDOVER_RECORD_DELETE: Chặn thao tác xóa hồ sơ ở trạng thái Đã giao 1 cửa (ID: ${logPayload.recordId}, Code: ${logPayload.code})`);
+    }
 };
 
 /**
@@ -621,8 +691,8 @@ export const resolveRecordRouting = (
     } else if (
         /^2\.\d+/i.test(rawType) || 
         /^2\./i.test(rawPCode) || 
-        isSurveyRecordType(rawType) || 
-        (record.content && isSurveyRecordType(record.content))
+        (rawType.length > 0 && isSurveyRecordType(rawType)) || 
+        Boolean(record.content && String(record.content).trim().length > 0 && isSurveyRecordType(record.content))
     ) {
         moduleName = 'DO_DAC';
         expectedTable = 'land_records';
@@ -647,6 +717,27 @@ export const resolveRecordRouting = (
         expectedTable = 'dangky_records';
     }
 
+    // 5. Priority 5: Inferred table from group/department/cache or explicit valid sourceTable
+    if (!expectedTable) {
+        const inferred = getInferredTable(record);
+        if (inferred) {
+            expectedTable = inferred;
+            moduleName = inferred === 'luutru_records' ? 'LUU_TRU' : inferred === 'land_records' ? 'DO_DAC' : 'DANG_KY';
+        } else {
+            const rawSrc = record.sourceTable;
+            if (rawSrc === 'archive_records' || rawSrc === 'luutru_records') {
+                expectedTable = 'luutru_records';
+                moduleName = 'LUU_TRU';
+            } else if (rawSrc === 'land_records') {
+                expectedTable = 'land_records';
+                moduleName = 'DO_DAC';
+            } else if (rawSrc === 'dangky_records') {
+                expectedTable = 'dangky_records';
+                moduleName = 'DANG_KY';
+            }
+        }
+    }
+
     const hasMissingProcedureCode = !rawPCode;
 
     if (!expectedTable) {
@@ -656,15 +747,15 @@ export const resolveRecordRouting = (
             prefix: matchedPrefix,
             procedureCode: rawPCode,
             module: 'UNRESOLVED',
-            expectedTable: (actualTable as any) || 'dangky_records',
+            expectedTable: (actualTable as any) || ('UNRESOLVED' as any),
             actualTable,
             routingStatus: 'ROUTING_UNRESOLVED',
             hasMissingProcedureCode,
-            routingReason: 'Cannot resolve expected table from code prefix, procedureCode, or recordType'
+            routingReason: 'RECORD_ROUTING_ERROR: Cannot resolve expected table from code prefix, procedureCode, recordType, or sourceTable'
         };
     }
 
-    let routingStatus: 'ROUTING_VALID' | 'ROUTING_CONFLICT' | 'ROUTING_UNRESOLVED' = 'ROUTING_VALID';
+    let routingStatus: 'ROUTING_VALID' | 'ROUTING_UNRESOLVED' | 'ROUTING_CONFLICT' = 'ROUTING_VALID';
     let routingReason = '';
 
     if (actualTable && actualTable !== expectedTable) {
@@ -732,8 +823,13 @@ export const validateRecordRouting = (
     const targetTable = routingResult.expectedTable;
 
     if (routingResult.status === 'ROUTING_CONFLICT') {
-        console.error(`[ROUTING] recordId=${record.id || 'N/A'} procedure=${routingResult.procedureCode} expectedTable=${routingResult.expectedTable} actualTable=${targetTableToMutate} decision=BLOCK reason=${routingResult.reason}`);
-        throw new Error(`ROUTING_CONFLICT: Record procedure '${routingResult.procedureCode}' expects '${routingResult.expectedTable}' but target table is specified as '${targetTableToMutate}'. Mutation blocked.`);
+        console.error(`[ROUTING] recordId=${record?.id || 'N/A'} procedure=${routingResult.procedureCode} expectedTable=${routingResult.expectedTable} actualTable=${targetTableToMutate} decision=BLOCK reason=${routingResult.reason}`);
+        throw new Error(`RECORD_ROUTING_ERROR: ROUTING_CONFLICT: Record procedure '${routingResult.procedureCode}' expects '${routingResult.expectedTable}' but target table is specified as '${targetTableToMutate}'. Mutation blocked.`);
+    }
+
+    if (routingResult.status === 'ROUTING_UNRESOLVED' || !['dangky_records', 'land_records', 'luutru_records'].includes(targetTable)) {
+        console.error(`[ROUTING] recordId=${record?.id || 'N/A'} code=${record?.code || 'N/A'} decision=BLOCK reason=RECORD_ROUTING_ERROR`);
+        throw new Error(`RECORD_ROUTING_ERROR: Không xác định được bảng dữ liệu cho hồ sơ (ID: ${record?.id || 'N/A'}, Code: ${record?.code || 'N/A'})`);
     }
 
     return {
@@ -744,93 +840,26 @@ export const validateRecordRouting = (
 };
 
 /**
- * Tự động xóa bản ghi trùng lặp ở các bảng sai (loại bỏ hoàn toàn lưu sai bảng / đa bảng)
- * TUYỆT ĐỐI TUÂN THỦ: Chỉ xóa khi có bằng chứng rõ ràng (cùng ID/mã, đã xác nhận tồn tại ở keepTable, không phải 2 hồ sơ nghiệp vụ khác nhau)
+ * [DATA INTEGRITY POLICY]: Vô hiệu hóa hoàn toàn việc tự động xóa chéo giữa các bảng (cross-table DELETE).
+ * Hồ sơ nghiệp vụ ở bất kỳ bảng nào đều không bao giờ bị xóa ngầm bởi thao tác lưu ở bảng khác.
  */
 export const purgeRecordFromOtherTables = async (
-    id?: string,
-    code?: string,
-    keepTable?: 'dangky_records' | 'land_records' | 'luutru_records'
+    _id?: string,
+    _code?: string,
+    _keepTable?: 'dangky_records' | 'land_records' | 'luutru_records'
 ) => {
-    if (!isConfigured || (!id && !code) || !keepTable) return;
-
-    const safeId = id && isValidUUID(id) ? id.trim() : null;
-    const safeCode = code && code.trim().length > 3 && !code.includes('?') ? code.trim() : null;
-
-    if (!safeId && !safeCode) return;
-
-    try {
-        // 1. Kiểm tra xác nhận bản ghi mục tiêu đã thực sự tồn tại trong keepTable
-        let query = supabase.from(keepTable).select('id, code, customerName');
-        if (safeId) query = query.eq('id', safeId);
-        else if (safeCode) query = query.eq('code', safeCode);
-
-        const { data: keepData, error: keepErr } = await query.limit(1);
-        if (keepErr || !keepData || keepData.length === 0) {
-            console.warn(`[PURGE_GUARD] Aborting purge: Record not confirmed in keepTable ${keepTable} (ID: ${safeId}, Code: ${safeCode}).`);
-            return;
-        }
-
-        const keepRecord = keepData[0];
-        const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
-        const otherTables = allTables.filter(t => t !== keepTable);
-
-        for (const tbl of otherTables) {
-            let otherQuery = supabase.from(tbl).select('id, code, customerName');
-            if (safeId) otherQuery = otherQuery.eq('id', safeId);
-            else if (safeCode) otherQuery = otherQuery.eq('code', safeCode);
-
-            const { data: otherData } = await otherQuery.limit(1);
-            if (otherData && otherData.length > 0) {
-                const otherRecord = otherData[0];
-                const isExactSameId = safeId && otherRecord.id === safeId;
-                const isSameCustomer = (otherRecord.customerName && keepRecord.customerName && otherRecord.customerName.trim().toLowerCase() === keepRecord.customerName.trim().toLowerCase());
-                
-                if (isExactSameId || isSameCustomer) {
-                    console.log(`[PURGE_GUARD] Purging confirmed duplicate record from ${tbl} (ID: ${otherRecord.id}, Code: ${otherRecord.code})`);
-                    await supabase.from(tbl).delete().eq('id', otherRecord.id);
-                } else {
-                    console.warn(`[PURGE_GUARD] Preserving record in ${tbl} with code ${safeCode} because it appears to be a distinct business record from keepTable ${keepTable}.`);
-                }
-            }
-        }
-    } catch (e) {
-        console.warn(`[PURGE_GUARD] Error during verified purge check:`, e);
-    }
+    return;
 };
 
 /**
- * Xóa hàng loạt bản ghi trùng lặp ở các bảng khác
+ * [DATA INTEGRITY POLICY]: Vô hiệu hóa hoàn toàn việc tự động xóa hàng loạt chéo giữa các bảng (cross-table batch DELETE).
  */
 export const purgeBatchFromOtherTables = async (
-    ids: string[],
-    codes: string[],
-    keepTable: 'dangky_records' | 'land_records' | 'luutru_records'
+    _ids: string[],
+    _codes: string[],
+    _keepTable: 'dangky_records' | 'land_records' | 'luutru_records'
 ) => {
-    if (!isConfigured || !keepTable || !ids || ids.length === 0) return;
-    const validIds = ids.filter(id => id && isValidUUID(id));
-    if (validIds.length === 0) return;
-
-    try {
-        const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
-        const otherTables = allTables.filter(t => t !== keepTable);
-
-        // Chỉ xóa khi ID chính xác trùng nhau và đã được xác nhận lưu vào keepTable
-        for (const tbl of otherTables) {
-            const CHUNK = 100;
-            for (let i = 0; i < validIds.length; i += CHUNK) {
-                const chunkIds = validIds.slice(i, i + CHUNK);
-                const { data } = await supabase.from(tbl).select('id').in('id', chunkIds);
-                if (data && data.length > 0) {
-                    const duplicateIds = data.map((d: any) => d.id);
-                    await supabase.from(tbl).delete().in('id', duplicateIds);
-                    console.log(`[PURGE_GUARD] Purged ${duplicateIds.length} confirmed duplicate IDs from ${tbl}.`);
-                }
-            }
-        }
-    } catch (e) {
-        console.warn(`[PURGE_GUARD] Error during batch verified purge:`, e);
-    }
+    return;
 };
 
 const OPTIONAL_NEW_COLUMNS = [
@@ -1000,46 +1029,57 @@ export const fetchRecords = async (onProgress?: TierProgressCallback, forceRefre
             fetchTableRecords('luutru_records')
         ]);
 
-        // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào dangky_records (ví dụ hồ sơ Đo đạc 2.x)
+        // Kiểm tra chẩn đoán các hồ sơ có thể bị phân nhầm bảng (chỉ cảnh báo log, tuyệt đối không xóa/di chuyển)
         const misplacedInDangky = dangky
             .map(mapRecordFromDb)
-            .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'dangky_records');
+            .filter((r): r is RecordFile => {
+                if (!r) return false;
+                const inf = getInferredTable(r);
+                return Boolean(inf && inf !== 'dangky_records');
+            });
 
-        // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào land_records (ví dụ hồ sơ Lưu trữ 1.x / mã LT-)
         const misplacedInLand = land
             .map(mapRecordFromDb)
-            .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'land_records');
-
-        // Tự động phát hiện các dòng hoàn toàn trống rác trong land_records, dangky_records, luutru_records
-        const blankInLandIds = new Set(
-            land.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
-        );
-        const blankInDangkyIds = new Set(
-            dangky.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
-        );
-        const blankInLuutruIds = new Set(
-            luutru.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
-        );
-        const allBlankIds = new Set([...blankInLandIds, ...blankInDangkyIds, ...blankInLuutruIds]);
+            .filter((r): r is RecordFile => {
+                if (!r) return false;
+                const inf = getInferredTable(r);
+                return Boolean(inf && inf !== 'land_records');
+            });
 
         if (misplacedInDangky.length > 0 || misplacedInLand.length > 0) {
             console.warn(`⚠️ [Fetch Warning] Phát hiện ${misplacedInDangky.length} hồ sơ có thể sai bảng ở dangky_records, ${misplacedInLand.length} ở land_records. Giữ nguyên dữ liệu, không tự động di chuyển hoặc xóa.`);
         }
         
+        // TUYỆT ĐỐI KHÔNG gộp blankIds chéo giữa các bảng (tránh dòng trống ở luutru_records làm ẩn hồ sơ thật ở land_records / dangky_records)
         const rawList = [...dangky, ...land, ...luutru];
         const currentTime = Date.now();
         rawList.forEach(item => {
             const mapped = mapRecordFromDb(item);
-            if (mapped && mapped.id && !allBlankIds.has(mapped.id)) {
-                const recent = RECENTLY_UPDATED_RECORDS.get(mapped.id);
-                if (recent && (currentTime - recent.updatedAt < 60000)) {
-                    console.log(`[SYNC] Record: ${mapped.code || mapped.id}`);
-                    console.log(`[SYNC] Server status: ${mapped.status}`);
-                    console.log(`[SYNC] Protection active (Client recent status: ${recent.record.status}). Keeping recent status.`);
-                    uniqueMap.set(mapped.id, { ...mapped, ...recent.record });
-                } else {
-                    uniqueMap.set(mapped.id, mapped);
+            if (!mapped || !mapped.id || isBlankRecord(mapped)) return;
+
+            // Nếu ID đã tồn tại từ một bảng trước đó, ưu tiên bản ghi nằm đúng bảng nghiệp vụ (authoritative table) và đầy đủ thông tin
+            const existing = uniqueMap.get(mapped.id);
+            if (existing) {
+                const existingAuthTable = getInferredTable(existing);
+                const mappedAuthTable = getInferredTable(mapped);
+                const existingIsAuthoritative = existingAuthTable && existing.sourceTable === existingAuthTable;
+                const mappedIsAuthoritative = mappedAuthTable && mapped.sourceTable === mappedAuthTable;
+                if (existingIsAuthoritative && !mappedIsAuthoritative) {
+                    return;
                 }
+                if (existing.customerName && !mapped.customerName) {
+                    return;
+                }
+            }
+
+            const recent = RECENTLY_UPDATED_RECORDS.get(mapped.id);
+            if (recent && (currentTime - recent.updatedAt < 60000)) {
+                console.log(`[SYNC] Record: ${mapped.code || mapped.id}`);
+                console.log(`[SYNC] Server status: ${mapped.status}`);
+                console.log(`[SYNC] Protection active (Client recent status: ${recent.record.status}). Keeping recent status.`);
+                uniqueMap.set(mapped.id, { ...mapped, ...recent.record });
+            } else {
+                uniqueMap.set(mapped.id, mapped);
             }
         });
 
@@ -1756,42 +1796,9 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
                     console.log(`[MUTATION][IDEMPOTENT] Record ID ${record.id} already matched in ${targetTable}.`);
                     data = existInTarget;
                 } else {
-                    // Kiểm tra nếu tồn tại ở bảng khác -> Báo lỗi ROUTING_DATA_INTEGRITY_ERROR, TUYỆT ĐỐI KHÔNG AUTO-MIGRATE
-                    const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
-                    let foundOther: string | null = null;
-                    for (const ot of otherTables) {
-                        try {
-                            const { data: otCheck } = await supabase.from(ot).select('id').eq('id', record.id).maybeSingle();
-                            if (otCheck && otCheck.id) {
-                                foundOther = ot;
-                                break;
-                            }
-                        } catch (e) {}
-                    }
-
-                    if (foundOther) {
-                        console.warn(`[AUTO_MIGRATION] Record ID ${record.id} found in ${foundOther}, but update requested for ${targetTable}. Performing safe migration...`);
-                        await supabase.from(foundOther).delete().eq('id', record.id);
-                        const sanitized = sanitizeRecordPayloadForTable(record, targetTable);
-                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
-                        if (insRes.data && insRes.data.length > 0) {
-                            data = insRes.data;
-                            console.log(`[AUTO_MIGRATION] Successfully migrated record ID ${record.id} from ${foundOther} to ${targetTable}`);
-                        } else {
-                            throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${record.id} exists in ${foundOther}. Auto-migration to ${targetTable} failed.`);
-                        }
-                    } else {
-                        console.warn(`[AUTO_UPSERT_MISSING] Record ID ${record.id} not found in any table. Performing upsert into ${targetTable}...`);
-                        const sanitized = sanitizeRecordPayloadForTable(record, targetTable);
-                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
-                        if (insRes.data && insRes.data.length > 0) {
-                            data = insRes.data;
-                            console.log(`[AUTO_UPSERT_MISSING] Successfully inserted missing record ID ${record.id} into ${targetTable}`);
-                        } else {
-                            console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${record.id} was not found in table ${targetTable}.`);
-                            throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${record.id} was not found in table ${targetTable}.`);
-                        }
-                    }
+                    // TUYỆT ĐỐI KHÔNG tự động DELETE bảng khác (AUTO_MIGRATION) hoặc tự ý INSERT bản ghi thiếu (AUTO_UPSERT_MISSING)
+                    console.error(`[RECORD_NOT_FOUND_FOR_UPDATE] Record with ID ${record.id} was not found in table ${targetTable}.`);
+                    throw new Error(`RECORD_NOT_FOUND_FOR_UPDATE: Record with ID ${record.id} was not found in table ${targetTable}.`);
                 }
             }
         }
@@ -1822,11 +1829,13 @@ export const updateRecordApi = async (record: RecordFile, expectedTargetTable?: 
 export const saveRecord = updateRecordApi;
 
 export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>, expectedTargetTable?: 'dangky_records' | 'land_records' | 'luutru_records'): Promise<RecordFile | null> => {
-    const fullRecord = { id, ...fields };
-    const { targetTable } = validateRecordRouting(fullRecord);
+    const cachedRecords: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+    const existingCached = cachedRecords.find(r => r.id === id) || MOCK_RECORDS.find(r => r.id === id);
+    const fullRecord = { ...(existingCached || {}), id, ...fields };
+    const { targetTable } = validateRecordRouting(fullRecord, expectedTargetTable);
 
     if (expectedTargetTable && targetTable !== expectedTargetTable) {
-        throw new Error(`[SYNC_ROUTING_CONFLICT] Target table in queue (${expectedTargetTable}) conflicts with record routing table (${targetTable}). Record ID: ${id}`);
+        throw new Error(`RECORD_ROUTING_ERROR: [SYNC_ROUTING_CONFLICT] Target table in queue (${expectedTargetTable}) conflicts with record routing table (${targetTable}). Record ID: ${id}`);
     }
 
     console.log(`[MUTATION][START] updateRecordFieldsApi for ID: ${id}`);
@@ -1866,7 +1875,7 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
     }
 
     try {
-        const payload = sanitizeRecordPayloadForTable(fullRecord as any, targetTable);
+        const payload = sanitizeRecordPayloadForTable({ id, ...fields } as any, targetTable);
         if (!payload.updated_at) {
             payload.updated_at = new Date().toISOString();
         }
@@ -1927,49 +1936,14 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
                     console.log(`[MUTATION][IDEMPOTENT] Record ID ${id} fields already matched in ${targetTable}.`);
                     data = existInTarget;
                 } else {
-                    // Kiểm tra nếu tồn tại ở bảng khác -> Báo lỗi ROUTING_DATA_INTEGRITY_ERROR, TUYỆT ĐỐI KHÔNG AUTO-MIGRATE
-                    const otherTables = (['land_records', 'dangky_records', 'luutru_records'] as const).filter(t => t !== targetTable);
-                    let foundOther: string | null = null;
-                    for (const ot of otherTables) {
-                        try {
-                            const { data: otCheck } = await supabase.from(ot).select('id').eq('id', id).maybeSingle();
-                            if (otCheck && otCheck.id) {
-                                foundOther = ot;
-                                break;
-                            }
-                        } catch (e) {}
-                    }
-
-                    if (foundOther) {
-                        console.warn(`[AUTO_MIGRATION] Record ID ${id} found in ${foundOther}, but update requested for ${targetTable}. Performing safe migration...`);
-                        const { data: oldRecData } = await supabase.from(foundOther).select('*').eq('id', id).maybeSingle();
-                        await supabase.from(foundOther).delete().eq('id', id);
-                        const mergedRecord = { ...(oldRecData || {}), ...fields, id };
-                        const sanitized = sanitizeRecordPayloadForTable(mergedRecord, targetTable);
-                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
-                        if (insRes.data && insRes.data.length > 0) {
-                            data = insRes.data;
-                            console.log(`[AUTO_MIGRATION] Successfully migrated record ID ${id} from ${foundOther} to ${targetTable}`);
-                        } else {
-                            throw new Error(`ROUTING_DATA_INTEGRITY_ERROR: Record with ID ${id} exists in ${foundOther}. Auto-migration to ${targetTable} failed.`);
-                        }
-                    } else {
-                        console.warn(`[AUTO_UPSERT_MISSING] Record ID ${id} not found in any table. Performing upsert into ${targetTable}...`);
-                        const sanitized = sanitizeRecordPayloadForTable({ id, ...fields }, targetTable);
-                        const insRes = await supabase.from(targetTable).upsert(sanitized).select();
-                        if (insRes.data && insRes.data.length > 0) {
-                            data = insRes.data;
-                            console.log(`[AUTO_UPSERT_MISSING] Successfully inserted missing record ID ${id} into ${targetTable}`);
-                        } else {
-                            console.error(`[RECORD_NOT_FOUND_IN_TARGET_TABLE] Record with ID ${id} was not found in table ${targetTable}.`);
-                            throw new Error(`RECORD_NOT_FOUND_IN_TARGET_TABLE: Record with ID ${id} was not found in table ${targetTable}.`);
-                        }
-                    }
+                    // TUYỆT ĐỐI KHÔNG tự động DELETE bảng khác (AUTO_MIGRATION) hoặc tự ý INSERT bản ghi thiếu (AUTO_UPSERT_MISSING)
+                    console.error(`[RECORD_NOT_FOUND_FOR_UPDATE] Record with ID ${id} was not found in table ${targetTable}.`);
+                    throw new Error(`RECORD_NOT_FOUND_FOR_UPDATE: Record with ID ${id} was not found in table ${targetTable}.`);
                 }
             }
         }
 
-        const result = mapRecordFromDb({ id, ...fields, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
+        const result = mapRecordFromDb({ ...fullRecord, ...(data[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
             console.log(`[MUTATION][VERIFY] SUCCESS - Verified fields update in DB (ID: ${result.id}, Table: ${targetTable})`);
             await removePendingRecord(result.id, result.code, true);
@@ -1999,12 +1973,22 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
     }
 };
 
-export const deleteRecordApi = async (id: string, record?: Partial<RecordFile>): Promise<boolean> => {
+export const deleteRecordApi = async (
+    id: string,
+    record?: Partial<RecordFile>,
+    options?: DeleteGuardOptions
+): Promise<boolean> => {
     let targetTable: 'dangky_records' | 'land_records' | 'luutru_records' | null = null;
     
     const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
-    const found = cached.find(r => r.id === id);
-    const mergedRecord = { ...found, ...record, id };
+    const found = cached.find(r => r.id === id) || MOCK_RECORDS.find(r => r.id === id);
+    const mergedRecord: Partial<RecordFile> = { ...found, ...record, id };
+
+    // Bảo vệ chống xóa nhầm hồ sơ "Đã giao 1 cửa" (Req #17)
+    assertCanDeleteRecord(mergedRecord, {
+        ...options,
+        caller: options?.caller || 'deleteRecordApi'
+    });
 
     try {
         targetTable = getTargetTable(mergedRecord);
@@ -2012,21 +1996,28 @@ export const deleteRecordApi = async (id: string, record?: Partial<RecordFile>):
         // Table not resolvable from mergedRecord properties alone, will check Supabase
     }
 
-    if (!targetTable && isOnline()) {
+    if (isOnline()) {
         try {
             const [landRes, dangkyRes, luutruRes] = await Promise.all([
-                supabase.from('land_records').select('id').eq('id', id).maybeSingle(),
-                supabase.from('dangky_records').select('id').eq('id', id).maybeSingle(),
-                supabase.from('luutru_records').select('id').eq('id', id).maybeSingle()
+                supabase.from('land_records').select('id, code, recordType, status').eq('id', id).maybeSingle(),
+                supabase.from('dangky_records').select('id, code, recordType, status').eq('id', id).maybeSingle(),
+                supabase.from('luutru_records').select('id, code, recordType, status').eq('id', id).maybeSingle()
             ]);
-            if (landRes.data) {
-                targetTable = 'land_records';
-            } else if (dangkyRes.data) {
-                targetTable = 'dangky_records';
-            } else if (luutruRes.data) {
-                targetTable = 'luutru_records';
+            const dbRecord = landRes.data || dangkyRes.data || luutruRes.data;
+            const resolvedDbTable = landRes.data ? 'land_records' : (dangkyRes.data ? 'dangky_records' : (luutruRes.data ? 'luutru_records' : null));
+            if (dbRecord) {
+                assertCanDeleteRecord(
+                    { ...mergedRecord, ...dbRecord, sourceTable: resolvedDbTable || mergedRecord.sourceTable },
+                    { ...options, caller: options?.caller || 'deleteRecordApi' }
+                );
             }
-        } catch (dbErr) {
+            if (!targetTable && resolvedDbTable) {
+                targetTable = resolvedDbTable;
+            }
+        } catch (dbErr: any) {
+            if (String(dbErr?.message || '').includes('PROTECTED_HANDOVER_RECORD_DELETE')) {
+                throw dbErr;
+            }
             console.warn(`[deleteRecordApi] Database lookup for record table failed:`, dbErr);
         }
     }
@@ -2040,19 +2031,8 @@ export const deleteRecordApi = async (id: string, record?: Partial<RecordFile>):
     }
 
     if (!targetTable) {
-        if (isOnline()) {
-            console.warn(`[deleteRecordApi] Record ID ${id} target table unresolved. Purging across all tables and cleaning cache.`);
-            await Promise.allSettled([
-                supabase.from('land_records').delete().eq('id', id),
-                supabase.from('dangky_records').delete().eq('id', id),
-                supabase.from('luutru_records').delete().eq('id', id)
-            ]);
-            syncCacheOnDelete(id);
-            return true;
-        } else {
-            syncCacheOnDelete(id);
-            return true;
-        }
+        console.error(`[deleteRecordApi][RECORD_ROUTING_ERROR] Record ID ${id} target table unresolved. Refusing blind cross-table delete.`);
+        throw new Error(`RECORD_ROUTING_ERROR: Cannot determine target table to delete record ID ${id}`);
     }
 
     if (!isOnline()) {
@@ -2086,7 +2066,8 @@ export const deleteRecordApi = async (id: string, record?: Partial<RecordFile>):
 export const deleteRecordsBatchApi = async (
     ids: string[], 
     recordsOrProgress?: Partial<RecordFile>[] | ((processed: number, total: number) => void),
-    onProgressParam?: (processed: number, total: number) => void
+    onProgressParam?: (processed: number, total: number) => void,
+    options?: DeleteGuardOptions
 ): Promise<boolean> => {
     if (!ids || ids.length === 0) return true;
 
@@ -2104,17 +2085,43 @@ export const deleteRecordsBatchApi = async (
     cached.forEach(r => {
         if (r && r.id) cachedMap.set(r.id, r);
     });
+    MOCK_RECORDS.forEach(r => {
+        if (r && r.id && !cachedMap.has(r.id)) cachedMap.set(r.id, r);
+    });
     recordHints.forEach(r => {
         if (r && r.id) cachedMap.set(r.id, { ...(cachedMap.get(r.id) || {}), ...r });
     });
 
+    // Kiểm tra bảo vệ chống xóa nhầm hồ sơ "Đã giao 1 cửa" từ cache/hints trước
+    for (const id of ids) {
+        const candidate = cachedMap.get(id);
+        if (candidate) {
+            assertCanDeleteRecord(candidate, {
+                ...options,
+                caller: options?.caller || 'deleteRecordsBatchApi'
+            });
+        }
+    }
+
     if (isOnline()) {
         try {
             const [landRes, dangkyRes, luutruRes] = await Promise.all([
-                supabase.from('land_records').select('id').in('id', ids),
-                supabase.from('dangky_records').select('id').in('id', ids),
-                supabase.from('luutru_records').select('id').in('id', ids)
+                supabase.from('land_records').select('id, code, recordType, status').in('id', ids),
+                supabase.from('dangky_records').select('id, code, recordType, status').in('id', ids),
+                supabase.from('luutru_records').select('id, code, recordType, status').in('id', ids)
             ]);
+
+            for (const row of [...(landRes.data || []), ...(dangkyRes.data || []), ...(luutruRes.data || [])]) {
+                const table = (landRes.data || []).some(r => r.id === row.id)
+                    ? 'land_records'
+                    : (dangkyRes.data || []).some(r => r.id === row.id)
+                    ? 'dangky_records'
+                    : 'luutru_records';
+                assertCanDeleteRecord(
+                    { ...(cachedMap.get(row.id) || {}), ...row, sourceTable: table },
+                    { ...options, caller: options?.caller || 'deleteRecordsBatchApi' }
+                );
+            }
 
             const landSet = new Set((landRes.data || []).map(r => r.id));
             const dangkySet = new Set((dangkyRes.data || []).map(r => r.id));
@@ -2153,7 +2160,10 @@ export const deleteRecordsBatchApi = async (
                     duplicateIds.push(id);
                 }
             }
-        } catch (dbError) {
+        } catch (dbError: any) {
+            if (String(dbError?.message || '').includes('PROTECTED_HANDOVER_RECORD_DELETE')) {
+                throw dbError;
+            }
             console.error("[MUTATION][DELETE_BATCH] DB resolve failed, using cache fallback", dbError);
             for (const id of ids) {
                 const found = cachedMap.get(id);
@@ -2198,17 +2208,8 @@ export const deleteRecordsBatchApi = async (
     }
 
     if (unresolvedIds.length > 0) {
-        if (isOnline()) {
-            console.warn(`[MUTATION][DELETE_BATCH] Purging unresolved IDs across tables:`, unresolvedIds);
-            await Promise.allSettled([
-                supabase.from('land_records').delete().in('id', unresolvedIds),
-                supabase.from('dangky_records').delete().in('id', unresolvedIds),
-                supabase.from('luutru_records').delete().in('id', unresolvedIds)
-            ]);
-            await syncCacheOnBatchDelete(unresolvedIds);
-        } else {
-            await syncCacheOnBatchDelete(unresolvedIds);
-        }
+        console.error(`[MUTATION][DELETE_BATCH][RECORD_ROUTING_ERROR] Unresolved IDs in batch delete:`, unresolvedIds);
+        throw new Error(`RECORD_ROUTING_ERROR: Cannot determine target table for batch delete IDs: ${unresolvedIds.join(', ')}`);
     }
 
     if (!isOnline()) {
@@ -2858,7 +2859,10 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
 
         const fullMergedUpdates: RecordFile[] = updates.map(u => {
             const existing = u.id ? idToExistingMap.get(u.id) : undefined;
-            return { ...(existing || {}), ...u } as RecordFile;
+            if (!existing) {
+                throw new Error(`RECORD_NOT_FOUND_FOR_UPDATE: Record with ID ${u.id || 'N/A'} was not found in cache or database for batch update.`);
+            }
+            return { ...existing, ...u } as RecordFile;
         });
 
         const landRows: any[] = [];
@@ -2866,14 +2870,8 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         const luutruRows: any[] = [];
 
         fullMergedUpdates.forEach(u => {
-            let table: 'land_records' | 'dangky_records' | 'luutru_records' = 'land_records';
-            try {
-                table = getTargetTable(u);
-            } catch (e) {
-                if (u.sourceTable && ['land_records', 'dangky_records', 'luutru_records'].includes(u.sourceTable)) {
-                    table = u.sourceTable as any;
-                }
-            }
+            const table = getTargetTable(u);
+            u.sourceTable = table;
             const sanitizedRow = sanitizeRecordPayloadForTable(u, table);
 
             if (table === 'luutru_records') {
@@ -2980,17 +2978,6 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
             }
         });
 
-        // Dọn dẹp bản ghi trùng ở bảng khác
-        if (landRows.length > 0) {
-            purgeBatchFromOtherTables(landRows.map(r => r.id), landRows.map(r => r.code), 'land_records');
-        }
-        if (dangkyRows.length > 0) {
-            purgeBatchFromOtherTables(dangkyRows.map(r => r.id), dangkyRows.map(r => r.code), 'dangky_records');
-        }
-        if (luutruRows.length > 0) {
-            purgeBatchFromOtherTables(luutruRows.map(r => r.id), luutruRows.map(r => r.code), 'luutru_records');
-        }
-        
         await syncCacheOnBatchUpdate(fullMergedUpdates);
         console.log(`[MUTATION] React State: UPDATED`);
         if (onProgress) onProgress(updates.length, updates.length);
@@ -2999,16 +2986,17 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         console.error(`[MUTATION] Supabase UPDATE: ERROR`, error);
         console.warn(`[MUTATION] React State: NOT COMMITTED`);
         logError("updateRecordsBatchById", error);
+        const errMsg = String(error?.message || '');
+        if (errMsg.includes('RECORD_ROUTING_ERROR') || errMsg.includes('RECORD_NOT_FOUND_FOR_UPDATE')) {
+            throw error;
+        }
         for (const u of updates) {
-            let table: any = (u as any).sourceTable;
-            if (!table) {
-                try {
-                    table = getTargetTable(u as RecordFile);
-                } catch {
-                    table = 'land_records';
-                }
+            try {
+                const table = getTargetTable(u as RecordFile);
+                await addPendingRecord({ ...u, _isOfflineSaved: true } as RecordFile, 'UPDATE', table);
+            } catch (routeErr) {
+                console.error(`[updateRecordsBatchById] Skipping offline queue for unroutable record:`, u?.id, routeErr);
             }
-            await addPendingRecord({ ...u, _isOfflineSaved: true } as RecordFile, 'UPDATE', table);
         }
         return { success: false, count: 0, error };
     }
@@ -3076,23 +3064,17 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
                         const currentDbUpdatedAt = checkData[0].updated_at;
                         if (isConcurrencyConflict(currentDbUpdatedAt, previousUpdatedAt)) {
                             console.warn(`[MUTATION][CONCURRENCY_SYNC] Auto-resolving bulk update recovery for Record ID ${r.id} in ${targetTable}. DB: ${currentDbUpdatedAt}, Prev: ${previousUpdatedAt}`);
-                            const forceRes = await supabase.from(targetTable).update(payload).eq('id', r.id).select();
-                            if (forceRes.data && forceRes.data.length > 0) {
-                                data = forceRes.data;
-                            }
+                        }
+                        const forceRes = await supabase.from(targetTable).update(payload).eq('id', r.id).select();
+                        if (forceRes.data && forceRes.data.length > 0) {
+                            data = forceRes.data;
                         }
                     }
-                    console.warn(`[bulkUpdateDangKyRecordsApi] Attempting upsert recovery on ${targetTable} for ID: ${r.id}`);
-                    const upRes = await supabase.from(targetTable).upsert(payload).select();
-                    if (upRes.data && upRes.data.length > 0) {
-                        data = upRes.data;
-                    } else {
-                        console.error(`[MUTATION][UPDATE_NOT_FOUND] UPDATE returned 0 modified rows on ${targetTable} for ID: ${r.id}`);
-                        throw new Error(`[UPDATE_NOT_FOUND] Record with ID ${r.id} was not found in table ${targetTable}.`);
+                    if (!data || data.length === 0) {
+                        console.error(`[MUTATION][RECORD_NOT_FOUND_FOR_UPDATE] UPDATE returned 0 modified rows on ${targetTable} for ID: ${r.id}`);
+                        throw new Error(`RECORD_NOT_FOUND_FOR_UPDATE: Record with ID ${r.id} was not found in table ${targetTable}.`);
                     }
                 }
-            } else {
-                purgeRecordFromOtherTables(r.id, r.code, targetTable);
             }
         }
         syncCacheOnBatchUpdate(records);

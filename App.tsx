@@ -1781,7 +1781,10 @@ function App() {
 
   const handleHandOverRecords = useCallback(async (recordIds: string[]) => {
       if (recordIds.length === 0) return;
-      const updates = recordIds.map(id => ({ id, isHandedOver: true }));
+      const updates = recordIds.map(id => {
+          const existing = rawRecords.find(r => r.id === id);
+          return existing ? { ...existing, isHandedOver: true } : { id, isHandedOver: true };
+      });
       try {
           const res = await updateRecordsBatchById(updates);
           if (res.success) {
@@ -1791,7 +1794,7 @@ function App() {
       } catch (err: any) {
           console.error("Auto handover error:", err);
       }
-  }, [setRecords]);
+  }, [rawRecords, setRecords]);
 
   const handleOpenRejectReturnModal = useCallback((targets: RecordFile[]) => {
       setRejectReturnTargetRecords(targets);

@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, RecordStatus } from '../types';
 import { connectionManager } from './connectionService';
 import { isBlankRecord, keepOnlyDate, keepOnlyDateTime, sanitizePayloadForDateErrors } from './apiCore';
-import { getTargetTable } from './apiRecords';
+import { getTargetTable, getInferredTable, assertCanDeleteRecord, DeleteGuardOptions } from './apiRecords';
 import { calculateRegistrationDeadline, addCalendarDays } from '../utils/registrationWorkflows';
 
 /**
@@ -338,8 +338,8 @@ export const fetchDangkyRecords = async (): Promise<RecordFile[]> => {
     const mapped = (data || []).map(mapDangkyRecordFromDb);
 
     // Kiểm tra log nếu có hồ sơ bị phân nhầm bảng (giữ nguyên READ ONLY, không tự động di chuyển)
-    const misplacedForLuutru = mapped.filter(r => getTargetTable(r) === 'luutru_records');
-    const misplacedForLand = mapped.filter(r => getTargetTable(r) === 'land_records');
+    const misplacedForLuutru = mapped.filter(r => getInferredTable({ ...r, sourceTable: undefined }) === 'luutru_records');
+    const misplacedForLand = mapped.filter(r => getInferredTable({ ...r, sourceTable: undefined }) === 'land_records');
     const blankRecords = mapped.filter(r => isBlankRecord(r));
 
     if (misplacedForLuutru.length > 0 || misplacedForLand.length > 0) {
@@ -555,7 +555,12 @@ export const updateDangkyRecordFields = async (
 /**
  * Xóa một hồ sơ Đăng ký
  */
-export const deleteDangkyRecord = async (id: string): Promise<void> => {
+export const deleteDangkyRecord = async (id: string, options?: DeleteGuardOptions): Promise<void> => {
+  const existing = await getDangkyRecordById(id);
+  if (existing) {
+    assertCanDeleteRecord(existing, { ...options, caller: options?.caller || 'deleteDangkyRecord' });
+  }
+
   const { error } = await supabase
     .from(TABLE_NAME)
     .delete()
@@ -571,8 +576,19 @@ export const deleteDangkyRecord = async (id: string): Promise<void> => {
 /**
  * Xóa hàng loạt hồ sơ Đăng ký
  */
-export const deleteBulkDangkyRecords = async (ids: string[]): Promise<void> => {
+export const deleteBulkDangkyRecords = async (ids: string[], options?: DeleteGuardOptions): Promise<void> => {
   if (!ids || ids.length === 0) return;
+
+  const { data: existingRows } = await supabase
+    .from(TABLE_NAME)
+    .select('*')
+    .in('id', ids);
+
+  if (existingRows && existingRows.length > 0) {
+    for (const row of existingRows) {
+      assertCanDeleteRecord(mapDangkyRecordFromDb(row), { ...options, caller: options?.caller || 'deleteBulkDangkyRecords' });
+    }
+  }
 
   const { error } = await supabase
     .from(TABLE_NAME)

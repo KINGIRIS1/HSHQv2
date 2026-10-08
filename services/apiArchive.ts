@@ -1,6 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, CACHE_KEYS, isTransientError } from './apiCore';
-import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated } from './apiRecords';
+import { updateArchiveCounterIfHigher, markRecordsRecentlyUpdated, assertCanDeleteRecord, DeleteGuardOptions } from './apiRecords';
 import { addPendingRecord, getPendingRecords } from './syncQueueService';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
@@ -264,47 +264,72 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
     else if (rawSt === 'withdrawn') st = 'withdrawn';
     else if (rawSt === 'rejected') st = 'rejected';
 
+    const rawDataObj = typeof row.data === 'object' && row.data !== null ? row.data : {};
+    const resolvedCustomer =
+        row.customerName ||
+        row.noi_nhan_gui ||
+        rawDataObj.customerName ||
+        rawDataObj.noi_nhan_gui ||
+        rawDataObj.ten_chu_su_dung ||
+        rawDataObj.chu_su_dung ||
+        rawDataObj.nguoi_gui ||
+        rawDataObj.ho_ten ||
+        rawDataObj.ten_khach_hang ||
+        row.receiverName ||
+        rawDataObj.receiverName ||
+        '';
+    const resolvedCode = row.code || row.so_hieu || rawDataObj.code || rawDataObj.so_hieu || rawDataObj.ma_ho_so || '';
+
     const extraData = {
-        ...(typeof row.data === 'object' && row.data !== null ? row.data : {}),
-        code: row.code,
-        so_hieu: row.code,
-        customerName: row.customerName,
-        noi_nhan_gui: row.customerName,
-        content: row.content,
-        trich_yeu: row.content,
-        xa_phuong: row.ward,
-        ward: row.ward,
-        to_ban_do: row.mapSheet,
-        mapSheet: row.mapSheet,
-        thua_dat: row.landPlot,
-        landPlot: row.landPlot,
-        hen_tra: row.deadline,
-        deadline: row.deadline,
-        assigned_to: row.assignedTo,
-        assignedTo: row.assignedTo,
-        assigned_date: row.assignedDate,
-        assignedDate: row.assignedDate,
-        ngay_hoan_thanh: row.completedWorkDate || row.exportDate || row.data?.ngay_hoan_thanh,
-        completedWorkDate: row.completedWorkDate,
-        area: row.area,
-        address: row.address,
-        phoneNumber: row.phoneNumber,
-        cccd: row.cccd,
-        customerAddress: row.customerAddress,
-        notes: row.notes,
-        privateNotes: row.privateNotes,
-        personalNotes: row.personalNotes,
-        recordType: row.recordType,
+        ...rawDataObj,
+        code: resolvedCode,
+        so_hieu: resolvedCode,
+        customerName: resolvedCustomer,
+        noi_nhan_gui: resolvedCustomer,
+        content: row.content || row.trich_yeu || rawDataObj.content || rawDataObj.trich_yeu,
+        trich_yeu: row.content || row.trich_yeu || rawDataObj.trich_yeu || rawDataObj.content,
+        xa_phuong: row.ward || rawDataObj.xa_phuong || rawDataObj.ward,
+        ward: row.ward || rawDataObj.ward || rawDataObj.xa_phuong,
+        to_ban_do: row.mapSheet || rawDataObj.to_ban_do || rawDataObj.mapSheet,
+        mapSheet: row.mapSheet || rawDataObj.mapSheet || rawDataObj.to_ban_do,
+        thua_dat: row.landPlot || rawDataObj.thua_dat || rawDataObj.landPlot,
+        landPlot: row.landPlot || rawDataObj.landPlot || rawDataObj.thua_dat,
+        hen_tra: row.deadline || rawDataObj.hen_tra || rawDataObj.deadline,
+        deadline: row.deadline || rawDataObj.deadline || rawDataObj.hen_tra,
+        assigned_to: row.assignedTo || rawDataObj.assigned_to || rawDataObj.assignedTo,
+        assignedTo: row.assignedTo || rawDataObj.assignedTo || rawDataObj.assigned_to,
+        assigned_date: row.assignedDate || rawDataObj.assigned_date || rawDataObj.assignedDate,
+        assignedDate: row.assignedDate || rawDataObj.assignedDate || rawDataObj.assigned_date,
+        ngay_hoan_thanh: row.completedWorkDate || row.exportDate || rawDataObj.ngay_hoan_thanh,
+        completedWorkDate: row.completedWorkDate || rawDataObj.completedWorkDate,
+        checkedBy: row.checkedBy || rawDataObj.checkedBy,
+        pendingCheckDate: row.pendingCheckDate || rawDataObj.pendingCheckDate,
+        checkedDate: row.checkedDate || rawDataObj.checkedDate,
+        submissionDate: row.submissionDate || rawDataObj.submissionDate,
+        submittedTo: row.submittedTo || rawDataObj.submittedTo,
+        approvalDate: row.approvalDate || rawDataObj.approvalDate,
+        completedDate: row.completedDate || rawDataObj.completedDate,
+        handoverWard: row.handoverWard || rawDataObj.handoverWard,
+        group: row.group || rawDataObj.group,
+        area: row.area ?? rawDataObj.area,
+        address: row.address || rawDataObj.address,
+        phoneNumber: row.phoneNumber || rawDataObj.phoneNumber,
+        cccd: row.cccd || rawDataObj.cccd,
+        customerAddress: row.customerAddress || rawDataObj.customerAddress,
+        notes: row.notes || rawDataObj.notes,
+        privateNotes: row.privateNotes || rawDataObj.privateNotes,
+        personalNotes: row.personalNotes || rawDataObj.personalNotes,
+        recordType: row.recordType || rawDataObj.recordType,
         exportBatch: batchVal ? String(batchVal) : row.exportBatch,
-        exportDate: row.exportDate || row.data?.ngay_hoan_thanh,
-        resultReturnedDate: row.resultReturnedDate,
-        receiverName: row.receiverName,
-        receiptNumber: row.receiptNumber,
+        exportDate: row.exportDate || rawDataObj.exportDate || rawDataObj.ngay_hoan_thanh,
+        resultReturnedDate: row.resultReturnedDate || rawDataObj.resultReturnedDate,
+        receiverName: row.receiverName || rawDataObj.receiverName,
+        receiptNumber: row.receiptNumber || rawDataObj.receiptNumber,
         isHandedOver: row.isHandedOver || st === 'completed',
-        so_vao_so: row.entryNumber || row.data?.so_vao_so || '',
-        so_phat_hanh: row.issueNumber || row.data?.so_phat_hanh || '',
-        entryNumber: row.entryNumber || row.data?.so_vao_so || '',
-        issueNumber: row.issueNumber || row.data?.so_phat_hanh || ''
+        so_vao_so: row.entryNumber || rawDataObj.so_vao_so || '',
+        so_phat_hanh: row.issueNumber || rawDataObj.so_phat_hanh || '',
+        entryNumber: row.entryNumber || rawDataObj.so_vao_so || '',
+        issueNumber: row.issueNumber || rawDataObj.so_phat_hanh || ''
     };
 
     return {
@@ -313,10 +338,10 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
         created_by: row.created_by || row.receivedBy,
         type,
         status: st,
-        so_hieu: row.code || row.so_hieu || '',
-        trich_yeu: row.content || row.trich_yeu || '',
-        ngay_thang: row.receivedDate || row.ngay_thang || (row.created_at ? row.created_at.split('T')[0] : ''),
-        noi_nhan_gui: row.customerName || row.noi_nhan_gui || '',
+        so_hieu: resolvedCode,
+        trich_yeu: row.content || row.trich_yeu || rawDataObj.trich_yeu || rawDataObj.content || '',
+        ngay_thang: row.receivedDate || row.ngay_thang || rawDataObj.receivedDate || (row.created_at ? row.created_at.split('T')[0] : ''),
+        noi_nhan_gui: resolvedCustomer,
         exportBatch: batchVal ? String(batchVal) : null,
         data: extraData
     };
@@ -399,7 +424,7 @@ export const mapDangkyRecordToArchiveRecord = (r: any): ArchiveRecord => {
 
 export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
     const d = r.data || {};
-    let recType = d.recordType;
+    let recType = d.recordType || (r as any).recordType;
     if (!recType) {
         if (r.type === 'congvan') recType = '1.2 Công văn';
         else if (r.type === 'vaoso') recType = 'Vào sổ GCN';
@@ -422,49 +447,60 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
 
     const exportBatchVal = r.exportBatch || d.exportBatch || d.danh_sach || null;
 
-    const effectiveCode = r.so_hieu || d.code || (r as any).code || '';
+    const effectiveCode = r.so_hieu || d.code || d.so_hieu || (r as any).code || '';
+    const effectiveCustomer =
+        r.noi_nhan_gui ||
+        (r as any).customerName ||
+        d.customerName ||
+        d.noi_nhan_gui ||
+        d.ten_chu_su_dung ||
+        d.chu_su_dung ||
+        d.nguoi_gui ||
+        d.ho_ten ||
+        d.ten_khach_hang ||
+        '';
     const payload = {
         id: r.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9)),
         code: effectiveCode,
         so_hieu: effectiveCode,
-        customerName: r.noi_nhan_gui || d.customerName || '',
-        content: r.trich_yeu || d.content || '',
-        receivedDate: r.ngay_thang || d.receivedDate || null,
-        receivedBy: r.created_by || d.receivedBy || null,
-        ward: d.xa_phuong || d.ward || null,
-        mapSheet: d.to_ban_do || d.mapSheet || null,
-        landPlot: d.thua_dat || d.landPlot || null,
-        area: d.area || null,
-        address: d.address || null,
-        group: d.group || null,
-        deadline: d.hen_tra || d.deadline || null,
+        customerName: effectiveCustomer,
+        content: r.trich_yeu || (r as any).content || d.content || d.trich_yeu || '',
+        receivedDate: r.ngay_thang || (r as any).receivedDate || d.receivedDate || null,
+        receivedBy: r.created_by || (r as any).receivedBy || d.receivedBy || null,
+        ward: (r as any).ward || d.xa_phuong || d.ward || null,
+        mapSheet: (r as any).mapSheet || d.to_ban_do || d.mapSheet || null,
+        landPlot: (r as any).landPlot || d.thua_dat || d.landPlot || null,
+        area: (r as any).area ?? d.area ?? null,
+        address: (r as any).address || d.address || null,
+        group: (r as any).group || d.group || null,
+        deadline: (r as any).deadline || d.hen_tra || d.deadline || null,
         recordType: recType,
         status: status,
-        assignedTo: d.assigned_to || d.assignedTo || null,
-        assignedDate: d.assigned_date || d.assignedDate || null,
-        completedWorkDate: d.ngay_hoan_thanh || d.completedWorkDate || null,
-        checkedBy: d.checkedBy || null,
-        pendingCheckDate: d.pendingCheckDate || null,
-        checkedDate: d.checkedDate || null,
-        submissionDate: d.submissionDate || null,
-        submittedTo: d.submittedTo || null,
-        approvalDate: d.approvalDate || null,
-        completedDate: d.completedDate || null,
-        notes: d.notes || null,
-        privateNotes: d.privateNotes || null,
-        personalNotes: d.personalNotes || null,
-        phoneNumber: d.phoneNumber || null,
-        cccd: d.cccd || null,
-        customerAddress: d.customerAddress || null,
+        assignedTo: (r as any).assignedTo || d.assigned_to || d.assignedTo || null,
+        assignedDate: (r as any).assignedDate || d.assigned_date || d.assignedDate || null,
+        completedWorkDate: (r as any).completedWorkDate || d.ngay_hoan_thanh || d.completedWorkDate || null,
+        checkedBy: (r as any).checkedBy || d.checkedBy || null,
+        pendingCheckDate: (r as any).pendingCheckDate || d.pendingCheckDate || null,
+        checkedDate: (r as any).checkedDate || d.checkedDate || null,
+        submissionDate: (r as any).submissionDate || d.submissionDate || null,
+        submittedTo: (r as any).submittedTo || d.submittedTo || null,
+        approvalDate: (r as any).approvalDate || d.approvalDate || null,
+        completedDate: (r as any).completedDate || d.completedDate || null,
+        notes: (r as any).notes || d.notes || null,
+        privateNotes: (r as any).privateNotes || d.privateNotes || null,
+        personalNotes: (r as any).personalNotes || d.personalNotes || null,
+        phoneNumber: (r as any).phoneNumber || d.phoneNumber || null,
+        cccd: (r as any).cccd || d.cccd || null,
+        customerAddress: (r as any).customerAddress || d.customerAddress || null,
         exportBatch: exportBatchVal ? String(exportBatchVal) : null,
-        exportDate: d.exportDate || d.ngay_hoan_thanh || null,
-        handoverWard: d.handoverWard || null,
-        resultReturnedDate: d.resultReturnedDate || null,
-        receiverName: d.receiverName || null,
-        receiptNumber: d.receiptNumber || null,
-        isHandedOver: d.isHandedOver || status === RecordStatus.HANDOVER,
-        entryNumber: (r as any).entryNumber || d.so_vao_so || (r as any).entryNumber || null,
-        issueNumber: (r as any).issueNumber || d.so_phat_hanh || (r as any).issueNumber || null
+        exportDate: (r as any).exportDate || d.exportDate || d.ngay_hoan_thanh || null,
+        handoverWard: (r as any).handoverWard || d.handoverWard || null,
+        resultReturnedDate: (r as any).resultReturnedDate || d.resultReturnedDate || null,
+        receiverName: (r as any).receiverName || d.receiverName || null,
+        receiptNumber: (r as any).receiptNumber || d.receiptNumber || null,
+        isHandedOver: (r as any).isHandedOver || d.isHandedOver || status === RecordStatus.HANDOVER,
+        entryNumber: (r as any).entryNumber || d.so_vao_so || d.entryNumber || null,
+        issueNumber: (r as any).issueNumber || d.so_phat_hanh || d.issueNumber || null
     };
 
     return sanitizeData(payload, ARCHIVE_DB_COLUMNS);
@@ -585,17 +621,33 @@ export const isValidArchiveCustomerName = (name?: string | null): boolean => {
            clean !== 'na';
 };
 
+export const isValidArchiveRecord = (r: any): boolean => {
+    if (!r) return false;
+    const name = r.customerName || r.noi_nhan_gui || r.data?.customerName || r.data?.noi_nhan_gui || r.data?.ten_chu_su_dung || r.data?.chu_su_dung;
+    if (isValidArchiveCustomerName(name)) return true;
+    const rawId = String(r.id || '').trim();
+    const rawCode = String(r.so_hieu || r.code || r.data?.so_hieu || r.data?.code || r.data?.ma_ho_so || '').trim();
+    const hasValidCode = Boolean(
+        rawCode &&
+        rawCode !== rawId &&
+        rawCode.toLowerCase() !== 'null' &&
+        rawCode.toLowerCase() !== 'undefined' &&
+        rawCode !== '-'
+    );
+    return hasValidCode;
+};
+
 // Giữ alias tương thích
 export const migrateCungCapTaiLieu = migrateArchiveRecordsFromLandRecords;
 
 export const getCachedArchiveRecords = async (): Promise<RecordFile[]> => {
     if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
-        return memoryArchiveRecordsCache.filter(r => isValidArchiveCustomerName(r.customerName));
+        return memoryArchiveRecordsCache.filter(r => isValidArchiveRecord(r));
     }
     try {
         const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
         if (Array.isArray(idb) && idb.length > 0) {
-            const filtered = idb.filter(r => isValidArchiveCustomerName(r.customerName));
+            const filtered = idb.filter(r => isValidArchiveRecord(r));
             memoryArchiveRecordsCache = filtered;
             return filtered;
         }
@@ -723,7 +775,7 @@ export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[
                     }
                 });
 
-                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveCustomerName(r.customerName));
+                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveRecord(r));
                 memoryArchiveRecordsCache = result;
                 setIndexedDBItem(CACHE_KEY_LUUTRU_RECORDS, result).catch(() => {});
                 return result;
@@ -731,12 +783,12 @@ export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[
 
             // Nếu kết nối lỗi hoặc không tải được dữ liệu, an toàn fallback về bộ nhớ đệm / IndexedDB (KHÔNG ghi đè rỗng)
             if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
-                return memoryArchiveRecordsCache.filter(r => isValidArchiveCustomerName(r.customerName));
+                return memoryArchiveRecordsCache.filter(r => isValidArchiveRecord(r));
             }
 
             const idbFallback = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
             if (Array.isArray(idbFallback) && idbFallback.length > 0) {
-                const filtered = idbFallback.filter(r => isValidArchiveCustomerName(r.customerName));
+                const filtered = idbFallback.filter(r => isValidArchiveRecord(r));
                 memoryArchiveRecordsCache = filtered;
                 return filtered;
             }
@@ -745,12 +797,12 @@ export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[
         } catch (error: any) {
             logError('fetchAllArchiveRecordsAsRecordFiles', error, true);
             if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
-                return memoryArchiveRecordsCache.filter(r => isValidArchiveCustomerName(r.customerName));
+                return memoryArchiveRecordsCache.filter(r => isValidArchiveRecord(r));
             }
             try {
                 const idbFallback = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
                 if (Array.isArray(idbFallback) && idbFallback.length > 0) {
-                    const filtered = idbFallback.filter(r => isValidArchiveCustomerName(r.customerName));
+                    const filtered = idbFallback.filter(r => isValidArchiveRecord(r));
                     memoryArchiveRecordsCache = filtered;
                     return filtered;
                 }
@@ -775,10 +827,10 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
     const promise = (async () => {
         if (!isConfigured) {
             const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
-            if (cached.length > 0) return cached.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+            if (cached.length > 0) return cached.filter(r => r.type === type && isValidArchiveRecord(r));
             const legacyCached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
             if (MOCK_ARCHIVE.length === 0 && legacyCached.length > 0) MOCK_ARCHIVE = legacyCached;
-            return MOCK_ARCHIVE.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+            return MOCK_ARCHIVE.filter(r => r.type === type && isValidArchiveRecord(r));
         }
         try {
             // Khi lấy dữ liệu Vào sổ GCN: chỉ truy vấn duy nhất từ bảng dangky_records, tuyệt đối không lấy từ luutru_records
@@ -821,7 +873,7 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                         uniqueMap.set(key, r);
                     }
                 });
-                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveRecord(r));
                 saveToCache(cacheKey, result);
                 memoryArchiveTypeCaches.set(type, result);
                 return result;
@@ -860,7 +912,7 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                         uniqueMap.set(key, r);
                     }
                 });
-                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+                const result = Array.from(uniqueMap.values()).filter(r => isValidArchiveRecord(r));
 
                 // Lưu vào cache riêng độc lập theo từng loại hồ sơ (không đè lẫn nhau)
                 saveToCache(cacheKey, result);
@@ -871,14 +923,14 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             // Fallback an toàn về cache riêng cũ (không ghi đè rỗng)
             const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
             if (cached.length > 0) {
-                const filtered = cached.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+                const filtered = cached.filter(r => r.type === type && isValidArchiveRecord(r));
                 memoryArchiveTypeCaches.set(type, filtered);
                 return filtered;
             }
             const legacyCached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-            if (legacyCached.length > 0) return legacyCached.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+            if (legacyCached.length > 0) return legacyCached.filter(r => r.type === type && isValidArchiveRecord(r));
             if (MOCK_ARCHIVE.length === 0 && legacyCached.length > 0) MOCK_ARCHIVE = legacyCached;
-            return MOCK_ARCHIVE.filter(r => r.type === type && isValidArchiveCustomerName(r.noi_nhan_gui || r.data?.customerName || r.data?.ten_chu_su_dung || r.data?.chu_su_dung));
+            return MOCK_ARCHIVE.filter(r => r.type === type && isValidArchiveRecord(r));
         } catch (error: any) {
             logError(`fetchArchiveRecords-${type}`, error, true);
             const cached = getFromCache<ArchiveRecord[]>(cacheKey, []);
@@ -1189,7 +1241,19 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
     }
 };
 
-export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
+export const deleteArchiveRecord = async (id: string, options?: DeleteGuardOptions): Promise<boolean> => {
+    const guardOpts: DeleteGuardOptions = { ...options, caller: options?.caller || 'deleteArchiveRecord' };
+    const cachedArchive = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+    const cachedRecords = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+    const localMatch = MOCK_ARCHIVE.find(r => r.id === id)
+        || memoryArchiveRecordsCache?.find(r => r.id === id)
+        || cachedArchive.find(r => r.id === id)
+        || cachedRecords.find(r => r.id === id);
+
+    if (localMatch) {
+        assertCanDeleteRecord(localMatch, guardOpts);
+    }
+
     if (!isConfigured) {
         const idx = MOCK_ARCHIVE.findIndex(r => r.id === id);
         if (idx !== -1) MOCK_ARCHIVE.splice(idx, 1);
@@ -1197,13 +1261,27 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
         return true;
     }
     try {
+        const [dkCheck, ltCheck] = await Promise.all([
+            supabase.from('dangky_records').select('*').eq('id', id).maybeSingle(),
+            supabase.from('luutru_records').select('*').eq('id', id).maybeSingle()
+        ]);
+        if (dkCheck.data) {
+            assertCanDeleteRecord({ ...dkCheck.data, sourceTable: 'dangky_records' }, guardOpts);
+        }
+        if (ltCheck.data) {
+            assertCanDeleteRecord({ ...ltCheck.data, sourceTable: 'luutru_records' }, guardOpts);
+        }
+
         await Promise.allSettled([
             supabase.from('dangky_records').delete().eq('id', id),
             supabase.from('luutru_records').delete().eq('id', id)
         ]);
         clearArchiveMemoryCaches();
         return true;
-    } catch (error) {
+    } catch (error: any) {
+        if (String(error?.message || '').includes('PROTECTED_HANDOVER_RECORD_DELETE')) {
+            throw error;
+        }
         logError("deleteArchiveRecord", error, true);
         const idx = MOCK_ARCHIVE.findIndex(r => r.id === id);
         if (idx !== -1) MOCK_ARCHIVE.splice(idx, 1);
@@ -1324,93 +1402,111 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
     if (ids.length === 0) return true;
 
     if (!isConfigured) {
+        let updatedCount = 0;
         MOCK_ARCHIVE = MOCK_ARCHIVE.map(r => {
             if (ids.includes(r.id)) {
+                updatedCount++;
                 const newData = updates.data ? { ...r.data, ...updates.data } : r.data;
                 return { ...r, ...updates, data: newData } as ArchiveRecord;
             }
             return r;
         });
+        if (updatedCount === 0) {
+            const cachedRecords = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+            const hasInMainCache = cachedRecords.some(r => ids.includes(r.id));
+            if (!hasInMainCache) {
+                throw new Error(`RECORD_NOT_FOUND_FOR_UPDATE: Archive records with IDs [${ids.join(', ')}] do not exist.`);
+            }
+        }
         saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
         return true;
     }
     try {
-        let { data: currentRecords, error: fetchError } = await supabase
-            .from('luutru_records')
-            .select('*')
-            .in('id', ids);
+        const [{ data: currentLuutruRecords, error: fetchError }, { data: currentDangkyRecords, error: dkFetchError }] = await Promise.all([
+            supabase.from('luutru_records').select('*').in('id', ids),
+            supabase.from('dangky_records').select('*').in('id', ids)
+        ]);
             
         if (fetchError) throw fetchError;
+        if (dkFetchError && dkFetchError.code !== '42P01' && dkFetchError.code !== 'PGRST205') {
+            console.warn('[updateArchiveRecordsBatch] Warning querying dangky_records:', dkFetchError);
+        }
 
-        // Phục hồi từ bộ nhớ cache lưu trữ hoặc pending queue nếu thiếu
-        const missingIds = ids.filter(id => !currentRecords?.some(r => r.id === id));
-        if (missingIds.length > 0) {
-            console.log(`[updateArchiveRecordsBatch] Resolving ${missingIds.length} missing IDs from local caches/queue:`, missingIds);
-            const localCachedArchive = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-            const localCachedRecords = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
-            let pending: any[] = [];
-            try {
-                pending = await getPendingRecords();
-            } catch {}
+        const currentRecords = currentLuutruRecords || [];
+        const dangkyRecords = currentDangkyRecords || [];
 
-            for (const missingId of missingIds) {
-                const foundCached = localCachedArchive.find(r => r.id === missingId)
-                        || memoryArchiveRecordsCache?.find(r => r.id === missingId)
-                        || MOCK_ARCHIVE.find(r => r.id === missingId)
-                        || localCachedRecords.find(r => r.id === missingId)
-                        || pending.find(r => r.id === missingId);
+        // Cập nhật các bản ghi thuộc bảng dangky_records (ví dụ từ VaoSoView) ngay tại bảng dangky_records,
+        // TUYỆT ĐỐI KHÔNG tự động tạo bản ghi trống (ghost record) sang luutru_records!
+        if (dangkyRecords.length > 0) {
+            const nowIso = new Date().toISOString();
+            for (const dkRow of dangkyRecords) {
+                const mergedData = {
+                    ...(dkRow.data || {}),
+                    ...(updates.data || {})
+                };
+                const rawStatus = updates.status ? String(updates.status) : '';
+                let nextDkStatus = dkRow.status;
+                if (rawStatus === 'completed' || rawStatus === 'HANDOVER') {
+                    nextDkStatus = RecordStatus.HANDOVER;
+                } else if (rawStatus === 'pending_sign' || rawStatus === 'PENDING_SIGN') {
+                    nextDkStatus = RecordStatus.PENDING_SIGN;
+                } else if (rawStatus === 'signed' || rawStatus === 'SIGNED') {
+                    nextDkStatus = RecordStatus.SIGNED;
+                } else if (rawStatus) {
+                    nextDkStatus = rawStatus;
+                }
 
-                    let baseArch: Partial<ArchiveRecord>;
-                    if (foundCached) {
-                        baseArch = (foundCached as any).data !== undefined ? (foundCached as ArchiveRecord) : mapLuutruDbToArchiveRecord(foundCached);
-                    } else {
-                        baseArch = {
-                            id: missingId,
-                            type: 'saoluc',
-                            status: (updates.status as any) || 'draft',
-                            so_hieu: (updates as any).so_hieu || '',
-                            trich_yeu: (updates as any).trich_yeu || '',
-                            ngay_thang: (updates as any).ngay_thang || new Date().toISOString().split('T')[0],
-                            noi_nhan_gui: (updates as any).noi_nhan_gui || ''
-                        };
-                    }
+                const dkUpdatePayload: any = {
+                    status: nextDkStatus,
+                    data: mergedData,
+                    updatedAt: nowIso
+                };
+                const batchVal = (updates as any).exportBatch || updates.data?.exportBatch || updates.data?.danh_sach;
+                const dateVal = (updates as any).exportDate || updates.data?.exportDate || updates.data?.ngay_hoan_thanh;
+                if (batchVal !== undefined) dkUpdatePayload.exportBatch = batchVal;
+                if (dateVal !== undefined) dkUpdatePayload.exportDate = dateVal;
+                if (updates.data?.so_vao_so !== undefined) dkUpdatePayload.entryNumber = updates.data.so_vao_so;
+                if (updates.data?.so_phat_hanh !== undefined) dkUpdatePayload.issueNumber = updates.data.so_phat_hanh;
+                if (updates.data?.ngay_ky_gcn !== undefined) {
+                    dkUpdatePayload.approvalDate = updates.data.ngay_ky_gcn;
+                    dkUpdatePayload.issueDate = updates.data.ngay_ky_gcn;
+                }
 
-                    const mergedArch: ArchiveRecord = {
-                        ...baseArch,
-                        ...updates,
-                        data: {
-                            ...(baseArch.data || {}),
-                            ...(updates.data || {})
-                        }
-                    } as ArchiveRecord;
-
-                    const payloadToUpsert = mapArchiveRecordToLuutruDb(mergedArch);
-                    let { data: upData, error: upErr } = await supabase.from('luutru_records').upsert(payloadToUpsert).select();
-                    if (upErr && (upErr.code === '42703' || String(upErr.message || '').includes('column') || upErr.code === 'PGRST204')) {
-                        const fallback = { ...payloadToUpsert };
-                        OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallback[col]);
-                        const res = await supabase.from('luutru_records').upsert(fallback).select();
-                        upData = res.data;
-                    }
-                    if (upData && upData.length > 0) {
-                        currentRecords = [...(currentRecords || []), upData[0]];
-                    }
+                let { error: dkUpdErr } = await supabase.from('dangky_records').update(dkUpdatePayload).eq('id', dkRow.id);
+                if (dkUpdErr && (dkUpdErr.code === '42703' || dkUpdErr.code === 'PGRST204' || String(dkUpdErr.message || '').includes('column'))) {
+                    const cleanDkPayload = {
+                        status: nextDkStatus,
+                        entryNumber: dkUpdatePayload.entryNumber ?? dkRow.entryNumber,
+                        issueNumber: dkUpdatePayload.issueNumber ?? dkRow.issueNumber,
+                        approvalDate: dkUpdatePayload.approvalDate ?? dkRow.approvalDate,
+                        issueDate: dkUpdatePayload.issueDate ?? dkRow.issueDate,
+                        updatedAt: nowIso
+                    };
+                    await supabase.from('dangky_records').update(cleanDkPayload).eq('id', dkRow.id);
                 }
             }
+            clearArchiveMemoryCaches('vaoso');
+        }
 
-        if (!currentRecords || currentRecords.length === 0) {
-            console.warn(`[MUTATION][UPDATE_NOT_FOUND] Records with IDs ${ids.join(', ')} not found in any table or cache. Enqueueing to offline pending queue.`);
-            for (const missingId of ids) {
-                const fallbackRec: ArchiveRecord = {
-                    id: missingId,
-                    type: 'saoluc',
-                    status: (updates.status as any) || 'draft',
-                    ...updates,
-                    data: updates.data || {}
-                } as ArchiveRecord;
-                const recFile = mapArchiveDbToRecordFile(mapArchiveRecordToLuutruDb(fallbackRec));
-                await addPendingRecord(recFile, 'UPDATE', 'luutru_records');
+        const foundIds = new Set<string>([
+            ...currentRecords.map(r => r.id),
+            ...dangkyRecords.map(r => r.id)
+        ]);
+        const missingIds = ids.filter(id => !foundIds.has(id));
+
+        if (missingIds.length > 0) {
+            // Kiểm tra xem các ID này có nằm ở land_records không. Nếu thuộc land_records thì KHÔNG ĐƯỢC chạm vào luutru_records.
+            const { data: landCheck } = await supabase.from('land_records').select('id').in('id', missingIds);
+            const landIds = new Set((landCheck || []).map((r: any) => r.id));
+            const trulyMissingIds = missingIds.filter(id => !landIds.has(id));
+
+            if (trulyMissingIds.length > 0 && currentRecords.length === 0 && dangkyRecords.length === 0 && landIds.size === 0) {
+                console.error(`[MUTATION][RECORD_NOT_FOUND_FOR_UPDATE] Archive records [${trulyMissingIds.join(', ')}] not found in database.`);
+                throw new Error(`RECORD_NOT_FOUND_FOR_UPDATE: Archive records with IDs [${trulyMissingIds.join(', ')}] do not exist in database.`);
             }
+        }
+
+        if (currentRecords.length === 0) {
             return true;
         }
 
@@ -1419,6 +1515,9 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
             const mergedArch: ArchiveRecord = {
                 ...currentArch,
                 ...updates,
+                so_hieu: updates.so_hieu || currentArch.so_hieu || r.code || '',
+                noi_nhan_gui: updates.noi_nhan_gui || currentArch.noi_nhan_gui || r.customerName || '',
+                trich_yeu: updates.trich_yeu || currentArch.trich_yeu || r.content || '',
                 data: {
                     ...(currentArch.data || {}),
                     ...(updates.data || {})
@@ -1466,26 +1565,12 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
                 if (checkData && checkData.length > 0) {
                     const currentDbUpdatedAt = checkData[0].updated_at;
                     if (currentDbUpdatedAt !== previousUpdatedAt) {
-                        console.error(`[MUTATION][CONCURRENCY_CONFLICT] Archive Record ID ${payload.id} in batch was updated by another session. DB: ${currentDbUpdatedAt}, Expected: ${previousUpdatedAt}`);
-                        throw new Error(`CONCURRENCY_CONFLICT: Archive Record with ID ${payload.id} was modified by another user or session. Please refresh.`);
+                        const forceRes = await supabase.from('luutru_records').update(payload).eq('id', payload.id).select();
+                        data = forceRes.data;
                     }
                 }
-                // Upsert fallback if 0 rows modified
-                console.warn(`[MUTATION][RECOVERY] UPDATE returned 0 modified rows on luutru_records for ID: ${payload.id}. Attempting upsert recovery...`);
-                let upsertRes = await supabase.from('luutru_records').upsert(payload).select();
-                if (upsertRes.error && (upsertRes.error.code === '42703' || String(upsertRes.error.message || '').includes('column') || upsertRes.error.code === 'PGRST204')) {
-                    const fbPayload = { ...payload };
-                    OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fbPayload[col]);
-                    upsertRes = await supabase.from('luutru_records').upsert(fbPayload).select();
-                }
-                if (upsertRes.error) {
-                    console.error(`[MUTATION][UPDATE_NOT_FOUND] Upsert recovery failed for ID: ${payload.id}:`, upsertRes.error);
-                    throw upsertRes.error;
-                }
-                if (!upsertRes.data || upsertRes.data.length === 0) {
-                    console.warn(`[MUTATION][UPDATE_NOT_FOUND] Enqueueing to offline queue for ID: ${payload.id}`);
-                    const recFile = mapArchiveDbToRecordFile(payload);
-                    await addPendingRecord(recFile, 'UPDATE', 'luutru_records');
+                if (!data || data.length === 0) {
+                    throw new Error(`RECORD_NOT_FOUND_FOR_UPDATE: Record ${payload.id} not found in luutru_records during batch update.`);
                 }
             }
         }
@@ -1702,19 +1787,28 @@ export const createArchiveBatch = async (
         }
 
         if (recordIds.length > 0 && isConfigured) {
-            // Update luutru_records ONLY
+            // Chỉ cập nhật các bản ghi thực sự tồn tại trong bảng luutru_records (hoặc dangky_records nếu gọi từ Vào sổ).
+            // TUYỆT ĐỐI KHÔNG tự ý upsert các ID của land_records / dangky_records sang luutru_records!
             try {
-                await updateArchiveRecordsBatch(recordIds, {
-                    status: 'completed',
-                    exportBatch: finalBatchName,
-                    data: {
+                const { data: existingLuutru } = await supabase
+                    .from('luutru_records')
+                    .select('id')
+                    .in('id', recordIds);
+                const luutruOnlyIds = (existingLuutru || []).map((r: any) => r.id);
+
+                if (luutruOnlyIds.length > 0) {
+                    await updateArchiveRecordsBatch(luutruOnlyIds, {
+                        status: 'completed',
                         exportBatch: finalBatchName,
-                        exportDate: handoverDate,
-                        ngay_hoan_thanh: handoverDate,
-                        danh_sach: finalBatchName,
-                        updated_at: nowIso
-                    }
-                });
+                        data: {
+                            exportBatch: finalBatchName,
+                            exportDate: handoverDate,
+                            ngay_hoan_thanh: handoverDate,
+                            danh_sach: finalBatchName,
+                            updated_at: nowIso
+                        }
+                    });
+                }
             } catch (err) {
                 console.warn('⚠️ updateArchiveRecordsBatch inside createArchiveBatch safely caught:', err);
             }
